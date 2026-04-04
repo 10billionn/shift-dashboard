@@ -11,6 +11,15 @@
     assignmentRule:
       "CSVで集めた出勤希望を優先し、希望エリアと時間帯をなるべく反映しながら必要人数に合わせて割り当てます。"
   },
+  requirements: [
+    { dateKey: "2026-04-06", earlyNeeded: 7, lateNeeded: 7 },
+    { dateKey: "2026-04-07", earlyNeeded: 5, lateNeeded: 5 },
+    { dateKey: "2026-04-08", earlyNeeded: 5, lateNeeded: 5 },
+    { dateKey: "2026-04-09", earlyNeeded: 6, lateNeeded: 6 },
+    { dateKey: "2026-04-10", earlyNeeded: 5, lateNeeded: 5 },
+    { dateKey: "2026-04-11", earlyNeeded: 6, lateNeeded: 6 },
+    { dateKey: "2026-04-12", earlyNeeded: 6, lateNeeded: 6 }
+  ],
   shiftRequests: [
     { name: "れいか", dateKey: "2026-04-06", startTime: "10:00", endTime: "18:00", preferredArea: "葛西", himeReservation: "あり", note: "葛西希望" },
     { name: "ななみ", dateKey: "2026-04-06", startTime: "12:00", endTime: "21:00", preferredArea: "浦安", himeReservation: "なし", note: "21:00以降可" },

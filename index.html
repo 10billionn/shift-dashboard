@@ -57,32 +57,21 @@
             <div id="summaryCards" class="summary-grid"></div>
           </section>
 
-          <section class="content-panel">
-            <div class="sub-head">
-              <h2>判断エリア</h2>
-            </div>
-            <div id="judgmentArea" class="judgment-stack"></div>
-            <details class="accordion" id="alertAccordion">
-              <summary>詳細を展開</summary>
-              <div id="warningBox" class="warning-list"></div>
-            </details>
-          </section>
-
-          <section class="content-panel">
-            <div class="sub-head">
-              <h2>行動エリア</h2>
-            </div>
-            <div class="action-row">
-              <button id="generateButton" class="primary-button action-button" type="button">シフト生成</button>
-            </div>
-          </section>
-
           <section class="content-panel weekly-panel">
             <div class="sub-head weekly-head">
-              <h2>週間の埋まり状況</h2>
+              <h2>分析</h2>
               <div id="periodSummary" class="period-summary"></div>
             </div>
-            <div id="fillChart" class="fill-chart"></div>
+            <div class="analysis-tabs" id="analysisTabs">
+              <button class="analysis-tab active" type="button" data-analysis-tab="fill">週間の埋まり状況</button>
+              <button class="analysis-tab" type="button" data-analysis-tab="sales">売上予測</button>
+            </div>
+            <div id="fillChart" class="fill-chart analysis-panel active" data-analysis-panel="fill"></div>
+            <div id="salesForecastPanel" class="analysis-panel" data-analysis-panel="sales"></div>
+            <details class="accordion" id="alertAccordion">
+              <summary>不足詳細を展開</summary>
+              <div id="warningBox" class="warning-list"></div>
+            </details>
           </section>
         </section>
 

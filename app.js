@@ -8,7 +8,8 @@
     errors: []
   },
   selectedDate: "",
-  latestDailyPlans: []
+  latestDailyPlans: [],
+  activeAnalysisTab: "fill"
 };
 
 const elements = {
@@ -19,16 +20,16 @@ const elements = {
   therapistImportSummary: document.querySelector("#therapistImportSummary"),
   requirementList: document.querySelector("#requirementList"),
   periodSummary: document.querySelector("#periodSummary"),
+  analysisTabs: document.querySelector("#analysisTabs"),
   fillChart: document.querySelector("#fillChart"),
+  salesForecastPanel: document.querySelector("#salesForecastPanel"),
   summary: document.querySelector("#summaryCards"),
-  judgmentArea: document.querySelector("#judgmentArea"),
   warningBox: document.querySelector("#warningBox"),
   todayShiftList: document.querySelector("#todayShiftList"),
   selectedDateLabel: document.querySelector("#selectedDateLabel"),
   prevDayButton: document.querySelector("#prevDayButton"),
   todayButton: document.querySelector("#todayButton"),
   nextDayButton: document.querySelector("#nextDayButton"),
-  generateButton: document.querySelector("#generateButton"),
   generationActionButton: document.querySelector("#generationActionButton"),
   generationSourceStatus: document.querySelector("#generationSourceStatus"),
   loadSampleButton: document.querySelector("#loadSampleButton"),
@@ -51,7 +52,6 @@ initializePrototype();
 function initializePrototype() {
   loadSampleData();
 
-  elements.generateButton.addEventListener("click", handleGenerate);
   elements.generationActionButton.addEventListener("click", handleGenerate);
   elements.loadSampleButton.addEventListener("click", loadSampleData);
   elements.startDate.addEventListener("change", handleStartDateChange);
@@ -63,6 +63,9 @@ function initializePrototype() {
   elements.prevDayButton.addEventListener("click", () => moveSelectedDate(-1));
   elements.todayButton.addEventListener("click", () => jumpToToday());
   elements.nextDayButton.addEventListener("click", () => moveSelectedDate(1));
+  elements.analysisTabs.querySelectorAll(".analysis-tab").forEach((button) => {
+    button.addEventListener("click", () => setAnalysisTab(button.dataset.analysisTab));
+  });
 
   elements.sidebarNav.querySelectorAll(".nav-item").forEach((button) => {
     button.addEventListener("click", () => setActiveView(button.dataset.view));
@@ -109,11 +112,12 @@ function syncRequirementRows() {
   const startDate = elements.startDate.value || samplePrototypeData.settings.startDate;
   const days = Number(elements.days.value) || 7;
   const existing = collectRequirementMap();
+  const sampleMap = new Map((samplePrototypeData.requirements || []).map((item) => [item.dateKey, item]));
   const dateList = createDateList(startDate, days);
 
   elements.requirementList.innerHTML = dateList
     .map((dateKey) => {
-      const current = existing.get(dateKey) || defaultRequirement(dateKey);
+      const current = existing.get(dateKey) || sampleMap.get(dateKey) || defaultRequirement(dateKey);
       return `
         <div class="requirement-row">
           <div class="requirement-date">
@@ -204,10 +208,11 @@ function handleGenerate() {
   renderTodayShift(currentDayPlan);
   renderPeriodSummary(result.summary.dateRangeText);
   renderFillChart(result.dailyPlans);
+  renderSalesForecast(currentDayPlan, aggregate);
   renderSummary(currentDayPlan, aggregate);
-  renderJudgmentArea(currentDayPlan, aggregate, result.warnings);
   renderAlertDetails(result.warnings);
   updateDayNavigation(result.dailyPlans);
+  renderAnalysisTab();
 }
 
 function collectModel() {
@@ -329,10 +334,11 @@ function renderValidationState(errors) {
   elements.todayShiftList.innerHTML = `<div class="empty-state">CSVを読み込むと当日のシフトがここに表示されます。</div>`;
   elements.periodSummary.innerHTML = `<div class="period-card">対象期間を設定してください。</div>`;
   elements.fillChart.innerHTML = `<div class="empty-state">週間の埋まり状況は生成後に表示されます。</div>`;
+  elements.salesForecastPanel.innerHTML = `<div class="empty-state">売上予測は生成後に表示されます。</div>`;
   elements.summary.innerHTML = "";
-  elements.judgmentArea.innerHTML = `<div class="alert-summary danger">${errors.join(" / ")}</div>`;
   renderAlertDetails(errors);
   updateDayNavigation([]);
+  renderAnalysisTab();
 }
 
 function renderTodayShift(dayPlan) {
@@ -369,7 +375,7 @@ function renderTodayShift(dayPlan) {
               <div class="shift-col shift-name" data-area="${assignment.area}">${assignment.name}</div>
               <div class="shift-col shift-area">${assignment.area}</div>
               <div class="shift-col shift-type">
-                <span class="shift-badge ${assignment.shiftLabel === "早番" ? "early" : "late"}">${assignment.shiftLabel}</span>
+                <span class="shift-badge ${assignment.shiftLabel === "早番" ? "early" : "late"}">${assignment.shiftLabel === "早番" ? "早" : "遅"} ${compactTimeRange(assignment.startTime, assignment.endTime)}</span>
               </div>
               <div class="shift-col shift-state">
                 ${assignment.himeReservation === "あり" ? `<span class="hime-badge">姫</span>` : `<span class="state-text">-</span>`}
@@ -476,11 +482,12 @@ function renderSummary(dayPlan, aggregate) {
   const assigned = dayPlan.earlyAssignments.length + dayPlan.lateAssignments.length;
   const shortage = Math.max(required - assigned, 0);
   const fillRate = required ? Math.round((assigned / required) * 100) : 0;
+  const sales = estimateDailySales(dayPlan);
+  const storeDrop = estimateStoreDrop(dayPlan);
   const cards = [
-    { label: "必要枠", value: `${required}枠`, tone: "default" },
-    { label: "割当数", value: `${assigned}件`, tone: "good" },
+    { label: "売上予測", value: formatCompactCurrency(sales), tone: "good" },
+    { label: "店落ち予測", value: formatCompactCurrency(storeDrop), tone: "default" },
     { label: "不足数", value: `${shortage}枠`, tone: shortage ? "danger" : "good" },
-    { label: "週不足", value: `${aggregate.shortageSlots}枠`, tone: aggregate.shortageSlots ? "default" : "good" },
     { label: "当日充足率", value: `${fillRate}%`, tone: fillRate >= 100 ? "good" : "default" }
   ];
 
@@ -494,30 +501,6 @@ function renderSummary(dayPlan, aggregate) {
       `
     )
     .join("");
-}
-
-function renderJudgmentArea(dayPlan, aggregate, warnings) {
-  if (!dayPlan) {
-    elements.judgmentArea.innerHTML = "";
-    return;
-  }
-
-  const required = dayPlan.requirement.earlyNeeded + dayPlan.requirement.lateNeeded;
-  const assigned = dayPlan.earlyAssignments.length + dayPlan.lateAssignments.length;
-  const shortage = Math.max(required - assigned, 0);
-  const maxShort = aggregate.mostShortDay;
-  const lines = [
-    shortage ? `当日不足あり: ${shortage}枠` : "当日不足なし",
-    `出勤希望: ${dayPlan.availableCount}人 / 未割当: ${dayPlan.offMembers.length}人`,
-    maxShort ? `週最大不足日: ${maxShort.dateKey}（${maxShort.shortage}枠）` : "週最大不足日: なし",
-    warnings.length ? "詳細は展開で確認" : "大きなアラートはありません"
-  ];
-
-  elements.judgmentArea.innerHTML = `
-    <div class="alert-summary ${shortage || warnings.length ? "danger" : "ok"}">
-      ${lines.map((line) => `<div>${line}</div>`).join("")}
-    </div>
-  `;
 }
 
 function renderAlertDetails(warnings) {
@@ -563,6 +546,39 @@ function buildDashboardAggregate(dailyPlans) {
   aggregate.fillRate = aggregate.requiredSlots ? Math.round((aggregate.assignedSlots / aggregate.requiredSlots) * 100) : 0;
   aggregate.mostShortDay = rankedDays.sort((left, right) => right.shortage - left.shortage || left.dateKey.localeCompare(right.dateKey))[0] || null;
   return aggregate;
+}
+
+function renderSalesForecast(dayPlan, aggregate) {
+  if (!dayPlan) {
+    elements.salesForecastPanel.innerHTML = `<div class="empty-state">売上予測を表示できません。</div>`;
+    return;
+  }
+
+  const dailySales = estimateDailySales(dayPlan);
+  const dailyStoreDrop = estimateStoreDrop(dayPlan);
+  const weeklySales = state.latestDailyPlans.reduce((sum, current) => sum + estimateDailySales(current), 0);
+  const weeklyStoreDrop = state.latestDailyPlans.reduce((sum, current) => sum + estimateStoreDrop(current), 0);
+
+  elements.salesForecastPanel.innerHTML = `
+    <div class="sales-grid">
+      <div class="sales-card">
+        <p>当日売上予測</p>
+        <strong>${formatCompactCurrency(dailySales)}</strong>
+      </div>
+      <div class="sales-card">
+        <p>当日店落ち予測</p>
+        <strong>${formatCompactCurrency(dailyStoreDrop)}</strong>
+      </div>
+      <div class="sales-card">
+        <p>週売上予測</p>
+        <strong>${formatCompactCurrency(weeklySales)}</strong>
+      </div>
+      <div class="sales-card">
+        <p>週不足数</p>
+        <strong>${aggregate.shortageSlots}枠</strong>
+      </div>
+    </div>
+  `;
 }
 
 function updateDayNavigation(dailyPlans) {
@@ -620,6 +636,20 @@ function setActiveView(viewName) {
   });
 
   closeSidebar();
+}
+
+function setAnalysisTab(tabName) {
+  state.activeAnalysisTab = tabName;
+  renderAnalysisTab();
+}
+
+function renderAnalysisTab() {
+  elements.analysisTabs.querySelectorAll(".analysis-tab").forEach((button) => {
+    button.classList.toggle("active", button.dataset.analysisTab === state.activeAnalysisTab);
+  });
+  document.querySelectorAll("[data-analysis-panel]").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.analysisPanel === state.activeAnalysisTab);
+  });
 }
 
 function toggleSidebar(forceState) {
@@ -825,6 +855,14 @@ function formatTimestamp(date) {
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
+function compactTimeRange(startTime, endTime) {
+  return `${shortTime(startTime)}-${shortTime(endTime)}`;
+}
+
+function shortTime(value) {
+  return String(value || "").replace(":00", "");
+}
+
 function compactShiftNote(note) {
   const text = String(note || "").trim();
   if (!text) {
@@ -855,4 +893,18 @@ function compactShiftNote(note) {
     return "八千代";
   }
   return text.length > 8 ? `${text.slice(0, 8)}…` : text;
+}
+
+function estimateDailySales(dayPlan) {
+  const assignments = [...dayPlan.earlyAssignments, ...dayPlan.lateAssignments];
+  return assignments.reduce((sum, assignment) => sum + (assignment.himeReservation === "あり" ? 30000 : 22000), 0);
+}
+
+function estimateStoreDrop(dayPlan) {
+  const assignments = [...dayPlan.earlyAssignments, ...dayPlan.lateAssignments];
+  return assignments.reduce((sum, assignment) => sum + (assignment.himeReservation === "あり" ? 13000 : 9000), 0);
+}
+
+function formatCompactCurrency(value) {
+  return `${Math.round(value / 1000).toLocaleString("ja-JP")}k`;
 }

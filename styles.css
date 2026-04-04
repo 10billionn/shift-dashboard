@@ -212,6 +212,24 @@ textarea:focus {
   flex-wrap: wrap;
 }
 
+.analysis-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.analysis-tab {
+  background: #eef2f5;
+  color: var(--muted);
+  min-height: 40px;
+}
+
+.analysis-tab.active {
+  background: var(--accent);
+  color: #fff;
+}
+
 .compact-field {
   min-width: 120px;
 }
@@ -360,6 +378,8 @@ textarea:focus {
 .shift-badge {
   background: #e8edf4;
   color: var(--accent);
+  min-height: 22px;
+  font-size: 0.72rem;
 }
 
 .shift-badge.early {
@@ -386,7 +406,7 @@ textarea:focus {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -595,6 +615,38 @@ textarea:focus {
   background: #fafbfc;
 }
 
+.analysis-panel {
+  display: none;
+}
+
+.analysis-panel.active {
+  display: block;
+}
+
+.sales-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.sales-card {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fafbfc;
+}
+
+.sales-card p {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.sales-card strong {
+  font-size: 1.12rem;
+}
+
 .chart-mobile-head {
   display: flex;
   justify-content: space-between;
@@ -663,6 +715,7 @@ textarea:focus {
 
 @media (max-width: 1024px) {
   .summary-grid,
+  .sales-grid,
   .generation-layout,
   .history-grid,
   .import-stat-grid,
@@ -740,6 +793,7 @@ textarea:focus {
   .weekly-head,
   .dashboard-head,
   .day-switcher,
+  .analysis-tabs,
   .therapist-card-head,
   .therapist-card-meta {
     flex-direction: column;
@@ -802,6 +856,7 @@ textarea:focus {
   }
 
   .summary-grid,
+  .sales-grid,
   .generation-layout,
   .history-grid,
   .csv-format-grid,
@@ -817,6 +872,10 @@ textarea:focus {
 
   .summary-card strong {
     font-size: 1.1rem;
+  }
+
+  .sales-card strong {
+    font-size: 1rem;
   }
 
   .shift-main {
