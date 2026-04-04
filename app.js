@@ -50,6 +50,7 @@ function initializePrototype() {
   elements.loadSampleButton.addEventListener("click", loadSampleData);
   elements.startDate.addEventListener("change", syncRequirementRows);
   elements.days.addEventListener("change", syncRequirementRows);
+  window.addEventListener("resize", handleGenerate);
   elements.menuToggle.addEventListener("click", () => toggleSidebar());
   elements.sidebarOverlay.addEventListener("click", () => closeSidebar());
   elements.csvFile.addEventListener("change", handleCsvUpload);
@@ -316,6 +317,36 @@ function renderPeriodSummary(dateRangeText) {
 }
 
 function renderFillChart(dailyPlans) {
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile) {
+    elements.fillChart.innerHTML = `
+      <div class="chart-mobile-list">
+        ${dailyPlans
+          .map((day) => {
+            const required = day.requirement.earlyNeeded + day.requirement.lateNeeded;
+            const assigned = day.earlyAssignments.length + day.lateAssignments.length;
+            const fillRate = required ? Math.round((assigned / required) * 100) : 100;
+            const shortage = Math.max(required - assigned, 0);
+            const toneClass = shortage > 0 ? "danger" : "ok";
+            return `
+              <div class="chart-mobile-item ${toneClass}">
+                <div class="chart-mobile-head">
+                  <strong>${day.dateKey}</strong>
+                  <span>${fillRate}%</span>
+                </div>
+                <div class="chart-mobile-bar">
+                  <span class="chart-mobile-bar-fill ${toneClass}" style="width:${Math.min(fillRate, 100)}%"></span>
+                </div>
+                <div class="chart-mobile-meta">${assigned}/${required}枠 ${shortage > 0 ? `・ ${shortage}枠不足` : "・ 充足"}</div>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    `;
+    return;
+  }
+
   const chartWidth = 640;
   const chartHeight = 220;
   const padding = { top: 18, right: 18, bottom: 48, left: 36 };
@@ -444,9 +475,12 @@ function renderResultTable(dailyPlans) {
                 const shiftLabel = day.earlyAssignments.includes(assignment) ? "早番" : "遅番";
                 return `
                   <div class="mobile-result-item">
-                    <strong>${assignment.name}</strong>
+                    <div class="mobile-result-top">
+                      <strong>${assignment.name}</strong>
+                      <span>${shiftLabel}</span>
+                    </div>
                     <div>${assignment.area}</div>
-                    <div>${shiftLabel} / ${assignment.startTime} - ${assignment.endTime}</div>
+                    <div>${assignment.startTime} - ${assignment.endTime}</div>
                     <div>${assignment.himeReservation}</div>
                     <div>${assignment.note || "-"}</div>
                   </div>

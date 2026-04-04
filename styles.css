@@ -706,11 +706,14 @@ th {
 
   .sidebar {
     position: fixed;
-    inset: 0 auto 0 0;
-    width: 260px;
+    inset: 0 16% 0 0;
+    width: auto;
+    max-width: 320px;
     transform: translateX(-100%);
     transition: transform 180ms ease;
     z-index: 50;
+    padding: 18px 12px;
+    box-shadow: 12px 0 28px rgba(17, 24, 39, 0.22);
   }
 
   .sidebar.open {
@@ -740,12 +743,12 @@ th {
   }
 
   .topbar {
-    padding: 14px 12px;
+    padding: 12px 10px;
   }
 
   .content-area {
-    padding: 10px;
-    gap: 12px;
+    padding: 8px;
+    gap: 10px;
   }
 
   .section-head,
@@ -770,27 +773,31 @@ th {
   .setting-card,
   .content-panel,
   .result-panel {
-    padding: 14px;
-    border-radius: 14px;
+    padding: 12px;
+    border-radius: 12px;
   }
 
   .summary-card strong {
-    font-size: 1.55rem;
+    font-size: 1.35rem;
     line-height: 1.15;
   }
 
   .section-head h1 {
-    font-size: 1.2rem;
+    font-size: 1.08rem;
   }
 
   .sub-head h2 {
-    font-size: 0.98rem;
+    font-size: 0.9rem;
   }
 
   .mini-label,
   .summary-card p,
-  .metric-card p {
-    font-size: 0.78rem;
+  .metric-card p,
+  .chart-mobile-meta,
+  .period-card,
+  .alert-summary,
+  .section-note {
+    font-size: 0.8rem;
   }
 
   .action-button,
@@ -847,31 +854,31 @@ th {
 
   .mobile-day-card {
     display: grid;
-    gap: 10px;
-    padding: 14px;
-    border-radius: 14px;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 12px;
     border: 1px solid var(--line);
     background: #fff;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
 
   .mobile-day-head {
     display: flex;
     justify-content: space-between;
-    gap: 12px;
+    gap: 8px;
     align-items: center;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
   }
 
   .mobile-day-meta {
     color: var(--muted);
-    font-size: 0.85rem;
-    line-height: 1.6;
+    font-size: 0.78rem;
+    line-height: 1.5;
   }
 
   .mobile-result-list {
     display: grid;
-    gap: 8px;
+    gap: 6px;
   }
 
   .chart-legend {
@@ -886,15 +893,98 @@ th {
 
   .mobile-result-item {
     display: grid;
-    gap: 4px;
-    padding: 10px 12px;
-    border-radius: 12px;
+    gap: 3px;
+    padding: 10px;
+    border-radius: 10px;
     background: #f8fafc;
     border: 1px solid var(--line);
-    font-size: 0.92rem;
+    font-size: 0.84rem;
   }
 
   .mobile-result-item.empty {
     color: var(--muted);
+  }
+
+  .mobile-result-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .mobile-result-top strong {
+    font-size: 0.9rem;
+  }
+
+  .period-card {
+    padding: 12px;
+  }
+
+  .chart-wrap {
+    gap: 10px;
+  }
+
+  .chart-svg {
+    display: none;
+  }
+
+  .chart-mobile-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .chart-mobile-item {
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: #fafbfc;
+  }
+
+  .chart-mobile-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: center;
+    font-size: 0.84rem;
+  }
+
+  .chart-mobile-bar {
+    height: 10px;
+    border-radius: 999px;
+    background: #e8edf1;
+    overflow: hidden;
+  }
+
+  .chart-mobile-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+  }
+
+  .chart-mobile-bar-fill.ok {
+    background: linear-gradient(90deg, #7ccf98 0%, #2f9e58 100%);
+  }
+
+  .chart-mobile-bar-fill.danger {
+    background: linear-gradient(90deg, #f3a6a6 0%, #d64545 100%);
+  }
+
+  .alert-summary {
+    padding: 10px 12px;
+    gap: 3px;
+  }
+
+  .accordion summary {
+    font-size: 0.82rem;
+  }
+
+  .action-row {
+    width: 100%;
+  }
+
+  .action-button {
+    min-height: 48px;
   }
 }
