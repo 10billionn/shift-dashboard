@@ -420,7 +420,8 @@ textarea:focus {
 
 .name-badges,
 .priority-tags,
-.shift-attr {
+.shift-attr,
+.shift-attr-list {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -599,6 +600,20 @@ textarea:focus {
 .shift-priority {
   display: grid;
   gap: 6px;
+  align-content: center;
+}
+
+.shift-col.shift-name {
+  align-self: center;
+}
+
+.shift-col.shift-attr,
+.shift-col.shift-priority {
+  align-items: start;
+}
+
+.priority-tags {
+  align-items: flex-start;
 }
 
 .shift-area-select {
@@ -614,6 +629,14 @@ textarea:focus {
   display: grid;
   grid-template-columns: 1fr 0.9fr;
   gap: 12px;
+}
+
+.distribution-list-panel,
+.distribution-preview-panel,
+.creation-check-list,
+.check-list-rows {
+  display: grid;
+  gap: 10px;
 }
 
 .distribution-list,
@@ -635,12 +658,53 @@ textarea:focus {
   justify-content: space-between;
   gap: 12px;
   align-items: center;
+  text-align: left;
+}
+
+.distribution-row.active {
+  border-color: rgba(31, 58, 95, 0.34);
+  background: #eef4fb;
 }
 
 .distribution-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.distribution-message {
+  margin: 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f3f6f9;
+  white-space: pre-wrap;
+  line-height: 1.55;
+  font-family: "Yu Gothic UI", "Hiragino Sans", sans-serif;
+  font-size: 0.84rem;
+}
+
+.check-group {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fafbfc;
+  display: grid;
+  gap: 8px;
+}
+
+.check-group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.check-row {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+  font-size: 0.82rem;
 }
 
 .summary-grid {

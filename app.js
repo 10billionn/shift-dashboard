@@ -7,18 +7,28 @@
     lastImportedAt: "",
     errors: []
   },
+  historyMeta: {
+    fileName: "",
+    appliedCount: 0,
+    errorCount: 0,
+    lastImportedAt: "",
+    headers: [],
+    errors: []
+  },
   selectedDate: "",
   latestDailyPlans: [],
   activeAnalysisTab: "fill",
   activeDailyShiftTab: "early",
-  disabledTherapists: new Set()
+  disabledTherapists: new Set(),
+  distributionDate: "",
+  selectedDistributionKey: "",
+  distributionPreviewText: ""
 };
 
 const elements = {
   startDate: document.querySelector("#startDate"),
   days: document.querySelector("#days"),
   assignmentRule: document.querySelector("#assignmentRule"),
-  therapistList: document.querySelector("#therapistList"),
   therapistImportSummary: document.querySelector("#therapistImportSummary"),
   requirementList: document.querySelector("#manualDemandPanel"),
   periodSummary: document.querySelector("#periodSummary"),
@@ -30,25 +40,24 @@ const elements = {
   todayShiftList: document.querySelector("#todayShiftList"),
   todayAdjustmentAlerts: document.querySelector("#todayAdjustmentAlerts"),
   selectedDateLabel: document.querySelector("#selectedDateLabel"),
-  creationSelectedDateLabel: document.querySelector("#creationSelectedDateLabel"),
-  creationShiftBoard: document.querySelector("#creationShiftBoard"),
-  creationAdjustmentAlerts: document.querySelector("#creationAdjustmentAlerts"),
   prevDayButton: document.querySelector("#prevDayButton"),
   todayButton: document.querySelector("#todayButton"),
   nextDayButton: document.querySelector("#nextDayButton"),
-  creationPrevDayButton: document.querySelector("#creationPrevDayButton"),
-  creationTodayButton: document.querySelector("#creationTodayButton"),
-  creationNextDayButton: document.querySelector("#creationNextDayButton"),
   generationActionButton: document.querySelector("#generationActionButton"),
   generationSourceStatus: document.querySelector("#generationSourceStatus"),
-  creationSummary: document.querySelector("#creationSummaryCards"),
   loadSampleButton: document.querySelector("#loadSampleButton"),
   csvFile: document.querySelector("#csvFile"),
+  historyCsvFile: document.querySelector("#historyCsvFile"),
   csvImportStatus: document.querySelector("#csvImportStatus"),
+  historyImportStatus: document.querySelector("#historyImportStatus"),
   csvPreviewMeta: document.querySelector("#csvPreviewMeta"),
   csvErrorList: document.querySelector("#csvErrorList"),
+  creationCheckSummary: document.querySelector("#creationCheckSummary"),
+  creationCheckList: document.querySelector("#creationCheckList"),
+  distributionDateSelect: document.querySelector("#distributionDateSelect"),
   distributionList: document.querySelector("#distributionList"),
   distributionPreview: document.querySelector("#distributionPreview"),
+  distributionCopyButton: document.querySelector("#distributionCopyButton"),
   sidebar: document.querySelector("#sidebar"),
   sidebarOverlay: document.querySelector("#sidebarOverlay"),
   sidebarNav: document.querySelector("#sidebarNav"),
@@ -69,12 +78,13 @@ function initializePrototype() {
   elements.menuToggle.addEventListener("click", () => toggleSidebar());
   elements.sidebarOverlay.addEventListener("click", () => closeSidebar());
   elements.csvFile.addEventListener("change", handleCsvUpload);
+  elements.historyCsvFile.addEventListener("change", handleHistoryCsvUpload);
   elements.prevDayButton.addEventListener("click", () => moveSelectedDate(-1));
   elements.todayButton.addEventListener("click", () => jumpToToday());
   elements.nextDayButton.addEventListener("click", () => moveSelectedDate(1));
-  elements.creationPrevDayButton.addEventListener("click", () => moveSelectedDate(-1));
-  elements.creationTodayButton.addEventListener("click", () => jumpToToday());
-  elements.creationNextDayButton.addEventListener("click", () => moveSelectedDate(1));
+  elements.distributionDateSelect.addEventListener("change", handleDistributionDateChange);
+  elements.distributionCopyButton.addEventListener("click", copyDistributionPreview);
+
   elements.analysisTabs.querySelectorAll(".analysis-tab").forEach((button) => {
     button.addEventListener("click", () => setAnalysisTab(button.dataset.analysisTab));
   });
@@ -100,7 +110,19 @@ function loadSampleData() {
     lastImportedAt: formatTimestamp(new Date()),
     errors: []
   };
+  state.historyMeta = {
+    fileName: "",
+    appliedCount: 0,
+    errorCount: 0,
+    lastImportedAt: "",
+    headers: [],
+    errors: []
+  };
+  state.disabledTherapists = new Set();
   state.selectedDate = samplePrototypeData.settings.startDate;
+  state.distributionDate = samplePrototypeData.settings.startDate;
+  state.selectedDistributionKey = "";
+  state.distributionPreviewText = "";
 
   syncRequirementRows();
   renderImportedDataState();
@@ -177,6 +199,7 @@ function handleCsvUpload(event) {
         lastImportedAt: formatTimestamp(new Date()),
         errors: parsed.errors
       };
+      state.disabledTherapists = new Set();
       ensureSelectedDateInRange();
       renderImportedDataState();
       handleGenerate();
@@ -197,6 +220,30 @@ function handleCsvUpload(event) {
   reader.readAsText(file, "utf-8");
 }
 
+function handleHistoryCsvUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const csvText = String(reader.result || "");
+    const parsed = parseHistoryCsv(csvText);
+    state.historyMeta = {
+      fileName: file.name,
+      appliedCount: parsed.rows.length,
+      errorCount: parsed.errors.length,
+      lastImportedAt: formatTimestamp(new Date()),
+      headers: parsed.headers,
+      errors: parsed.errors
+    };
+    renderImportedDataState();
+  };
+
+  reader.readAsText(file, "utf-8");
+}
+
 function handleGenerate() {
   const model = collectModel();
 
@@ -206,16 +253,14 @@ function handleGenerate() {
   }
 
   const result = generateShiftPlan(model);
-  const aggregate = buildDashboardAggregate(result.dailyPlans);
-  const currentDayPlan = findCurrentDayPlan(result.dailyPlans);
-
   state.latestDailyPlans = result.dailyPlans;
-
   renderDashboardFromState(result.summary.dateRangeText);
 }
 
 function collectModel() {
-  const therapists = aggregateTherapists(state.shiftRequests);
+  const therapists = aggregateTherapists(state.shiftRequests).filter(
+    (therapist) => !state.disabledTherapists.has(therapist.name)
+  );
   const settings = {
     startDate: elements.startDate.value,
     days: Number(elements.days.value),
@@ -248,148 +293,231 @@ function collectModel() {
 }
 
 function renderImportedDataState() {
-  renderTherapistList();
   renderCsvImportState();
+  renderHistoryImportState();
+  renderCreationChecks();
+
   const enabledCount = state.shiftRequests.filter((request) => !state.disabledTherapists.has(request.name)).length;
+  const issueSummary = buildCreationChecks();
   elements.generationSourceStatus.innerHTML = state.shiftRequests.length
-    ? `${enabledCount}件を生成候補として使用中`
-    : "CSV未読込";
-}
-
-function renderTherapistList() {
-  const therapists = aggregateTherapists(state.shiftRequests);
-
-  elements.therapistImportSummary.innerHTML = therapists.length
-    ? `${therapists.length}名 / ${state.shiftRequests.length}件の希望を管理画面に反映中`
-    : "CSVを読み込むとセラピスト別に希望一覧が表示されます。";
-
-  if (!therapists.length) {
-    elements.therapistList.innerHTML = `<div class="empty-state">シフト希望CSVを読み込むと、ここにセラピスト別の希望一覧が表示されます。</div>`;
-    return;
-  }
-
-  elements.therapistList.innerHTML = therapists
-    .map((therapist) => {
-      const profile = getTherapistProfile(therapist.name);
-      const enabled = !state.disabledTherapists.has(therapist.name);
-      return `
-      <article class="therapist-card ${enabled ? "" : "disabled"}">
-        <div class="therapist-card-head">
-          <strong>${therapist.name}</strong>
-          <span>${therapist.entries.length}日分</span>
-        </div>
-        <div class="therapist-card-meta">
-          <span>希望エリア: ${therapist.preferredAreas.join(" / ")}</span>
-          <span>${profile.rank} / ${profile.flags.join(" / ") || "属性なし"}</span>
-        </div>
-        <label class="therapist-toggle">
-          <input class="therapist-enable-toggle" type="checkbox" data-therapist-name="${therapist.name}" ${enabled ? "checked" : ""}>
-          <span>${enabled ? "生成対象" : "除外中"}</span>
-        </label>
-        <div class="request-chip-list">
-          ${therapist.entries
-            .map(
-              (entry) => `
-                <div class="request-chip">
-                  <strong>${entry.dateKey}</strong>
-                  <span>${entry.startTime} - ${entry.endTime}</span>
-                  <span>${entry.preferredArea}</span>
-                  <span>${entry.himeReservation}</span>
-                  <span>${entry.note || "-"}</span>
-                </div>
-              `
-            )
-            .join("")}
-        </div>
-      </article>
-    `;
-    })
-    .join("");
-
-  elements.therapistList.querySelectorAll(".therapist-enable-toggle").forEach((toggle) => {
-    toggle.addEventListener("change", () => {
-      if (toggle.checked) {
-        state.disabledTherapists.delete(toggle.dataset.therapistName);
-      } else {
-        state.disabledTherapists.add(toggle.dataset.therapistName);
-      }
-      renderImportedDataState();
-      handleGenerate();
-    });
-  });
+    ? `${enabledCount}件の希望 / 実績 ${state.historyMeta.appliedCount}件 / 要確認 ${issueSummary.needsConfirmCount}名`
+    : "シフト希望CSV未読込";
 }
 
 function renderCsvImportState() {
   const meta = state.importMeta;
+  const therapistCount = new Set(state.shiftRequests.map((request) => request.name)).size;
 
   elements.csvImportStatus.innerHTML = meta.appliedCount
     ? `
       <div class="import-stat-grid">
         <div class="import-stat-card"><strong>${meta.appliedCount}</strong><span>反映件数</span></div>
         <div class="import-stat-card"><strong>${meta.errorCount}</strong><span>エラー件数</span></div>
+        <div class="import-stat-card"><strong>${therapistCount}</strong><span>対象人数</span></div>
       </div>
       <div class="section-note">最終読込: ${meta.fileName} / ${meta.lastImportedAt}</div>
     `
-    : `<div class="section-note">まだCSVは反映されていません。</div>`;
+    : `<div class="section-note">まだシフト希望CSVは反映されていません。</div>`;
 
   elements.csvPreviewMeta.innerHTML = meta.appliedCount
-    ? `読込後は、セラピスト管理とシフト生成に同じデータが反映されます。現在は ${meta.appliedCount} 件を保持しています。`
-    : "CSVを読み込むと、ここに反映結果が表示されます。";
+    ? `想定列: 名前 / 出勤可能日 / 出勤開始時間 / 出勤終了時間 / 希望エリア / 姫予約有無 / 備考。読込後は抜け漏れチェックと生成候補にそのまま反映されます。`
+    : "シフト希望CSVを読み込むと、反映件数と確認状況がここに表示されます。";
 
   if (!meta.errors.length) {
-    elements.csvErrorList.innerHTML = `<div class="ok-box">形式エラーはありません。</div>`;
+    elements.csvErrorList.innerHTML = `<div class="ok-box">シフト希望CSVの形式エラーはありません。</div>`;
     return;
   }
 
   elements.csvErrorList.innerHTML = `
     <div class="warning-box">
-      <strong>読込エラー</strong>
+      <strong>シフト希望CSVの読込エラー</strong>
       <ul>${meta.errors.map((error) => `<li>${error}</li>`).join("")}</ul>
     </div>
   `;
 }
 
+function renderHistoryImportState() {
+  const meta = state.historyMeta;
+  if (!meta.appliedCount && !meta.fileName) {
+    elements.historyImportStatus.innerHTML = `<div class="section-note">過去実績データはまだ未読込です。</div>`;
+    return;
+  }
+
+  const usedColumns = meta.headers.length
+    ? meta.headers.map((header) => `<span class="attr-tag">${header}</span>`).join("")
+    : `<span class="state-text">ヘッダー未取得</span>`;
+
+  elements.historyImportStatus.innerHTML = `
+    <div class="import-stat-grid">
+      <div class="import-stat-card"><strong>${meta.appliedCount}</strong><span>反映件数</span></div>
+      <div class="import-stat-card"><strong>${meta.errorCount}</strong><span>エラー件数</span></div>
+      <div class="import-stat-card"><strong>${meta.headers.length}</strong><span>読込列数</span></div>
+    </div>
+    <div class="section-note">最終読込: ${meta.fileName || "-"} ${meta.lastImportedAt ? `/ ${meta.lastImportedAt}` : ""}</div>
+    <div class="csv-helper-list">
+      <span>想定用途: 曜日別 / 時間帯別 / エリア別の需要推定に拡張</span>
+      <span>読込列: ${usedColumns}</span>
+    </div>
+    ${
+      meta.errors.length
+        ? `<div class="warning-box compact"><ul>${meta.errors.map((error) => `<li>${error}</li>`).join("")}</ul></div>`
+        : `<div class="ok-box compact">実績データは需要反映の入口として保持されています。</div>`
+    }
+  `;
+}
+function renderCreationChecks() {
+  const summary = buildCreationChecks();
+  elements.therapistImportSummary.innerHTML = summary.requestCount
+    ? `${summary.submittedTherapistCount}名 / ${summary.requestCount}件の希望を保持中`
+    : "シフト希望CSVを読み込むと確認状況が表示されます。";
+
+  elements.creationCheckSummary.innerHTML = [
+    { label: "反映件数", value: `${summary.requestCount}件`, tone: "default" },
+    { label: "エラー件数", value: `${summary.errorCount}件`, tone: summary.errorCount ? "danger" : "good" },
+    { label: "未提出人数", value: `${summary.unsubmittedCount}名`, tone: summary.unsubmittedCount ? "danger" : "good" },
+    { label: "要確認人数", value: `${summary.needsConfirmCount}名`, tone: summary.needsConfirmCount ? "danger" : "good" }
+  ]
+    .map(
+      (card) => `
+        <article class="summary-card ${card.tone === "danger" ? "summary-danger" : ""} ${card.tone === "good" ? "summary-good" : ""}">
+          <p>${card.label}</p>
+          <strong>${card.value}</strong>
+        </article>
+      `
+    )
+    .join("");
+
+  const groups = [
+    { title: "未提出", items: summary.unsubmittedNames, empty: "未提出はありません。", tone: "danger" },
+    { title: "時間未入力", items: summary.missingTime, empty: "時間未入力はありません。", tone: "warning" },
+    { title: "希望エリア未入力", items: summary.missingArea, empty: "希望エリア未入力はありません。", tone: "warning" },
+    { title: "姫予約未設定", items: summary.missingHime, empty: "姫予約未設定はありません。", tone: "warning" },
+    { title: "非対応エリア含む", items: summary.invalidArea, empty: "非対応エリアはありません。", tone: "warning" }
+  ];
+
+  elements.creationCheckList.innerHTML = groups
+    .map((group) => {
+      if (!group.items.length) {
+        return `
+          <article class="check-group">
+            <div class="check-group-head">
+              <strong>${group.title}</strong>
+              <span class="status-badge flag">0件</span>
+            </div>
+            <div class="ok-box compact">${group.empty}</div>
+          </article>
+        `;
+      }
+
+      return `
+        <article class="check-group">
+          <div class="check-group-head">
+            <strong>${group.title}</strong>
+            <span class="status-badge ${group.tone === "danger" ? "hime" : "flag"}">${group.items.length}件</span>
+          </div>
+          <div class="check-list-rows">
+            ${group.items.map((item) => `<div class="check-row">${item}</div>`).join("")}
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function buildCreationChecks() {
+  const requests = state.shiftRequests;
+  const profileNames = Object.keys(samplePrototypeData.therapistProfiles || {});
+  const submittedNames = [...new Set(requests.map((request) => request.name))];
+  const unsubmittedNames = profileNames.filter((name) => !submittedNames.includes(name));
+  const availableAreas = new Set(samplePrototypeData.settings.areas || []);
+
+  const missingTime = requests
+    .filter((request) => !request.startTime || !request.endTime)
+    .map((request) => `${request.name} / ${request.dateKey}`);
+  const missingArea = requests
+    .filter((request) => !request.preferredArea)
+    .map((request) => `${request.name} / ${request.dateKey}`);
+  const missingHime = requests
+    .filter((request) => !request.himeReservation)
+    .map((request) => `${request.name} / ${request.dateKey}`);
+  const invalidArea = requests
+    .filter((request) => request.preferredArea && !availableAreas.has(request.preferredArea))
+    .map((request) => `${request.name} / ${request.dateKey} / ${request.preferredArea}`);
+
+  const needsConfirmNames = new Set([
+    ...unsubmittedNames,
+    ...missingTime.map((item) => item.split(" / ")[0]),
+    ...missingArea.map((item) => item.split(" / ")[0]),
+    ...missingHime.map((item) => item.split(" / ")[0]),
+    ...invalidArea.map((item) => item.split(" / ")[0])
+  ]);
+
+  return {
+    requestCount: requests.length,
+    errorCount: state.importMeta.errorCount + state.historyMeta.errorCount,
+    submittedTherapistCount: submittedNames.length,
+    unsubmittedCount: unsubmittedNames.length,
+    needsConfirmCount: needsConfirmNames.size,
+    unsubmittedNames,
+    missingTime,
+    missingArea,
+    missingHime,
+    invalidArea
+  };
+}
+
 function renderValidationState(errors) {
   elements.selectedDateLabel.innerHTML = "";
-  elements.creationSelectedDateLabel.innerHTML = "";
-  elements.todayShiftList.innerHTML = `<div class="empty-state">CSVを読み込むと当日のシフトがここに表示されます。</div>`;
-  elements.creationShiftBoard.innerHTML = `<div class="empty-state">CSVを読み込むと当日のシフト盤面がここに表示されます。</div>`;
+  elements.todayShiftList.innerHTML = `<div class="empty-state">生成条件が整うと本日のシフトがここに表示されます。</div>`;
   elements.periodSummary.innerHTML = `<div class="period-card">対象期間を設定してください。</div>`;
   elements.fillChart.innerHTML = `<div class="empty-state">週間の埋まり状況は生成後に表示されます。</div>`;
   elements.salesForecastPanel.innerHTML = `<div class="empty-state">売上予測は生成後に表示されます。</div>`;
   elements.summary.innerHTML = "";
-  elements.creationSummary.innerHTML = "";
   elements.todayAdjustmentAlerts.innerHTML = "";
-  elements.creationAdjustmentAlerts.innerHTML = "";
+  elements.distributionDateSelect.innerHTML = "";
   elements.distributionList.innerHTML = `<div class="empty-state">生成後に個別配布一覧が表示されます。</div>`;
-  elements.distributionPreview.innerHTML = `<div class="empty-state">セラピストを選ぶと個別出力プレビューを表示します。</div>`;
+  elements.distributionPreview.innerHTML = `<div class="empty-state">セラピストを選ぶと個別配布文言が表示されます。</div>`;
+  elements.distributionCopyButton.disabled = true;
+  state.distributionPreviewText = "";
   renderAlertDetails(errors);
   updateDayNavigation([]);
   renderAnalysisTab();
+}
+
+function renderDashboardFromState(dateRangeText = elements.periodSummary.textContent) {
+  const currentDayPlan = findCurrentDayPlan(state.latestDailyPlans);
+  const aggregate = buildDashboardAggregate(state.latestDailyPlans);
+  const combinedWarnings = [...buildCoverageWarnings(state.latestDailyPlans), ...buildAdjustmentWarnings(currentDayPlan)];
+
+  renderTodayShift(currentDayPlan);
+  renderPeriodSummary(dateRangeText);
+  renderFillChart(state.latestDailyPlans);
+  renderSalesForecast(currentDayPlan, aggregate);
+  renderSummary(currentDayPlan);
+  renderAlertDetails(combinedWarnings);
+  updateDayNavigation(state.latestDailyPlans);
+  renderAnalysisTab();
+  renderDistributionView();
 }
 
 function renderTodayShift(dayPlan) {
   if (!dayPlan) {
     elements.selectedDateLabel.innerHTML = "対象日なし";
     elements.todayShiftList.innerHTML = `<div class="empty-state">表示できる当日シフトがありません。</div>`;
-    elements.creationSelectedDateLabel.innerHTML = "対象日なし";
-    elements.creationShiftBoard.innerHTML = `<div class="empty-state">表示できる当日シフトがありません。</div>`;
     return;
   }
 
   const dateLabel = `${dayPlan.dateKey} (${dayPlan.weekday})`;
   elements.selectedDateLabel.innerHTML = dateLabel;
-  elements.creationSelectedDateLabel.innerHTML = dateLabel;
   const earlyAssignments = dayPlan.earlyAssignments.map((assignment) => ({ ...assignment, shiftLabel: "早番" }));
   const lateAssignments = dayPlan.lateAssignments.map((assignment) => ({ ...assignment, shiftLabel: "遅番" }));
 
   if (!earlyAssignments.length && !lateAssignments.length) {
     elements.todayShiftList.innerHTML = `<div class="empty-state">この日は割り当てがありません。</div>`;
-    elements.creationShiftBoard.innerHTML = `<div class="empty-state">この日は割り当てがありません。</div>`;
     return;
   }
 
-  const markup = `
+  elements.todayShiftList.innerHTML = `
     <div class="daily-shift-tabs">
       <button class="daily-shift-tab ${state.activeDailyShiftTab === "early" ? "active" : ""}" type="button" data-daily-tab="early">
         早番 ${earlyAssignments.length}/${dayPlan.requirement.earlyNeeded}
@@ -409,635 +537,9 @@ function renderTodayShift(dayPlan) {
       </section>
     </div>
   `;
-  elements.todayShiftList.innerHTML = markup;
-  elements.creationShiftBoard.innerHTML = markup;
 
-  bindShiftBoardEvents(elements.todayShiftList, dayPlan);
-  bindShiftBoardEvents(elements.creationShiftBoard, dayPlan);
+  bindShiftBoardEvents(elements.todayShiftList);
   renderTodayAdjustmentAlerts(dayPlan);
-}
-
-function renderPeriodSummary(dateRangeText) {
-  elements.periodSummary.innerHTML = `<div class="period-card">${dateRangeText}</div>`;
-}
-
-function renderFillChart(dailyPlans) {
-  const isMobile = window.innerWidth <= 768;
-  if (isMobile) {
-    elements.fillChart.innerHTML = `
-      <div class="chart-mobile-list">
-        ${dailyPlans
-          .map((day) => {
-            const required = day.requirement.earlyNeeded + day.requirement.lateNeeded;
-            const assigned = day.earlyAssignments.length + day.lateAssignments.length;
-            const fillRate = required ? Math.round((assigned / required) * 100) : 100;
-            const shortage = Math.max(required - assigned, 0);
-            const toneClass = shortage > 0 ? "danger" : "ok";
-            return `
-              <div class="chart-mobile-item ${toneClass}">
-                <div class="chart-mobile-head">
-                  <strong>${day.dateKey.slice(5)} ${day.weekday}</strong>
-                  <span>${fillRate}%</span>
-                </div>
-                <div class="chart-mobile-bar">
-                  <span class="chart-mobile-bar-fill ${toneClass}" style="width:${Math.min(fillRate, 100)}%"></span>
-                </div>
-              </div>
-            `;
-          })
-          .join("")}
-      </div>
-    `;
-    return;
-  }
-
-  const chartWidth = 640;
-  const chartHeight = 180;
-  const padding = { top: 16, right: 16, bottom: 36, left: 34 };
-  const innerWidth = chartWidth - padding.left - padding.right;
-  const innerHeight = chartHeight - padding.top - padding.bottom;
-  const points = dailyPlans.map((day, index) => {
-    const required = day.requirement.earlyNeeded + day.requirement.lateNeeded;
-    const assigned = day.earlyAssignments.length + day.lateAssignments.length;
-    const fillRate = required ? Math.round((assigned / required) * 100) : 100;
-    const x = padding.left + (dailyPlans.length === 1 ? innerWidth / 2 : (innerWidth / Math.max(dailyPlans.length - 1, 1)) * index);
-    const y = padding.top + innerHeight - (Math.min(fillRate, 100) / 100) * innerHeight;
-    return { dateKey: day.dateKey, shortDate: day.dateKey.slice(5), fillRate, shortage: Math.max(required - assigned, 0), x, y };
-  });
-
-  const polyline = points.map((point) => `${point.x},${point.y}`).join(" ");
-  const areaPath = points.length
-    ? `M ${points[0].x} ${padding.top + innerHeight} L ${points.map((point) => `${point.x} ${point.y}`).join(" L ")} L ${points[points.length - 1].x} ${padding.top + innerHeight} Z`
-    : "";
-
-  elements.fillChart.innerHTML = `
-    <div class="chart-wrap">
-      <svg viewBox="0 0 ${chartWidth} ${chartHeight}" class="chart-svg" role="img" aria-label="週間の埋まり状況グラフ">
-        <path d="${areaPath}" class="chart-area"></path>
-        <polyline points="${polyline}" class="chart-line"></polyline>
-        ${points
-          .map(
-            (point) => `
-              <circle cx="${point.x}" cy="${point.y}" r="4.5" class="chart-point ${point.shortage > 0 ? "danger" : "ok"}"></circle>
-              <text x="${point.x}" y="${chartHeight - 10}" class="chart-date-label">${point.shortDate}</text>
-            `
-          )
-          .join("")}
-      </svg>
-      <div class="chart-legend compact">
-        ${points
-          .map(
-            (point) => `
-              <div class="chart-legend-item ${point.shortage > 0 ? "danger" : "ok"}">
-                <strong>${point.shortDate}</strong>
-                <span>${point.fillRate}%</span>
-              </div>
-            `
-          )
-          .join("")}
-      </div>
-    </div>
-  `;
-}
-
-function renderSummary(dayPlan, aggregate) {
-  if (!dayPlan) {
-    elements.summary.innerHTML = "";
-    elements.creationSummary.innerHTML = "";
-    return;
-  }
-
-  const required = dayPlan.requirement.earlyNeeded + dayPlan.requirement.lateNeeded;
-  const assigned = dayPlan.earlyAssignments.length + dayPlan.lateAssignments.length;
-  const shortage = Math.max(required - assigned, 0);
-  const fillRate = required ? Math.round((assigned / required) * 100) : 0;
-  const sales = estimateDailySales(dayPlan);
-  const storeDrop = estimateStoreDrop(dayPlan);
-  const cards = [
-    { label: "売上予測", value: formatCompactCurrency(sales), tone: "good" },
-    { label: "店落ち予測", value: formatCompactCurrency(storeDrop), tone: "default" },
-    { label: "不足数", value: `${shortage}枠`, tone: shortage ? "danger" : "good" },
-    { label: "当日充足率", value: `${fillRate}%`, tone: fillRate >= 100 ? "good" : "default" }
-  ];
-
-  const markup = cards
-    .map(
-      (card) => `
-        <article class="summary-card ${card.tone === "danger" ? "summary-danger" : ""} ${card.tone === "good" ? "summary-good" : ""}">
-          <p>${card.label}</p>
-          <strong>${card.value}</strong>
-        </article>
-      `
-    )
-    .join("");
-  elements.summary.innerHTML = markup;
-  elements.creationSummary.innerHTML = markup;
-}
-
-function renderAlertDetails(warnings) {
-  if (!warnings.length) {
-    elements.warningBox.innerHTML = `<div class="ok-box">アラートはありません。</div>`;
-    return;
-  }
-
-  elements.warningBox.innerHTML = `
-    <div class="warning-box">
-      <ul>${warnings.map((warning) => `<li>${warning}</li>`).join("")}</ul>
-    </div>
-  `;
-}
-
-function buildDashboardAggregate(dailyPlans) {
-  const aggregate = {
-    totalDays: dailyPlans.length,
-    requiredSlots: 0,
-    assignedSlots: 0,
-    shortageSlots: 0,
-    shortageDays: [],
-    mostShortDay: null,
-    fillRate: 0
-  };
-  const rankedDays = [];
-
-  dailyPlans.forEach((day) => {
-    const required = day.requirement.earlyNeeded + day.requirement.lateNeeded;
-    const assigned = day.earlyAssignments.length + day.lateAssignments.length;
-    const shortage = Math.max(required - assigned, 0);
-
-    aggregate.requiredSlots += required;
-    aggregate.assignedSlots += assigned;
-    aggregate.shortageSlots += shortage;
-
-    if (shortage > 0) {
-      aggregate.shortageDays.push(day.dateKey);
-      rankedDays.push({ dateKey: day.dateKey, shortage });
-    }
-  });
-
-  aggregate.fillRate = aggregate.requiredSlots ? Math.round((aggregate.assignedSlots / aggregate.requiredSlots) * 100) : 0;
-  aggregate.mostShortDay = rankedDays.sort((left, right) => right.shortage - left.shortage || left.dateKey.localeCompare(right.dateKey))[0] || null;
-  return aggregate;
-}
-
-function renderSalesForecast(dayPlan, aggregate) {
-  if (!dayPlan) {
-    elements.salesForecastPanel.innerHTML = `<div class="empty-state">売上予測を表示できません。</div>`;
-    return;
-  }
-
-  const dailySales = estimateDailySales(dayPlan);
-  const dailyStoreDrop = estimateStoreDrop(dayPlan);
-  const weeklySales = state.latestDailyPlans.reduce((sum, current) => sum + estimateDailySales(current), 0);
-  const weeklyStoreDrop = state.latestDailyPlans.reduce((sum, current) => sum + estimateStoreDrop(current), 0);
-
-  elements.salesForecastPanel.innerHTML = `
-    <div class="sales-grid">
-      <div class="sales-card">
-        <p>当日売上予測</p>
-        <strong>${formatCompactCurrency(dailySales)}</strong>
-      </div>
-      <div class="sales-card">
-        <p>当日店落ち予測</p>
-        <strong>${formatCompactCurrency(dailyStoreDrop)}</strong>
-      </div>
-      <div class="sales-card">
-        <p>週売上予測</p>
-        <strong>${formatCompactCurrency(weeklySales)}</strong>
-      </div>
-      <div class="sales-card">
-        <p>週不足数</p>
-        <strong>${aggregate.shortageSlots}枠</strong>
-      </div>
-    </div>
-  `;
-}
-
-function renderDashboardFromState(dateRangeText = elements.periodSummary.textContent) {
-  const currentDayPlan = findCurrentDayPlan(state.latestDailyPlans);
-  const aggregate = buildDashboardAggregate(state.latestDailyPlans);
-  const combinedWarnings = [...buildCoverageWarnings(state.latestDailyPlans), ...buildAdjustmentWarnings(currentDayPlan)];
-
-  renderTodayShift(currentDayPlan);
-  renderPeriodSummary(dateRangeText);
-  renderFillChart(state.latestDailyPlans);
-  renderSalesForecast(currentDayPlan, aggregate);
-  renderSummary(currentDayPlan, aggregate);
-  renderAlertDetails(combinedWarnings);
-  updateDayNavigation(state.latestDailyPlans);
-  renderAnalysisTab();
-  renderDistributionView(currentDayPlan);
-}
-
-function updateDayNavigation(dailyPlans) {
-  const dateList = dailyPlans.map((day) => day.dateKey);
-  const selectedIndex = dateList.indexOf(state.selectedDate);
-  const hasDates = dateList.length > 0;
-
-  elements.prevDayButton.disabled = !hasDates || selectedIndex <= 0;
-  elements.nextDayButton.disabled = !hasDates || selectedIndex === -1 || selectedIndex >= dateList.length - 1;
-  elements.todayButton.disabled = !hasDates;
-  elements.creationPrevDayButton.disabled = elements.prevDayButton.disabled;
-  elements.creationNextDayButton.disabled = elements.nextDayButton.disabled;
-  elements.creationTodayButton.disabled = elements.todayButton.disabled;
-}
-
-function moveSelectedDate(offset) {
-  const dateList = state.latestDailyPlans.map((day) => day.dateKey);
-  const currentIndex = dateList.indexOf(state.selectedDate);
-  if (currentIndex === -1) {
-    return;
-  }
-
-  const nextIndex = currentIndex + offset;
-  if (nextIndex < 0 || nextIndex >= dateList.length) {
-    return;
-  }
-
-  state.selectedDate = dateList[nextIndex];
-  renderDashboardFromState();
-}
-
-function jumpToToday() {
-  const dateList = state.latestDailyPlans.map((day) => day.dateKey);
-  const actualToday = formatDate(new Date());
-  state.selectedDate = dateList.includes(actualToday) ? actualToday : dateList[0] || samplePrototypeData.settings.startDate;
-  renderDashboardFromState();
-}
-
-function ensureSelectedDateInRange() {
-  const dateList = createDateList(elements.startDate.value || samplePrototypeData.settings.startDate, Number(elements.days.value) || 7);
-  if (!dateList.includes(state.selectedDate)) {
-    state.selectedDate = dateList[0] || samplePrototypeData.settings.startDate;
-  }
-}
-
-function findCurrentDayPlan(dailyPlans) {
-  ensureSelectedDateInRange();
-  return dailyPlans.find((day) => day.dateKey === state.selectedDate) || dailyPlans[0] || null;
-}
-
-function setActiveView(viewName) {
-  elements.sidebarNav.querySelectorAll(".nav-item").forEach((button) => {
-    button.classList.toggle("active", button.dataset.view === viewName);
-  });
-
-  elements.views.forEach((view) => {
-    view.classList.toggle("active", view.dataset.viewPanel === viewName);
-  });
-
-  closeSidebar();
-}
-
-function setAnalysisTab(tabName) {
-  state.activeAnalysisTab = tabName;
-  renderAnalysisTab();
-}
-
-function renderAnalysisTab() {
-  elements.analysisTabs.querySelectorAll(".analysis-tab").forEach((button) => {
-    button.classList.toggle("active", button.dataset.analysisTab === state.activeAnalysisTab);
-  });
-  document.querySelectorAll("[data-analysis-panel]").forEach((panel) => {
-    panel.classList.toggle("active", panel.dataset.analysisPanel === state.activeAnalysisTab);
-  });
-}
-
-function toggleSidebar(forceState) {
-  const nextState = typeof forceState === "boolean" ? forceState : !elements.sidebar.classList.contains("open");
-  elements.sidebar.classList.toggle("open", nextState);
-  elements.sidebarOverlay.classList.toggle("visible", nextState);
-  elements.menuToggle.setAttribute("aria-expanded", String(nextState));
-}
-
-function closeSidebar() {
-  toggleSidebar(false);
-}
-
-function aggregateTherapists(shiftRequests) {
-  const map = new Map();
-
-  shiftRequests.forEach((request) => {
-    const current = map.get(request.name) || { name: request.name, preferredAreas: new Set(), himeCount: 0, entries: [] };
-    current.preferredAreas.add(request.preferredArea);
-    current.himeCount += request.himeReservation === "あり" ? 1 : 0;
-    current.entries.push({ ...request });
-    map.set(request.name, current);
-  });
-
-  return [...map.values()]
-    .map((item) => ({
-      name: item.name,
-      preferredAreas: [...item.preferredAreas],
-      himeCount: item.himeCount,
-      entries: item.entries.sort((left, right) => left.dateKey.localeCompare(right.dateKey))
-    }))
-    .sort((left, right) => left.name.localeCompare(right.name, "ja"));
-}
-
-function parseShiftRequestCsv(csvText) {
-  const rows = parseCsvRows(csvText);
-  if (!rows.length) {
-    return { rows: [], errors: ["CSVにデータがありません。"] };
-  }
-
-  const header = rows[0].map(normalizeHeader);
-  const requiredHeaders = ["名前", "出勤可能日", "出勤開始時間", "出勤終了時間", "希望エリア", "姫予約有無", "備考"];
-  const errors = [];
-  const headerMap = new Map(header.map((name, index) => [name, index]));
-
-  requiredHeaders.forEach((column) => {
-    if (!headerMap.has(column)) {
-      errors.push(`ヘッダー不足: ${column}`);
-    }
-  });
-
-  if (errors.length) {
-    return { rows: [], errors };
-  }
-
-  const parsedRows = [];
-  const uniqueKey = new Set();
-
-  rows.slice(1).forEach((columns, rowIndex) => {
-    if (columns.every((value) => !String(value).trim())) {
-      return;
-    }
-
-    const record = {
-      name: readColumn(columns, headerMap, "名前"),
-      dateKey: readColumn(columns, headerMap, "出勤可能日"),
-      startTime: normalizeTime(readColumn(columns, headerMap, "出勤開始時間")),
-      endTime: normalizeTime(readColumn(columns, headerMap, "出勤終了時間")),
-      preferredArea: readColumn(columns, headerMap, "希望エリア"),
-      himeReservation: normalizeHime(readColumn(columns, headerMap, "姫予約有無")),
-      note: readColumn(columns, headerMap, "備考")
-    };
-
-    const rowNumber = rowIndex + 2;
-    const rowErrors = [];
-    if (!record.name) rowErrors.push("名前が空です");
-    if (!isValidDate(record.dateKey)) rowErrors.push("出勤可能日が不正です");
-    if (!isValidTime(record.startTime)) rowErrors.push("出勤開始時間が不正です");
-    if (!isValidTime(record.endTime)) rowErrors.push("出勤終了時間が不正です");
-    if (!record.preferredArea) rowErrors.push("希望エリアが空です");
-    if (!record.himeReservation) rowErrors.push("姫予約有無が不正です");
-    if (isValidTime(record.startTime) && isValidTime(record.endTime) && toMinutes(record.startTime) >= toMinutes(record.endTime)) {
-      rowErrors.push("終了時間は開始時間より後にしてください");
-    }
-
-    const compositeKey = `${record.name}__${record.dateKey}`;
-    if (uniqueKey.has(compositeKey)) {
-      rowErrors.push("同一人物・同一日の重複があります");
-    }
-
-    if (rowErrors.length) {
-      errors.push(`行 ${rowNumber}: ${rowErrors.join(" / ")}`);
-      return;
-    }
-
-    uniqueKey.add(compositeKey);
-    parsedRows.push(record);
-  });
-
-  return { rows: parsedRows, errors };
-}
-
-function parseCsvRows(text) {
-  const normalized = String(text || "").replace(/^\uFEFF/, "");
-  const rows = [];
-  let current = "";
-  let row = [];
-  let quoted = false;
-
-  for (let index = 0; index < normalized.length; index += 1) {
-    const char = normalized[index];
-    const next = normalized[index + 1];
-
-    if (char === '"') {
-      if (quoted && next === '"') {
-        current += '"';
-        index += 1;
-      } else {
-        quoted = !quoted;
-      }
-      continue;
-    }
-
-    if (char === "," && !quoted) {
-      row.push(current);
-      current = "";
-      continue;
-    }
-
-    if ((char === "\n" || char === "\r") && !quoted) {
-      if (char === "\r" && next === "\n") index += 1;
-      row.push(current);
-      rows.push(row);
-      row = [];
-      current = "";
-      continue;
-    }
-
-    current += char;
-  }
-
-  if (current.length || row.length) {
-    row.push(current);
-    rows.push(row);
-  }
-
-  return rows;
-}
-
-function normalizeHeader(value) {
-  return String(value || "").trim();
-}
-
-function readColumn(columns, headerMap, name) {
-  return String(columns[headerMap.get(name)] || "").trim();
-}
-
-function normalizeTime(value) {
-  const text = String(value || "").trim();
-  if (!text) return "";
-  const match = text.match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return text;
-  return `${match[1].padStart(2, "0")}:${match[2]}`;
-}
-
-function normalizeHime(value) {
-  const text = String(value || "").trim();
-  if (["あり", "有", "yes", "YES", "true", "TRUE", "1"].includes(text)) return "あり";
-  if (["なし", "無", "no", "NO", "false", "FALSE", "0"].includes(text)) return "なし";
-  return "";
-}
-
-function isValidDate(value) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
-}
-
-function isValidTime(value) {
-  if (!/^\d{2}:\d{2}$/.test(String(value || ""))) return false;
-  const [hours, minutes] = value.split(":").map(Number);
-  return hours >= 0 && hours <= 27 && minutes >= 0 && minutes < 60;
-}
-
-function toMinutes(timeText) {
-  const [hours, minutes] = String(timeText || "0:00").split(":").map(Number);
-  return (hours || 0) * 60 + (minutes || 0);
-}
-
-function formatTimestamp(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
-}
-
-function compactTimeRange(startTime, endTime) {
-  return `${shortTime(startTime)}-${shortTime(endTime)}`;
-}
-
-function shortTime(value) {
-  return String(value || "").replace(":00", "");
-}
-
-function compactShiftNote(note) {
-  const text = String(note || "").trim();
-  if (!text) {
-    return "";
-  }
-  if (text.includes("店泊")) {
-    return "店泊";
-  }
-  if (text.includes("終電")) {
-    return "終電";
-  }
-  if (text.includes("21:00")) {
-    return "21時以降";
-  }
-  if (text.includes("葛西")) {
-    return "葛西";
-  }
-  if (text.includes("浦安")) {
-    return "浦安";
-  }
-  if (text.includes("船橋")) {
-    return "船橋";
-  }
-  if (text.includes("浅草橋")) {
-    return "浅草橋";
-  }
-  if (text.includes("八千代")) {
-    return "八千代";
-  }
-  return text.length > 8 ? `${text.slice(0, 8)}…` : text;
-}
-
-function estimateDailySales(dayPlan) {
-  const assignments = [...dayPlan.earlyAssignments, ...dayPlan.lateAssignments];
-  return assignments.reduce((sum, assignment) => sum + (assignment.himeReservation === "あり" ? 30000 : 22000), 0);
-}
-
-function estimateStoreDrop(dayPlan) {
-  const assignments = [...dayPlan.earlyAssignments, ...dayPlan.lateAssignments];
-  return assignments.reduce((sum, assignment) => sum + (assignment.himeReservation === "あり" ? 13000 : 9000), 0);
-}
-
-function formatCompactCurrency(value) {
-  return `${Math.round(value).toLocaleString("ja-JP")}円`;
-}
-
-function getTherapistProfile(name) {
-  return samplePrototypeData.therapistProfiles?.[name] || { rank: "G", flags: [] };
-}
-
-function renderStatusBadges(profile, hasHime) {
-  const badges = [];
-  if (profile.rank) {
-    badges.push(`<span class="status-badge rank">${profile.rank}</span>`);
-  }
-  profile.flags.slice(0, 2).forEach((flag) => {
-    badges.push(`<span class="status-badge flag">${flag}</span>`);
-  });
-  if (hasHime) {
-    badges.push(`<span class="status-badge hime">姫あり</span>`);
-  }
-  return badges.join("");
-}
-
-function renderAttributeColumn(profile, attendance, hasHime) {
-  const items = [profile.rank, attendance, hasHime ? "姫あり" : null].filter(Boolean);
-  return items.length
-    ? items.map((item) => `<span class="attr-tag">${item}</span>`).join("")
-    : `<span class="state-text">-</span>`;
-}
-
-function buildPriorityTags(assignment) {
-  const tags = [];
-  const note = compactShiftNote(assignment.note);
-  if (note) {
-    tags.push(note);
-  }
-  if (assignment.areaWarning) {
-    tags.push("要確認");
-  }
-  return tags.slice(0, 2);
-}
-
-function areaClassName(area) {
-  return (
-    {
-      "葛西": "kasai",
-      "浦安": "urayasu",
-      "船橋": "funabashi",
-      "浅草橋": "asakusabashi",
-      "八千代": "yachiyo"
-    }[area] || "default"
-  );
-}
-
-function renderTimeOptions(selectedValue) {
-  return buildTimeOptions()
-    .map((time) => `<option value="${time}" ${time === selectedValue ? "selected" : ""}>${shortTime(time)}</option>`)
-    .join("");
-}
-
-function buildTimeOptions() {
-  const options = [];
-  for (let hour = 10; hour <= 27; hour += 1) {
-    options.push(`${String(hour).padStart(2, "0")}:00`);
-    if (hour !== 27) {
-      options.push(`${String(hour).padStart(2, "0")}:30`);
-    }
-  }
-  return options;
-}
-
-function selectAttendanceFlag(profile) {
-  const attendance = profile.flags.find((flag) => ["勤怠安定", "遅刻注意", "出稼ぎ"].includes(flag));
-  return attendance || "勤怠安定";
-}
-
-function renderMobileChartItem(day) {
-  const required = day.requirement.earlyNeeded + day.requirement.lateNeeded;
-  const assigned = day.earlyAssignments.length + day.lateAssignments.length;
-  const fillRate = required ? Math.round((assigned / required) * 100) : 100;
-  const shortage = Math.max(required - assigned, 0);
-  const toneClass = shortage > 0 ? "danger" : "ok";
-  return `
-    <div class="chart-mobile-item ${toneClass}">
-      <div class="chart-mobile-head">
-        <strong>${day.dateKey.slice(5)} ${day.weekday}</strong>
-        <span>${fillRate}%</span>
-      </div>
-      <div class="chart-mobile-bar">
-        <span class="chart-mobile-bar-fill ${toneClass}" style="width:${Math.min(fillRate, 100)}%"></span>
-      </div>
-    </div>
-  `;
 }
 
 function renderShiftTeamList(assignments, shift) {
@@ -1057,24 +559,25 @@ function renderShiftTeamList(assignments, shift) {
       ${assignments
         .map((assignment, index) => {
           const profile = getTherapistProfile(assignment.name);
-          const tags = buildPriorityTags(assignment);
           const attendance = selectAttendanceFlag(profile);
+          const tags = buildPriorityTags(assignment);
+          const attributeItems = [
+            profile.rank,
+            attendance,
+            assignment.himeReservation === "あり" ? "姫あり" : "姫なし"
+          ];
           return `
             <article class="shift-list-row fixed-grid area-${areaClassName(assignment.area)} ${assignment.himeReservation === "あり" ? "has-hime" : ""}" draggable="true" data-shift="${shift}" data-index="${index}">
-              <div class="shift-col shift-name" data-area="${assignment.area}">
+              <div class="shift-col shift-name">
                 <div class="shift-line-primary">
                   <span class="name-main">${assignment.name}</span>
-                  <span class="status-badge rank">${profile.rank}</span>
-                  <span class="status-badge flag">${attendance}</span>
-                  ${assignment.himeReservation === "あり" ? `<span class="status-badge hime">姫</span>` : ""}
-                </div>
-                <div class="shift-line-secondary">
-                  <span class="area-pill area-${areaClassName(assignment.area)}">${assignment.area}</span>
-                  <span class="time-text">${compactTimeRange(assignment.startTime, assignment.endTime)}</span>
-                  ${tags.map((tag) => `<span class="priority-tag ${tag === "要確認" ? "warning" : ""}">${tag}</span>`).join("")}
                 </div>
               </div>
-              <div class="shift-col shift-attr">${renderAttributeColumn(profile, attendance, assignment.himeReservation === "あり")}</div>
+              <div class="shift-col shift-attr">
+                <div class="shift-attr-list">
+                  ${attributeItems.map((item) => `<span class="attr-tag">${item}</span>`).join("")}
+                </div>
+              </div>
               <div class="shift-col shift-area shift-area-editor">
                 <span class="area-pill area-${areaClassName(assignment.area)}">${assignment.area}</span>
                 <select class="shift-area-select" data-shift="${shift}" data-index="${index}">
@@ -1096,7 +599,11 @@ function renderShiftTeamList(assignments, shift) {
                 </div>
               </div>
               <div class="shift-col shift-priority">
-                <div class="priority-tags">${tags.map((tag) => `<span class="priority-tag ${tag === "要確認" ? "warning" : ""}">${tag}</span>`).join("")}</div>
+                ${
+                  tags.length
+                    ? `<div class="priority-tags">${tags.map((tag) => `<span class="priority-tag ${tag === "要確認" ? "warning" : ""}">${tag}</span>`).join("")}</div>`
+                    : `<span class="state-text">-</span>`
+                }
               </div>
             </article>
           `;
@@ -1106,11 +613,11 @@ function renderShiftTeamList(assignments, shift) {
   `;
 }
 
-function bindShiftBoardEvents(target, dayPlan) {
+function bindShiftBoardEvents(target) {
   target.querySelectorAll(".daily-shift-tab").forEach((button) => {
     button.addEventListener("click", () => {
       state.activeDailyShiftTab = button.dataset.dailyTab;
-      renderTodayShift(dayPlan);
+      renderTodayShift(findCurrentDayPlan(state.latestDailyPlans));
     });
   });
 
@@ -1137,7 +644,6 @@ function bindShiftBoardEvents(target, dayPlan) {
     });
   });
 }
-
 function handleShiftRowDragStart(event) {
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData(
@@ -1230,6 +736,557 @@ function getShiftAssignments(dayPlan, shift) {
   return shift === "early" ? dayPlan.earlyAssignments : dayPlan.lateAssignments;
 }
 
+function renderPeriodSummary(dateRangeText) {
+  elements.periodSummary.innerHTML = `<div class="period-card">${dateRangeText}</div>`;
+}
+
+function renderFillChart(dailyPlans) {
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile) {
+    elements.fillChart.innerHTML = `<div class="chart-mobile-list">${dailyPlans.map(renderMobileChartItem).join("")}</div>`;
+    return;
+  }
+
+  const chartWidth = 640;
+  const chartHeight = 180;
+  const padding = { top: 16, right: 16, bottom: 36, left: 34 };
+  const innerWidth = chartWidth - padding.left - padding.right;
+  const innerHeight = chartHeight - padding.top - padding.bottom;
+  const points = dailyPlans.map((day, index) => {
+    const required = day.requirement.earlyNeeded + day.requirement.lateNeeded;
+    const assigned = day.earlyAssignments.length + day.lateAssignments.length;
+    const fillRate = required ? Math.round((assigned / required) * 100) : 100;
+    const x = padding.left + (dailyPlans.length === 1 ? innerWidth / 2 : (innerWidth / Math.max(dailyPlans.length - 1, 1)) * index);
+    const y = padding.top + innerHeight - (Math.min(fillRate, 100) / 100) * innerHeight;
+    return { shortDate: day.dateKey.slice(5), fillRate, shortage: Math.max(required - assigned, 0), x, y };
+  });
+
+  const polyline = points.map((point) => `${point.x},${point.y}`).join(" ");
+  const areaPath = points.length
+    ? `M ${points[0].x} ${padding.top + innerHeight} L ${points.map((point) => `${point.x} ${point.y}`).join(" L ")} L ${points[points.length - 1].x} ${padding.top + innerHeight} Z`
+    : "";
+
+  elements.fillChart.innerHTML = `
+    <div class="chart-wrap">
+      <svg viewBox="0 0 ${chartWidth} ${chartHeight}" class="chart-svg" role="img" aria-label="週間の埋まり状況グラフ">
+        <path d="${areaPath}" class="chart-area"></path>
+        <polyline points="${polyline}" class="chart-line"></polyline>
+        ${points
+          .map(
+            (point) => `
+              <circle cx="${point.x}" cy="${point.y}" r="4.5" class="chart-point ${point.shortage > 0 ? "danger" : "ok"}"></circle>
+              <text x="${point.x}" y="${chartHeight - 10}" class="chart-date-label">${point.shortDate}</text>
+            `
+          )
+          .join("")}
+      </svg>
+      <div class="chart-legend compact">
+        ${points
+          .map(
+            (point) => `
+              <div class="chart-legend-item ${point.shortage > 0 ? "danger" : "ok"}">
+                <strong>${point.shortDate}</strong>
+                <span>${point.fillRate}%</span>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderSalesForecast(dayPlan, aggregate) {
+  if (!dayPlan) {
+    elements.salesForecastPanel.innerHTML = `<div class="empty-state">売上予測を表示できません。</div>`;
+    return;
+  }
+
+  const dailySales = estimateDailySales(dayPlan);
+  const dailyStoreDrop = estimateStoreDrop(dayPlan);
+  const weeklySales = state.latestDailyPlans.reduce((sum, current) => sum + estimateDailySales(current), 0);
+
+  elements.salesForecastPanel.innerHTML = `
+    <div class="sales-grid">
+      <div class="sales-card">
+        <p>当日売上予測</p>
+        <strong>${formatCompactCurrency(dailySales)}</strong>
+      </div>
+      <div class="sales-card">
+        <p>当日店落ち予測</p>
+        <strong>${formatCompactCurrency(dailyStoreDrop)}</strong>
+      </div>
+      <div class="sales-card">
+        <p>週売上予測</p>
+        <strong>${formatCompactCurrency(weeklySales)}</strong>
+      </div>
+      <div class="sales-card">
+        <p>週不足数</p>
+        <strong>${aggregate.shortageSlots}枠</strong>
+      </div>
+    </div>
+  `;
+}
+
+function renderSummary(dayPlan) {
+  if (!dayPlan) {
+    elements.summary.innerHTML = "";
+    return;
+  }
+
+  const required = dayPlan.requirement.earlyNeeded + dayPlan.requirement.lateNeeded;
+  const assigned = dayPlan.earlyAssignments.length + dayPlan.lateAssignments.length;
+  const shortage = Math.max(required - assigned, 0);
+  const fillRate = required ? Math.round((assigned / required) * 100) : 0;
+  const sales = estimateDailySales(dayPlan);
+  const storeDrop = estimateStoreDrop(dayPlan);
+
+  elements.summary.innerHTML = [
+    { label: "売上予測", value: formatCompactCurrency(sales), tone: "good" },
+    { label: "店落ち予測", value: formatCompactCurrency(storeDrop), tone: "default" },
+    { label: "不足数", value: `${shortage}枠`, tone: shortage ? "danger" : "good" },
+    { label: "当日充足率", value: `${fillRate}%`, tone: fillRate >= 100 ? "good" : "default" }
+  ]
+    .map(
+      (card) => `
+        <article class="summary-card ${card.tone === "danger" ? "summary-danger" : ""} ${card.tone === "good" ? "summary-good" : ""}">
+          <p>${card.label}</p>
+          <strong>${card.value}</strong>
+        </article>
+      `
+    )
+    .join("");
+}
+
+function renderAlertDetails(warnings) {
+  if (!warnings.length) {
+    elements.warningBox.innerHTML = `<div class="ok-box">アラートはありません。</div>`;
+    return;
+  }
+
+  elements.warningBox.innerHTML = `
+    <div class="warning-box">
+      <ul>${warnings.map((warning) => `<li>${warning}</li>`).join("")}</ul>
+    </div>
+  `;
+}
+
+function buildDashboardAggregate(dailyPlans) {
+  const aggregate = {
+    totalDays: dailyPlans.length,
+    requiredSlots: 0,
+    assignedSlots: 0,
+    shortageSlots: 0,
+    shortageDays: [],
+    mostShortDay: null,
+    fillRate: 0
+  };
+  const rankedDays = [];
+
+  dailyPlans.forEach((day) => {
+    const required = day.requirement.earlyNeeded + day.requirement.lateNeeded;
+    const assigned = day.earlyAssignments.length + day.lateAssignments.length;
+    const shortage = Math.max(required - assigned, 0);
+
+    aggregate.requiredSlots += required;
+    aggregate.assignedSlots += assigned;
+    aggregate.shortageSlots += shortage;
+
+    if (shortage > 0) {
+      aggregate.shortageDays.push(day.dateKey);
+      rankedDays.push({ dateKey: day.dateKey, shortage });
+    }
+  });
+
+  aggregate.fillRate = aggregate.requiredSlots ? Math.round((aggregate.assignedSlots / aggregate.requiredSlots) * 100) : 0;
+  aggregate.mostShortDay = rankedDays.sort((left, right) => right.shortage - left.shortage || left.dateKey.localeCompare(right.dateKey))[0] || null;
+  return aggregate;
+}
+
+function updateDayNavigation(dailyPlans) {
+  const dateList = dailyPlans.map((day) => day.dateKey);
+  const selectedIndex = dateList.indexOf(state.selectedDate);
+  const hasDates = dateList.length > 0;
+
+  elements.prevDayButton.disabled = !hasDates || selectedIndex <= 0;
+  elements.nextDayButton.disabled = !hasDates || selectedIndex === -1 || selectedIndex >= dateList.length - 1;
+  elements.todayButton.disabled = !hasDates;
+}
+
+function moveSelectedDate(offset) {
+  const dateList = state.latestDailyPlans.map((day) => day.dateKey);
+  const currentIndex = dateList.indexOf(state.selectedDate);
+  if (currentIndex === -1) {
+    return;
+  }
+
+  const nextIndex = currentIndex + offset;
+  if (nextIndex < 0 || nextIndex >= dateList.length) {
+    return;
+  }
+
+  state.selectedDate = dateList[nextIndex];
+  renderDashboardFromState();
+}
+
+function jumpToToday() {
+  const dateList = state.latestDailyPlans.map((day) => day.dateKey);
+  const actualToday = formatDate(new Date());
+  state.selectedDate = dateList.includes(actualToday) ? actualToday : dateList[0] || samplePrototypeData.settings.startDate;
+  renderDashboardFromState();
+}
+
+function ensureSelectedDateInRange() {
+  const dateList = createDateList(elements.startDate.value || samplePrototypeData.settings.startDate, Number(elements.days.value) || 7);
+  if (!dateList.includes(state.selectedDate)) {
+    state.selectedDate = dateList[0] || samplePrototypeData.settings.startDate;
+  }
+}
+
+function findCurrentDayPlan(dailyPlans) {
+  ensureSelectedDateInRange();
+  return dailyPlans.find((day) => day.dateKey === state.selectedDate) || dailyPlans[0] || null;
+}
+
+function setActiveView(viewName) {
+  elements.sidebarNav.querySelectorAll(".nav-item").forEach((button) => {
+    button.classList.toggle("active", button.dataset.view === viewName);
+  });
+
+  elements.views.forEach((view) => {
+    view.classList.toggle("active", view.dataset.viewPanel === viewName);
+  });
+
+  closeSidebar();
+}
+
+function setAnalysisTab(tabName) {
+  state.activeAnalysisTab = tabName;
+  renderAnalysisTab();
+}
+
+function renderAnalysisTab() {
+  elements.analysisTabs.querySelectorAll(".analysis-tab").forEach((button) => {
+    button.classList.toggle("active", button.dataset.analysisTab === state.activeAnalysisTab);
+  });
+  document.querySelectorAll("[data-analysis-panel]").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.analysisPanel === state.activeAnalysisTab);
+  });
+}
+
+function toggleSidebar(forceState) {
+  const nextState = typeof forceState === "boolean" ? forceState : !elements.sidebar.classList.contains("open");
+  elements.sidebar.classList.toggle("open", nextState);
+  elements.sidebarOverlay.classList.toggle("visible", nextState);
+  elements.menuToggle.setAttribute("aria-expanded", String(nextState));
+}
+
+function closeSidebar() {
+  toggleSidebar(false);
+}
+function aggregateTherapists(shiftRequests) {
+  const map = new Map();
+
+  shiftRequests.forEach((request) => {
+    const current = map.get(request.name) || { name: request.name, preferredAreas: new Set(), himeCount: 0, entries: [] };
+    current.preferredAreas.add(request.preferredArea);
+    current.himeCount += request.himeReservation === "あり" ? 1 : 0;
+    current.entries.push({ ...request });
+    map.set(request.name, current);
+  });
+
+  return [...map.values()]
+    .map((item) => ({
+      name: item.name,
+      preferredAreas: [...item.preferredAreas],
+      himeCount: item.himeCount,
+      entries: item.entries.sort((left, right) => left.dateKey.localeCompare(right.dateKey))
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name, "ja"));
+}
+
+function parseShiftRequestCsv(csvText) {
+  const rows = parseCsvRows(csvText);
+  if (!rows.length) {
+    return { rows: [], errors: ["CSVにデータがありません。"] };
+  }
+
+  const header = rows[0].map(normalizeHeader);
+  const requiredHeaders = ["名前", "出勤可能日", "出勤開始時間", "出勤終了時間", "希望エリア", "姫予約有無", "備考"];
+  const errors = [];
+  const headerMap = new Map(header.map((name, index) => [name, index]));
+
+  requiredHeaders.forEach((column) => {
+    if (!headerMap.has(column)) {
+      errors.push(`ヘッダー不足: ${column}`);
+    }
+  });
+
+  if (errors.length) {
+    return { rows: [], errors };
+  }
+
+  const parsedRows = [];
+  const uniqueKey = new Set();
+
+  rows.slice(1).forEach((columns, rowIndex) => {
+    if (columns.every((value) => !String(value).trim())) {
+      return;
+    }
+
+    const record = {
+      name: readColumn(columns, headerMap, "名前"),
+      dateKey: readColumn(columns, headerMap, "出勤可能日"),
+      startTime: normalizeTime(readColumn(columns, headerMap, "出勤開始時間")),
+      endTime: normalizeTime(readColumn(columns, headerMap, "出勤終了時間")),
+      preferredArea: readColumn(columns, headerMap, "希望エリア"),
+      himeReservation: normalizeHime(readColumn(columns, headerMap, "姫予約有無")),
+      note: readColumn(columns, headerMap, "備考")
+    };
+
+    const rowNumber = rowIndex + 2;
+    const rowErrors = [];
+    if (!record.name) rowErrors.push("名前が空です");
+    if (!isValidDate(record.dateKey)) rowErrors.push("出勤可能日が不正です");
+    if (!isValidTime(record.startTime)) rowErrors.push("出勤開始時間が不正です");
+    if (!isValidTime(record.endTime)) rowErrors.push("出勤終了時間が不正です");
+    if (!record.preferredArea) rowErrors.push("希望エリアが空です");
+    if (!record.himeReservation) rowErrors.push("姫予約有無が不正です");
+    if (isValidTime(record.startTime) && isValidTime(record.endTime) && toMinutes(record.startTime) >= toMinutes(record.endTime)) {
+      rowErrors.push("終了時間は開始時間より後にしてください");
+    }
+
+    const compositeKey = `${record.name}__${record.dateKey}`;
+    if (uniqueKey.has(compositeKey)) {
+      rowErrors.push("同一人物・同一日の重複があります");
+    }
+
+    if (rowErrors.length) {
+      errors.push(`行 ${rowNumber}: ${rowErrors.join(" / ")}`);
+      return;
+    }
+
+    uniqueKey.add(compositeKey);
+    parsedRows.push(record);
+  });
+
+  return { rows: parsedRows, errors };
+}
+
+function parseHistoryCsv(csvText) {
+  const rows = parseCsvRows(csvText);
+  if (!rows.length) {
+    return { rows: [], headers: [], errors: ["過去実績CSVにデータがありません。"] };
+  }
+
+  const headers = rows[0].map(normalizeHeader).filter(Boolean);
+  if (!headers.length) {
+    return { rows: [], headers: [], errors: ["過去実績CSVのヘッダーを取得できませんでした。"] };
+  }
+
+  return {
+    rows: rows.slice(1).filter((row) => row.some((value) => String(value || "").trim())),
+    headers,
+    errors: []
+  };
+}
+
+function parseCsvRows(text) {
+  const normalized = String(text || "").replace(/^\uFEFF/, "");
+  const rows = [];
+  let current = "";
+  let row = [];
+  let quoted = false;
+
+  for (let index = 0; index < normalized.length; index += 1) {
+    const char = normalized[index];
+    const next = normalized[index + 1];
+
+    if (char === '"') {
+      if (quoted && next === '"') {
+        current += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+      continue;
+    }
+
+    if (char === "," && !quoted) {
+      row.push(current);
+      current = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(current);
+      rows.push(row);
+      row = [];
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current.length || row.length) {
+    row.push(current);
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function normalizeHeader(value) {
+  return String(value || "").trim();
+}
+
+function readColumn(columns, headerMap, name) {
+  return String(columns[headerMap.get(name)] || "").trim();
+}
+
+function normalizeTime(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const match = text.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return text;
+  return `${match[1].padStart(2, "0")}:${match[2]}`;
+}
+
+function normalizeHime(value) {
+  const text = String(value || "").trim();
+  if (["あり", "有", "yes", "YES", "true", "TRUE", "1"].includes(text)) return "あり";
+  if (["なし", "無", "no", "NO", "false", "FALSE", "0"].includes(text)) return "なし";
+  return "";
+}
+
+function isValidDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
+}
+
+function isValidTime(value) {
+  if (!/^\d{2}:\d{2}$/.test(String(value || ""))) return false;
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours >= 0 && hours <= 27 && minutes >= 0 && minutes < 60;
+}
+
+function formatTimestamp(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+function compactTimeRange(startTime, endTime) {
+  return `${shortTime(startTime)}-${shortTime(endTime)}`;
+}
+
+function shortTime(value) {
+  return String(value || "").replace(":00", "");
+}
+
+function compactShiftNote(note) {
+  const text = String(note || "").trim();
+  if (!text) {
+    return "";
+  }
+  if (text.includes("店泊")) return "店泊";
+  if (text.includes("終電")) return "終電";
+  if (text.includes("21")) return "21時以降";
+  if (text.includes("要確認")) return "要確認";
+  return text.length > 8 ? `${text.slice(0, 8)}…` : text;
+}
+
+function estimateDailySales(dayPlan) {
+  const assignments = [...dayPlan.earlyAssignments, ...dayPlan.lateAssignments];
+  return assignments.reduce((sum, assignment) => sum + (assignment.himeReservation === "あり" ? 30000 : 22000), 0);
+}
+
+function estimateStoreDrop(dayPlan) {
+  const assignments = [...dayPlan.earlyAssignments, ...dayPlan.lateAssignments];
+  return assignments.reduce((sum, assignment) => sum + (assignment.himeReservation === "あり" ? 13000 : 9000), 0);
+}
+
+function formatCompactCurrency(value) {
+  return `${Math.round(value).toLocaleString("ja-JP")}円`;
+}
+
+function getTherapistProfile(name) {
+  return samplePrototypeData.therapistProfiles?.[name] || { rank: "G", flags: [] };
+}
+
+function renderAttributeColumn(profile, attendance, hasHime) {
+  const items = [profile.rank, attendance, hasHime ? "姫あり" : null].filter(Boolean);
+  return items.length ? items.map((item) => `<span class="attr-tag">${item}</span>`).join("") : `<span class="state-text">-</span>`;
+}
+
+function buildPriorityTags(assignment) {
+  const tags = [];
+  const note = compactShiftNote(assignment.note);
+  if (note) {
+    tags.push(note);
+  }
+  if (assignment.areaWarning) {
+    tags.push("要確認");
+  }
+  return tags.slice(0, 2);
+}
+
+function areaClassName(area) {
+  return (
+    {
+      "葛西": "kasai",
+      "浦安": "urayasu",
+      "船橋": "funabashi",
+      "浅草橋": "asakusabashi",
+      "八千代": "yachiyo"
+    }[area] || "default"
+  );
+}
+
+function renderTimeOptions(selectedValue) {
+  return buildTimeOptions()
+    .map((time) => `<option value="${time}" ${time === selectedValue ? "selected" : ""}>${shortTime(time)}</option>`)
+    .join("");
+}
+
+function buildTimeOptions() {
+  const options = [];
+  for (let hour = 10; hour <= 27; hour += 1) {
+    options.push(`${String(hour).padStart(2, "0")}:00`);
+    if (hour !== 27) {
+      options.push(`${String(hour).padStart(2, "0")}:30`);
+    }
+  }
+  return options;
+}
+
+function selectAttendanceFlag(profile) {
+  const attendance = profile.flags.find((flag) => ["勤怠安定", "遅刻注意", "出稼ぎ"].includes(flag));
+  return attendance || "勤怠安定";
+}
+
+function renderMobileChartItem(day) {
+  const required = day.requirement.earlyNeeded + day.requirement.lateNeeded;
+  const assigned = day.earlyAssignments.length + day.lateAssignments.length;
+  const fillRate = required ? Math.round((assigned / required) * 100) : 100;
+  const shortage = Math.max(required - assigned, 0);
+  const toneClass = shortage > 0 ? "danger" : "ok";
+  return `
+    <div class="chart-mobile-item ${toneClass}">
+      <div class="chart-mobile-head">
+        <strong>${day.dateKey.slice(5)} ${day.weekday}</strong>
+        <span>${fillRate}%</span>
+      </div>
+      <div class="chart-mobile-bar">
+        <span class="chart-mobile-bar-fill ${toneClass}" style="width:${Math.min(fillRate, 100)}%"></span>
+      </div>
+    </div>
+  `;
+}
 function buildAdjustmentWarnings(dayPlan) {
   if (!dayPlan) {
     return [];
@@ -1245,7 +1302,7 @@ function buildAdjustmentWarnings(dayPlan) {
         warnings.push(`${dayPlan.dateKey} の${shift === "early" ? "早番" : "遅番"}で ${assignment.name} の最終受付余白が不足の可能性があります。`);
       }
       if (assignment.areaWarning) {
-        warnings.push(`${dayPlan.dateKey} の${assignment.name} は本来希望外エリア (${assignment.area}) のため要確認です。`);
+        warnings.push(`${dayPlan.dateKey} の${assignment.name} は希望外エリア (${assignment.area}) のため要確認です。`);
       }
     });
 
@@ -1274,53 +1331,90 @@ function buildCoverageWarnings(dailyPlans) {
 
 function renderTodayAdjustmentAlerts(dayPlan) {
   const warnings = buildAdjustmentWarnings(dayPlan);
-  const markup = !warnings.length
+  elements.todayAdjustmentAlerts.innerHTML = !warnings.length
     ? `<div class="ok-box compact">手動調整の警告はありません。</div>`
     : `<div class="warning-box compact"><ul>${warnings.map((warning) => `<li>${warning}</li>`).join("")}</ul></div>`;
-  elements.todayAdjustmentAlerts.innerHTML = markup;
-  elements.creationAdjustmentAlerts.innerHTML = markup;
 }
 
-function renderDistributionView(dayPlan) {
-  if (!dayPlan) {
-    elements.distributionList.innerHTML = `<div class="empty-state">配布対象がありません。</div>`;
-    elements.distributionPreview.innerHTML = `<div class="empty-state">個別シフトをここに表示します。</div>`;
+function renderDistributionView() {
+  const dateOptions = state.latestDailyPlans.map((day) => day.dateKey);
+  if (!dateOptions.length) {
+    elements.distributionDateSelect.innerHTML = "";
+    elements.distributionList.innerHTML = `<div class="empty-state">生成後に個別配布一覧が表示されます。</div>`;
+    elements.distributionPreview.innerHTML = `<div class="empty-state">セラピストを選ぶと個別配布文言が表示されます。</div>`;
+    elements.distributionCopyButton.disabled = true;
+    state.distributionPreviewText = "";
     return;
   }
 
+  if (!dateOptions.includes(state.distributionDate)) {
+    state.distributionDate = state.selectedDate && dateOptions.includes(state.selectedDate) ? state.selectedDate : dateOptions[0];
+  }
+
+  elements.distributionDateSelect.innerHTML = dateOptions
+    .map((dateKey) => `<option value="${dateKey}" ${dateKey === state.distributionDate ? "selected" : ""}>${dateKey}</option>`)
+    .join("");
+
+  const dayPlan = state.latestDailyPlans.find((day) => day.dateKey === state.distributionDate) || state.latestDailyPlans[0];
   const assignments = [
     ...dayPlan.earlyAssignments.map((item) => ({ ...item, shiftLabel: "早番" })),
     ...dayPlan.lateAssignments.map((item) => ({ ...item, shiftLabel: "遅番" }))
   ];
 
+  if (!assignments.length) {
+    elements.distributionList.innerHTML = `<div class="empty-state">この日の配布対象はありません。</div>`;
+    elements.distributionPreview.innerHTML = `<div class="empty-state">配布対象がありません。</div>`;
+    elements.distributionCopyButton.disabled = true;
+    state.distributionPreviewText = "";
+    return;
+  }
+
+  if (!assignments.some((assignment) => buildDistributionKey(dayPlan.dateKey, assignment) === state.selectedDistributionKey)) {
+    state.selectedDistributionKey = buildDistributionKey(dayPlan.dateKey, assignments[0]);
+  }
+
   elements.distributionList.innerHTML = assignments
-    .map(
-      (assignment, index) => `
-        <div class="distribution-row">
+    .map((assignment, index) => {
+      const key = buildDistributionKey(dayPlan.dateKey, assignment);
+      return `
+        <button class="distribution-row ${key === state.selectedDistributionKey ? "active" : ""}" type="button" data-distribution-index="${index}">
           <div>
             <strong>${assignment.name}</strong>
             <div class="section-note">${assignment.shiftLabel} / ${assignment.area} / ${assignment.startTime}-${assignment.endTime}</div>
           </div>
-          <div class="distribution-actions">
-            <button class="ghost-button distribution-preview-button" type="button" data-distribution-index="${index}">確認</button>
-            <button class="secondary-button distribution-export-button" type="button" data-distribution-index="${index}">個別出力</button>
-          </div>
-        </div>
-      `
-    )
+          <span class="status-badge ${assignment.himeReservation === "あり" ? "hime" : "flag"}">${assignment.himeReservation === "あり" ? "姫あり" : "通常"}</span>
+        </button>
+      `;
+    })
     .join("");
 
-  elements.distributionPreview.innerHTML = `<div class="empty-state">確認を押すと個別シフトをここに表示します。</div>`;
+  elements.distributionList.querySelectorAll(".distribution-row").forEach((button) => {
+    button.addEventListener("click", () => {
+      const assignment = assignments[Number(button.dataset.distributionIndex)];
+      showDistributionPreview(assignment, dayPlan);
+    });
+  });
 
-  elements.distributionList.querySelectorAll(".distribution-preview-button").forEach((button) => {
-    button.addEventListener("click", () => showDistributionPreview(assignments[Number(button.dataset.distributionIndex)], dayPlan));
-  });
-  elements.distributionList.querySelectorAll(".distribution-export-button").forEach((button) => {
-    button.addEventListener("click", () => exportDistribution(assignments[Number(button.dataset.distributionIndex)], dayPlan));
-  });
+  const selectedAssignment =
+    assignments.find((assignment) => buildDistributionKey(dayPlan.dateKey, assignment) === state.selectedDistributionKey) || assignments[0];
+  renderDistributionPreview(selectedAssignment, dayPlan);
+}
+
+function handleDistributionDateChange() {
+  state.distributionDate = elements.distributionDateSelect.value;
+  state.selectedDistributionKey = "";
+  renderDistributionView();
 }
 
 function showDistributionPreview(assignment, dayPlan) {
+  state.selectedDistributionKey = buildDistributionKey(dayPlan.dateKey, assignment);
+  renderDistributionView();
+}
+
+function renderDistributionPreview(assignment, dayPlan) {
+  const message = buildDistributionMessage(assignment, dayPlan);
+  state.distributionPreviewText = message;
+  elements.distributionCopyButton.disabled = false;
   elements.distributionPreview.innerHTML = `
     <div class="distribution-preview-card">
       <strong>${assignment.name}</strong>
@@ -1328,18 +1422,39 @@ function showDistributionPreview(assignment, dayPlan) {
       <p>${assignment.shiftLabel} / ${assignment.area}</p>
       <p>${assignment.startTime} - ${assignment.endTime}</p>
       <p>${assignment.himeReservation === "あり" ? "姫予約あり" : "通常出勤"}</p>
-      <p>${assignment.note || "備考なし"}</p>
+      <pre class="distribution-message">${message}</pre>
     </div>
   `;
 }
 
-function exportDistribution(assignment, dayPlan) {
-  const text = `${assignment.name}\n${dayPlan.dateKey} ${dayPlan.weekday}曜\n${assignment.shiftLabel} ${assignment.area}\n${assignment.startTime}-${assignment.endTime}\n${assignment.himeReservation === "あり" ? "姫予約あり" : "通常出勤"}\n${assignment.note || "備考なし"}`;
-  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${assignment.name}_${dayPlan.dateKey}_shift.txt`;
-  link.click();
-  URL.revokeObjectURL(url);
+function copyDistributionPreview() {
+  if (!state.distributionPreviewText) {
+    return;
+  }
+
+  const text = state.distributionPreviewText;
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      elements.distributionCopyButton.textContent = "コピー済み";
+      window.setTimeout(() => {
+        elements.distributionCopyButton.textContent = "文言をコピー";
+      }, 1200);
+    });
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+}
+
+function buildDistributionMessage(assignment, dayPlan) {
+  return `${assignment.name}さん\n${dayPlan.dateKey}(${dayPlan.weekday})のシフトです。\n${assignment.shiftLabel} / ${assignment.area}\n${assignment.startTime}-${assignment.endTime}\n${assignment.himeReservation === "あり" ? "姫予約あり" : "通常出勤"}\n${assignment.note || "備考なし"}`;
+}
+
+function buildDistributionKey(dateKey, assignment) {
+  return `${dateKey}__${assignment.name}__${assignment.shiftLabel}`;
 }

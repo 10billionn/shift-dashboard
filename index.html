@@ -89,43 +89,35 @@
                       シフト希望CSV
                       <input id="csvFile" type="file" accept=".csv,text/csv">
                     </label>
+                    <label>
+                      過去実績データ
+                      <input id="historyCsvFile" type="file" accept=".csv,text/csv">
+                    </label>
                     <div id="csvImportStatus" class="import-status"></div>
+                    <div id="historyImportStatus" class="import-status"></div>
                     <div id="csvPreviewMeta" class="section-note"></div>
                     <div id="csvErrorList" class="error-list"></div>
                   </div>
                 </div>
                 <div class="setting-card">
-                  <h2>セラピスト一覧</h2>
+                  <h2>反映確認</h2>
                   <div id="therapistImportSummary" class="section-note"></div>
-                  <div id="therapistList" class="stack-list"></div>
+                  <div id="creationCheckSummary" class="summary-grid compact"></div>
                 </div>
               </aside>
 
               <section class="creation-main">
                 <div class="setting-card">
-                  <div class="sub-head">
-                    <h2>当日シフト盤面</h2>
-                    <div id="creationSelectedDateLabel" class="selected-date-label"></div>
-                  </div>
-                  <div class="day-switcher">
-                    <button id="creationPrevDayButton" class="ghost-button day-nav-button" type="button">◀ 前日</button>
-                    <button id="creationTodayButton" class="secondary-button day-nav-button" type="button">今日</button>
-                    <button id="creationNextDayButton" class="ghost-button day-nav-button" type="button">次日 ▶</button>
-                  </div>
-                  <div id="creationShiftBoard" class="today-shift-list"></div>
-                  <div id="creationAdjustmentAlerts" class="adjustment-alerts"></div>
+                  <h2>抜け漏れチェック</h2>
+                  <div id="creationCheckList" class="creation-check-list"></div>
                 </div>
               </section>
 
               <aside class="creation-side creation-right">
                 <div class="setting-card">
-                  <h2>サマリー</h2>
-                  <div id="creationSummaryCards" class="summary-grid compact"></div>
-                </div>
-                <div class="setting-card">
                   <h2>生成</h2>
                   <div id="generationSourceStatus" class="inline-status"></div>
-                  <button class="secondary-button secondary-action" type="button" id="generationActionButton">この条件で再計算</button>
+                  <button class="secondary-button secondary-action" type="button" id="generationActionButton">シフト生成</button>
                 </div>
               </aside>
             </div>
@@ -155,8 +147,17 @@
           </div>
           <section class="content-panel">
             <div class="distribution-layout">
-              <div id="distributionList" class="distribution-list"></div>
-              <div id="distributionPreview" class="distribution-preview"></div>
+              <div class="distribution-list-panel">
+                <label class="compact-field">
+                  日付
+                  <select id="distributionDateSelect"></select>
+                </label>
+                <div id="distributionList" class="distribution-list"></div>
+              </div>
+              <div class="distribution-preview-panel">
+                <div id="distributionPreview" class="distribution-preview"></div>
+                <button id="distributionCopyButton" class="secondary-button" type="button">文言をコピー</button>
+              </div>
             </div>
           </section>
         </section>
