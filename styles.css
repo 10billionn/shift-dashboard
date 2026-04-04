@@ -50,11 +50,7 @@ button {
 }
 
 .eyebrow {
-  margin: 0 0 4px;
-  color: var(--muted);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  display: none;
 }
 
 .selected-date-label {
@@ -152,6 +148,26 @@ button {
   border-left: 4px solid #e4c9a8;
 }
 
+.shift-card.area-kasai {
+  border-left-color: #2f80ed;
+}
+
+.shift-card.area-urayasu {
+  border-left-color: #27ae60;
+}
+
+.shift-card.area-funabashi {
+  border-left-color: #f2994a;
+}
+
+.shift-card.area-asakusabashi {
+  border-left-color: #9b51e0;
+}
+
+.shift-card.area-yachiyo {
+  border-left-color: #eb5757;
+}
+
 .shift-card.has-hime {
   border-left-color: #ea7a63;
 }
@@ -229,6 +245,8 @@ button {
 
 .area-text {
   justify-self: start;
+  background: #eef2f6;
+  color: var(--accent);
 }
 
 .time-grid {
@@ -265,6 +283,7 @@ button {
   color: var(--muted);
   display: grid;
   gap: 6px;
+  background: #fafbfd;
 }
 
 .empty-state {
@@ -289,6 +308,7 @@ button {
   .topbar {
     flex-direction: column;
     align-items: stretch;
+    padding: 12px;
   }
 
   .content-area {
@@ -330,7 +350,8 @@ button {
   }
 
   .shift-card-top {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .time-grid {

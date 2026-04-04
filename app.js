@@ -82,7 +82,7 @@ function renderShiftCards(members, shiftLabel) {
       const attendance = selectAttendanceFlag(profile.flags);
       const priorityTags = buildPriorityTags(member);
       return `
-        <article class="shift-card ${member.himeReservation === "あり" ? "has-hime" : ""}">
+        <article class="shift-card area-${areaClassName(member.preferredArea)} ${member.himeReservation === "あり" ? "has-hime" : ""}">
           <div class="shift-card-top">
             <strong class="therapist-name">${member.name}</strong>
             <div class="status-row">
@@ -156,6 +156,18 @@ function buildPriorityTags(member) {
 
 function selectAttendanceFlag(flags) {
   return flags.find((flag) => ["勤怠安定", "遅刻注意", "出稼ぎ"].includes(flag)) || "勤怠安定";
+}
+
+function areaClassName(area) {
+  return (
+    {
+      "葛西": "kasai",
+      "浦安": "urayasu",
+      "船橋": "funabashi",
+      "浅草橋": "asakusabashi",
+      "八千代": "yachiyo"
+    }[area] || "default"
+  );
 }
 
 function isEarlyShift(request) {
