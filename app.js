@@ -9,7 +9,8 @@
   },
   selectedDate: "",
   latestDailyPlans: [],
-  activeAnalysisTab: "fill"
+  activeAnalysisTab: "fill",
+  activeDailyShiftTab: "early"
 };
 
 const elements = {
@@ -26,6 +27,7 @@ const elements = {
   summary: document.querySelector("#summaryCards"),
   warningBox: document.querySelector("#warningBox"),
   todayShiftList: document.querySelector("#todayShiftList"),
+  todayAdjustmentAlerts: document.querySelector("#todayAdjustmentAlerts"),
   selectedDateLabel: document.querySelector("#selectedDateLabel"),
   prevDayButton: document.querySelector("#prevDayButton"),
   todayButton: document.querySelector("#todayButton"),
@@ -205,14 +207,7 @@ function handleGenerate() {
 
   state.latestDailyPlans = result.dailyPlans;
 
-  renderTodayShift(currentDayPlan);
-  renderPeriodSummary(result.summary.dateRangeText);
-  renderFillChart(result.dailyPlans);
-  renderSalesForecast(currentDayPlan, aggregate);
-  renderSummary(currentDayPlan, aggregate);
-  renderAlertDetails(result.warnings);
-  updateDayNavigation(result.dailyPlans);
-  renderAnalysisTab();
+  renderDashboardFromState(result.summary.dateRangeText);
 }
 
 function collectModel() {
@@ -336,6 +331,7 @@ function renderValidationState(errors) {
   elements.fillChart.innerHTML = `<div class="empty-state">週間の埋まり状況は生成後に表示されます。</div>`;
   elements.salesForecastPanel.innerHTML = `<div class="empty-state">売上予測は生成後に表示されます。</div>`;
   elements.summary.innerHTML = "";
+  elements.todayAdjustmentAlerts.innerHTML = "";
   renderAlertDetails(errors);
   updateDayNavigation([]);
   renderAnalysisTab();
@@ -349,44 +345,44 @@ function renderTodayShift(dayPlan) {
   }
 
   elements.selectedDateLabel.innerHTML = `${dayPlan.dateKey} (${dayPlan.weekday})`;
-  const assignments = [
-    ...dayPlan.earlyAssignments.map((assignment) => ({ ...assignment, shiftLabel: "早番" })),
-    ...dayPlan.lateAssignments.map((assignment) => ({ ...assignment, shiftLabel: "遅番" }))
-  ];
+  const earlyAssignments = dayPlan.earlyAssignments.map((assignment) => ({ ...assignment, shiftLabel: "早番" }));
+  const lateAssignments = dayPlan.lateAssignments.map((assignment) => ({ ...assignment, shiftLabel: "遅番" }));
 
-  if (!assignments.length) {
+  if (!earlyAssignments.length && !lateAssignments.length) {
     elements.todayShiftList.innerHTML = `<div class="empty-state">この日は割り当てがありません。</div>`;
     return;
   }
 
   elements.todayShiftList.innerHTML = `
-    <div class="shift-list">
-      <div class="shift-list-head">
-        <span>名前</span>
-        <span>エリア</span>
-        <span>早遅</span>
-        <span>状態</span>
-      </div>
-      ${assignments
-        .map((assignment) => {
-          const shortNote = compactShiftNote(assignment.note);
-          return `
-            <article class="shift-list-row ${assignment.himeReservation === "あり" ? "has-hime" : ""}">
-              <div class="shift-col shift-name" data-area="${assignment.area}">${assignment.name}</div>
-              <div class="shift-col shift-area">${assignment.area}</div>
-              <div class="shift-col shift-type">
-                <span class="shift-badge ${assignment.shiftLabel === "早番" ? "early" : "late"}">${assignment.shiftLabel === "早番" ? "早" : "遅"} ${compactTimeRange(assignment.startTime, assignment.endTime)}</span>
-              </div>
-              <div class="shift-col shift-state">
-                ${assignment.himeReservation === "あり" ? `<span class="hime-badge">姫</span>` : `<span class="state-text">-</span>`}
-                ${shortNote ? `<span class="state-note">${shortNote}</span>` : ""}
-              </div>
-            </article>
-          `;
-        })
-        .join("")}
+    <div class="daily-shift-tabs">
+      <button class="daily-shift-tab ${state.activeDailyShiftTab === "early" ? "active" : ""}" type="button" data-daily-tab="early">
+        早番 ${earlyAssignments.length}/${dayPlan.requirement.earlyNeeded}
+      </button>
+      <button class="daily-shift-tab ${state.activeDailyShiftTab === "late" ? "active" : ""}" type="button" data-daily-tab="late">
+        遅番 ${lateAssignments.length}/${dayPlan.requirement.lateNeeded}
+      </button>
+    </div>
+    <div class="daily-shift-columns">
+      <section class="shift-team-panel ${state.activeDailyShiftTab === "early" ? "active" : ""}" data-shift-panel="early" data-drop-shift="early">
+        <div class="shift-team-head">早番 ${earlyAssignments.length}/${dayPlan.requirement.earlyNeeded}</div>
+        ${renderShiftTeamList(earlyAssignments, "early")}
+      </section>
+      <section class="shift-team-panel ${state.activeDailyShiftTab === "late" ? "active" : ""}" data-shift-panel="late" data-drop-shift="late">
+        <div class="shift-team-head">遅番 ${lateAssignments.length}/${dayPlan.requirement.lateNeeded}</div>
+        ${renderShiftTeamList(lateAssignments, "late")}
+      </section>
     </div>
   `;
+
+  elements.todayShiftList.querySelectorAll(".daily-shift-tab").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.activeDailyShiftTab = button.dataset.dailyTab;
+      renderTodayShift(dayPlan);
+    });
+  });
+
+  bindShiftAdjustmentEvents();
+  renderTodayAdjustmentAlerts(dayPlan);
 }
 
 function renderPeriodSummary(dateRangeText) {
@@ -581,6 +577,21 @@ function renderSalesForecast(dayPlan, aggregate) {
   `;
 }
 
+function renderDashboardFromState(dateRangeText = elements.periodSummary.textContent) {
+  const currentDayPlan = findCurrentDayPlan(state.latestDailyPlans);
+  const aggregate = buildDashboardAggregate(state.latestDailyPlans);
+  const combinedWarnings = [...buildCoverageWarnings(state.latestDailyPlans), ...buildAdjustmentWarnings(currentDayPlan)];
+
+  renderTodayShift(currentDayPlan);
+  renderPeriodSummary(dateRangeText);
+  renderFillChart(state.latestDailyPlans);
+  renderSalesForecast(currentDayPlan, aggregate);
+  renderSummary(currentDayPlan, aggregate);
+  renderAlertDetails(combinedWarnings);
+  updateDayNavigation(state.latestDailyPlans);
+  renderAnalysisTab();
+}
+
 function updateDayNavigation(dailyPlans) {
   const dateList = dailyPlans.map((day) => day.dateKey);
   const selectedIndex = dateList.indexOf(state.selectedDate);
@@ -604,14 +615,14 @@ function moveSelectedDate(offset) {
   }
 
   state.selectedDate = dateList[nextIndex];
-  handleGenerate();
+  renderDashboardFromState();
 }
 
 function jumpToToday() {
   const dateList = state.latestDailyPlans.map((day) => day.dateKey);
   const actualToday = formatDate(new Date());
   state.selectedDate = dateList.includes(actualToday) ? actualToday : dateList[0] || samplePrototypeData.settings.startDate;
-  handleGenerate();
+  renderDashboardFromState();
 }
 
 function ensureSelectedDateInRange() {
@@ -907,4 +918,212 @@ function estimateStoreDrop(dayPlan) {
 
 function formatCompactCurrency(value) {
   return `${Math.round(value / 1000).toLocaleString("ja-JP")}k`;
+}
+
+function renderShiftTeamList(assignments, shift) {
+  if (!assignments.length) {
+    return `<div class="empty-state compact">割り当てなし</div>`;
+  }
+
+  return `
+    <div class="shift-list">
+      <div class="shift-list-head">
+        <span>名前</span>
+        <span>エリア</span>
+        <span>時間</span>
+        <span>調整</span>
+      </div>
+      ${assignments
+        .map((assignment, index) => {
+          const shortNote = compactShiftNote(assignment.note);
+          return `
+            <article class="shift-list-row ${assignment.himeReservation === "あり" ? "has-hime" : ""}" draggable="true" data-shift="${shift}" data-index="${index}">
+              <div class="shift-col shift-name" data-area="${assignment.area}">${assignment.name}</div>
+              <div class="shift-col shift-area">${assignment.area}</div>
+              <div class="shift-col shift-type">
+                <span class="shift-badge ${assignment.shiftLabel === "早番" ? "early" : "late"}">${compactTimeRange(assignment.startTime, assignment.endTime)}</span>
+              </div>
+              <div class="shift-col shift-actions">
+                ${assignment.himeReservation === "あり" ? `<span class="hime-badge">姫</span>` : `<span class="state-text">-</span>`}
+                ${shortNote ? `<span class="state-note">${shortNote}</span>` : ""}
+                <button class="shift-toggle-button" type="button" data-shift="${shift}" data-index="${index}">
+                  ${shift === "early" ? "遅へ" : "早へ"}
+                </button>
+                <select class="shift-area-select" data-shift="${shift}" data-index="${index}">
+                  ${samplePrototypeData.settings.areas
+                    .map((area) => `<option value="${area}" ${assignment.area === area ? "selected" : ""}>${area}</option>`)
+                    .join("")}
+                </select>
+              </div>
+            </article>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function bindShiftAdjustmentEvents() {
+  elements.todayShiftList.querySelectorAll(".shift-list-row").forEach((row) => {
+    row.addEventListener("dragstart", handleShiftRowDragStart);
+    row.addEventListener("dragover", handleShiftRowDragOver);
+    row.addEventListener("drop", handleShiftRowDrop);
+  });
+
+  elements.todayShiftList.querySelectorAll("[data-drop-shift]").forEach((panel) => {
+    panel.addEventListener("dragover", handleShiftPanelDragOver);
+    panel.addEventListener("drop", handleShiftPanelDrop);
+  });
+
+  elements.todayShiftList.querySelectorAll(".shift-toggle-button").forEach((button) => {
+    button.addEventListener("click", () => {
+      applyShiftToggle(button.dataset.shift, Number(button.dataset.index));
+    });
+  });
+
+  elements.todayShiftList.querySelectorAll(".shift-area-select").forEach((select) => {
+    select.addEventListener("change", () => {
+      applyAreaChange(select.dataset.shift, Number(select.dataset.index), select.value);
+    });
+  });
+}
+
+function handleShiftRowDragStart(event) {
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData(
+    "text/plain",
+    JSON.stringify({
+      fromShift: event.currentTarget.dataset.shift,
+      fromIndex: Number(event.currentTarget.dataset.index)
+    })
+  );
+}
+
+function handleShiftRowDragOver(event) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+}
+
+function handleShiftRowDrop(event) {
+  event.preventDefault();
+  const payload = readDragPayload(event);
+  if (!payload) {
+    return;
+  }
+  applyAssignmentMove(payload.fromShift, payload.fromIndex, event.currentTarget.dataset.shift, Number(event.currentTarget.dataset.index));
+}
+
+function handleShiftPanelDragOver(event) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+}
+
+function handleShiftPanelDrop(event) {
+  event.preventDefault();
+  const payload = readDragPayload(event);
+  if (!payload) {
+    return;
+  }
+  const dayPlan = findCurrentDayPlan(state.latestDailyPlans);
+  const targetList = getShiftAssignments(dayPlan, event.currentTarget.dataset.dropShift);
+  applyAssignmentMove(payload.fromShift, payload.fromIndex, event.currentTarget.dataset.dropShift, targetList.length);
+}
+
+function readDragPayload(event) {
+  try {
+    return JSON.parse(event.dataTransfer.getData("text/plain"));
+  } catch {
+    return null;
+  }
+}
+
+function applyShiftToggle(fromShift, fromIndex) {
+  const toShift = fromShift === "early" ? "late" : "early";
+  const dayPlan = findCurrentDayPlan(state.latestDailyPlans);
+  const targetList = getShiftAssignments(dayPlan, toShift);
+  applyAssignmentMove(fromShift, fromIndex, toShift, targetList.length);
+}
+
+function applyAreaChange(shift, index, nextArea) {
+  const dayPlan = findCurrentDayPlan(state.latestDailyPlans);
+  const assignment = getShiftAssignments(dayPlan, shift)[index];
+  if (!assignment) {
+    return;
+  }
+  assignment.area = nextArea;
+  renderDashboardFromState();
+}
+
+function applyAssignmentMove(fromShift, fromIndex, toShift, toIndex) {
+  const dayPlan = findCurrentDayPlan(state.latestDailyPlans);
+  const fromList = getShiftAssignments(dayPlan, fromShift);
+  const toList = getShiftAssignments(dayPlan, toShift);
+  const [assignment] = fromList.splice(fromIndex, 1);
+
+  if (!assignment) {
+    return;
+  }
+
+  let insertIndex = Math.max(0, Math.min(toIndex, toList.length));
+  if (fromShift === toShift && insertIndex > fromIndex) {
+    insertIndex -= 1;
+  }
+  toList.splice(insertIndex, 0, assignment);
+  renderDashboardFromState();
+}
+
+function getShiftAssignments(dayPlan, shift) {
+  return shift === "early" ? dayPlan.earlyAssignments : dayPlan.lateAssignments;
+}
+
+function buildAdjustmentWarnings(dayPlan) {
+  if (!dayPlan) {
+    return [];
+  }
+
+  const warnings = [];
+  ["early", "late"].forEach((shift) => {
+    const counts = new Map();
+    getShiftAssignments(dayPlan, shift).forEach((assignment) => {
+      counts.set(assignment.area, (counts.get(assignment.area) || 0) + 1);
+      const duration = toMinutes(assignment.endTime) - toMinutes(assignment.startTime);
+      if (duration < 120) {
+        warnings.push(`${dayPlan.dateKey} の${shift === "early" ? "早番" : "遅番"}で ${assignment.name} の最終受付余白が不足の可能性があります。`);
+      }
+    });
+
+    counts.forEach((count, area) => {
+      if (count > 1) {
+        warnings.push(`${dayPlan.dateKey} の${shift === "early" ? "早番" : "遅番"}で ${area} が重複しています。`);
+      }
+    });
+  });
+
+  return warnings;
+}
+
+function buildCoverageWarnings(dailyPlans) {
+  const warnings = [];
+  dailyPlans.forEach((dayPlan) => {
+    if (dayPlan.earlyAssignments.length < dayPlan.requirement.earlyNeeded) {
+      warnings.push(`${dayPlan.dateKey} の早番が ${dayPlan.requirement.earlyNeeded - dayPlan.earlyAssignments.length} 人不足しています。`);
+    }
+    if (dayPlan.lateAssignments.length < dayPlan.requirement.lateNeeded) {
+      warnings.push(`${dayPlan.dateKey} の遅番が ${dayPlan.requirement.lateNeeded - dayPlan.lateAssignments.length} 人不足しています。`);
+    }
+  });
+  return warnings;
+}
+
+function renderTodayAdjustmentAlerts(dayPlan) {
+  const warnings = buildAdjustmentWarnings(dayPlan);
+  if (!warnings.length) {
+    elements.todayAdjustmentAlerts.innerHTML = `<div class="ok-box compact">手動調整の警告はありません。</div>`;
+    return;
+  }
+  elements.todayAdjustmentAlerts.innerHTML = `
+    <div class="warning-box compact">
+      <ul>${warnings.map((warning) => `<li>${warning}</li>`).join("")}</ul>
+    </div>
+  `;
 }

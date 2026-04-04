@@ -299,6 +299,31 @@ textarea:focus {
   margin-top: 10px;
 }
 
+.adjustment-alerts {
+  margin-top: 10px;
+}
+
+.daily-shift-tabs {
+  display: none;
+}
+
+.daily-shift-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.shift-team-panel {
+  min-width: 0;
+}
+
+.shift-team-head {
+  margin-bottom: 8px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
 .shift-list {
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -325,6 +350,7 @@ textarea:focus {
 .shift-list-row {
   border-top: 1px solid var(--line);
   font-size: 0.84rem;
+  cursor: grab;
 }
 
 .shift-list-row.has-hime {
@@ -341,6 +367,14 @@ textarea:focus {
 
 .shift-area,
 .shift-state {
+  color: var(--muted);
+}
+
+.shift-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
   color: var(--muted);
 }
 
@@ -402,6 +436,23 @@ textarea:focus {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.shift-toggle-button {
+  min-height: 28px;
+  padding: 4px 8px;
+  background: #edf2f7;
+  color: var(--accent);
+  font-size: 0.74rem;
+}
+
+.shift-area-select {
+  width: auto;
+  min-width: 72px;
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 0.74rem;
+  border-radius: 8px;
 }
 
 .summary-grid {
@@ -476,6 +527,13 @@ textarea:focus {
   border-radius: 12px;
   border: 1px solid var(--line);
   background: #fff;
+}
+
+.warning-box.compact,
+.ok-box.compact,
+.empty-state.compact {
+  padding: 8px 10px;
+  font-size: 0.78rem;
 }
 
 .warning-box {
@@ -800,6 +858,39 @@ textarea:focus {
     align-items: stretch;
   }
 
+  .daily-shift-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .daily-shift-tab {
+    flex: 1 1 0;
+    min-height: 38px;
+    background: #eef2f5;
+    color: var(--muted);
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+
+  .daily-shift-tab.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .daily-shift-columns {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .shift-team-panel {
+    display: none;
+  }
+
+  .shift-team-panel.active {
+    display: block;
+  }
+
   .compact-field,
   .compact-field-date,
   .day-nav-button,
@@ -835,11 +926,16 @@ textarea:focus {
     display: none;
   }
 
+  .shift-team-head {
+    display: none;
+  }
+
   .shift-list-row {
     grid-template-columns: 1fr;
     gap: 3px;
     padding: 8px 10px;
     font-size: 0.8rem;
+    cursor: default;
   }
 
   .shift-name::after {
@@ -891,10 +987,17 @@ textarea:focus {
   }
 
   .shift-col.shift-type,
-  .shift-col.shift-state {
+  .shift-col.shift-state,
+  .shift-col.shift-actions {
     display: flex;
     align-items: center;
     gap: 6px;
+  }
+
+  .shift-toggle-button,
+  .shift-area-select {
+    width: auto;
+    min-height: 28px;
   }
 
   .shift-sub,
