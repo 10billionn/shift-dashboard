@@ -6,7 +6,9 @@
     errorCount: 0,
     lastImportedAt: "",
     errors: []
-  }
+  },
+  selectedDate: "",
+  latestDailyPlans: []
 };
 
 const elements = {
@@ -21,7 +23,11 @@ const elements = {
   summary: document.querySelector("#summaryCards"),
   judgmentArea: document.querySelector("#judgmentArea"),
   warningBox: document.querySelector("#warningBox"),
-  resultTable: document.querySelector("#resultTable"),
+  todayShiftList: document.querySelector("#todayShiftList"),
+  selectedDateLabel: document.querySelector("#selectedDateLabel"),
+  prevDayButton: document.querySelector("#prevDayButton"),
+  todayButton: document.querySelector("#todayButton"),
+  nextDayButton: document.querySelector("#nextDayButton"),
   generateButton: document.querySelector("#generateButton"),
   generationActionButton: document.querySelector("#generationActionButton"),
   generationSourceStatus: document.querySelector("#generationSourceStatus"),
@@ -48,12 +54,15 @@ function initializePrototype() {
   elements.generateButton.addEventListener("click", handleGenerate);
   elements.generationActionButton.addEventListener("click", handleGenerate);
   elements.loadSampleButton.addEventListener("click", loadSampleData);
-  elements.startDate.addEventListener("change", syncRequirementRows);
+  elements.startDate.addEventListener("change", handleStartDateChange);
   elements.days.addEventListener("change", syncRequirementRows);
   window.addEventListener("resize", handleGenerate);
   elements.menuToggle.addEventListener("click", () => toggleSidebar());
   elements.sidebarOverlay.addEventListener("click", () => closeSidebar());
   elements.csvFile.addEventListener("change", handleCsvUpload);
+  elements.prevDayButton.addEventListener("click", () => moveSelectedDate(-1));
+  elements.todayButton.addEventListener("click", () => jumpToToday());
+  elements.nextDayButton.addEventListener("click", () => moveSelectedDate(1));
 
   elements.sidebarNav.querySelectorAll(".nav-item").forEach((button) => {
     button.addEventListener("click", () => setActiveView(button.dataset.view));
@@ -81,11 +90,18 @@ function loadSampleData() {
     lastImportedAt: formatTimestamp(new Date()),
     errors: []
   };
+  state.selectedDate = samplePrototypeData.settings.startDate;
 
   syncRequirementRows();
   renderImportedDataState();
   setDemandMode("manual");
   setActiveView("dashboard");
+  handleGenerate();
+}
+
+function handleStartDateChange() {
+  syncRequirementRows();
+  ensureSelectedDateInRange();
   handleGenerate();
 }
 
@@ -151,6 +167,7 @@ function handleCsvUpload(event) {
         lastImportedAt: formatTimestamp(new Date()),
         errors: parsed.errors
       };
+      ensureSelectedDateInRange();
       renderImportedDataState();
       handleGenerate();
       setActiveView("history");
@@ -180,13 +197,17 @@ function handleGenerate() {
 
   const result = generateShiftPlan(model);
   const aggregate = buildDashboardAggregate(result.dailyPlans);
+  const currentDayPlan = findCurrentDayPlan(result.dailyPlans);
 
+  state.latestDailyPlans = result.dailyPlans;
+
+  renderTodayShift(currentDayPlan);
   renderPeriodSummary(result.summary.dateRangeText);
   renderFillChart(result.dailyPlans);
-  renderSummary(aggregate);
-  renderJudgmentArea(aggregate, result.warnings);
+  renderSummary(currentDayPlan, aggregate);
+  renderJudgmentArea(currentDayPlan, aggregate, result.warnings);
   renderAlertDetails(result.warnings);
-  renderResultTable(result.dailyPlans);
+  updateDayNavigation(result.dailyPlans);
 }
 
 function collectModel() {
@@ -304,12 +325,49 @@ function renderCsvImportState() {
 }
 
 function renderValidationState(errors) {
-  elements.periodSummary.innerHTML = `<div class="empty-state">開始日を設定すると対象期間が表示されます。</div>`;
-  elements.fillChart.innerHTML = `<div class="empty-state">CSVを読み込むと、1週間の埋まり状況グラフがここに表示されます。</div>`;
+  elements.selectedDateLabel.innerHTML = "";
+  elements.todayShiftList.innerHTML = `<div class="empty-state">CSVを読み込むと当日のシフトがここに表示されます。</div>`;
+  elements.periodSummary.innerHTML = `<div class="period-card">対象期間を設定してください。</div>`;
+  elements.fillChart.innerHTML = `<div class="empty-state">週間の埋まり状況は生成後に表示されます。</div>`;
   elements.summary.innerHTML = "";
   elements.judgmentArea.innerHTML = `<div class="alert-summary danger">${errors.join(" / ")}</div>`;
   renderAlertDetails(errors);
-  elements.resultTable.innerHTML = "";
+  updateDayNavigation([]);
+}
+
+function renderTodayShift(dayPlan) {
+  if (!dayPlan) {
+    elements.selectedDateLabel.innerHTML = "対象日なし";
+    elements.todayShiftList.innerHTML = `<div class="empty-state">表示できる当日シフトがありません。</div>`;
+    return;
+  }
+
+  elements.selectedDateLabel.innerHTML = `${dayPlan.dateKey} (${dayPlan.weekday})`;
+  const assignments = [
+    ...dayPlan.earlyAssignments.map((assignment) => ({ ...assignment, shiftLabel: "早番" })),
+    ...dayPlan.lateAssignments.map((assignment) => ({ ...assignment, shiftLabel: "遅番" }))
+  ];
+
+  if (!assignments.length) {
+    elements.todayShiftList.innerHTML = `<div class="empty-state">この日は割り当てがありません。</div>`;
+    return;
+  }
+
+  elements.todayShiftList.innerHTML = assignments
+    .map(
+      (assignment) => `
+        <article class="shift-row ${assignment.himeReservation === "あり" ? "has-hime" : ""}">
+          <div class="shift-main">
+            <strong>${assignment.name}</strong>
+            <span class="shift-badge">${assignment.shiftLabel}</span>
+            ${assignment.himeReservation === "あり" ? `<span class="hime-badge">姫予約</span>` : ""}
+          </div>
+          <div class="shift-sub">${assignment.area} / ${assignment.startTime} - ${assignment.endTime}</div>
+          <div class="shift-note">${assignment.note || "備考なし"}</div>
+        </article>
+      `
+    )
+    .join("");
 }
 
 function renderPeriodSummary(dateRangeText) {
@@ -331,13 +389,12 @@ function renderFillChart(dailyPlans) {
             return `
               <div class="chart-mobile-item ${toneClass}">
                 <div class="chart-mobile-head">
-                  <strong>${day.dateKey}</strong>
+                  <strong>${day.dateKey.slice(5)} ${day.weekday}</strong>
                   <span>${fillRate}%</span>
                 </div>
                 <div class="chart-mobile-bar">
                   <span class="chart-mobile-bar-fill ${toneClass}" style="width:${Math.min(fillRate, 100)}%"></span>
                 </div>
-                <div class="chart-mobile-meta">${assigned}/${required}枠 ${shortage > 0 ? `・ ${shortage}枠不足` : "・ 充足"}</div>
               </div>
             `;
           })
@@ -348,8 +405,8 @@ function renderFillChart(dailyPlans) {
   }
 
   const chartWidth = 640;
-  const chartHeight = 220;
-  const padding = { top: 18, right: 18, bottom: 48, left: 36 };
+  const chartHeight = 180;
+  const padding = { top: 16, right: 16, bottom: 36, left: 34 };
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
   const points = dailyPlans.map((day, index) => {
@@ -358,46 +415,29 @@ function renderFillChart(dailyPlans) {
     const fillRate = required ? Math.round((assigned / required) * 100) : 100;
     const x = padding.left + (dailyPlans.length === 1 ? innerWidth / 2 : (innerWidth / Math.max(dailyPlans.length - 1, 1)) * index);
     const y = padding.top + innerHeight - (Math.min(fillRate, 100) / 100) * innerHeight;
-    return {
-      dateKey: day.dateKey,
-      shortDate: day.dateKey.slice(5),
-      fillRate,
-      shortage: Math.max(required - assigned, 0),
-      x,
-      y
-    };
+    return { dateKey: day.dateKey, shortDate: day.dateKey.slice(5), fillRate, shortage: Math.max(required - assigned, 0), x, y };
   });
 
   const polyline = points.map((point) => `${point.x},${point.y}`).join(" ");
   const areaPath = points.length
     ? `M ${points[0].x} ${padding.top + innerHeight} L ${points.map((point) => `${point.x} ${point.y}`).join(" L ")} L ${points[points.length - 1].x} ${padding.top + innerHeight} Z`
     : "";
-  const yAxis = [0, 50, 100]
-    .map((tick) => {
-      const y = padding.top + innerHeight - (tick / 100) * innerHeight;
-      return `
-        <line x1="${padding.left}" y1="${y}" x2="${chartWidth - padding.right}" y2="${y}" class="chart-grid-line"></line>
-        <text x="${padding.left - 8}" y="${y + 4}" class="chart-axis-label">${tick}</text>
-      `;
-    })
-    .join("");
 
   elements.fillChart.innerHTML = `
     <div class="chart-wrap">
-      <svg viewBox="0 0 ${chartWidth} ${chartHeight}" class="chart-svg" role="img" aria-label="1週間の埋まり状況グラフ">
-        ${yAxis}
+      <svg viewBox="0 0 ${chartWidth} ${chartHeight}" class="chart-svg" role="img" aria-label="週間の埋まり状況グラフ">
         <path d="${areaPath}" class="chart-area"></path>
         <polyline points="${polyline}" class="chart-line"></polyline>
         ${points
           .map(
             (point) => `
-              <circle cx="${point.x}" cy="${point.y}" r="5" class="${point.shortage > 0 ? "chart-point danger" : "chart-point ok"}"></circle>
-              <text x="${point.x}" y="${chartHeight - 18}" class="chart-date-label">${point.shortDate}</text>
+              <circle cx="${point.x}" cy="${point.y}" r="4.5" class="chart-point ${point.shortage > 0 ? "danger" : "ok"}"></circle>
+              <text x="${point.x}" y="${chartHeight - 10}" class="chart-date-label">${point.shortDate}</text>
             `
           )
           .join("")}
       </svg>
-      <div class="chart-legend">
+      <div class="chart-legend compact">
         ${points
           .map(
             (point) => `
@@ -413,12 +453,22 @@ function renderFillChart(dailyPlans) {
   `;
 }
 
-function renderSummary(aggregate) {
+function renderSummary(dayPlan, aggregate) {
+  if (!dayPlan) {
+    elements.summary.innerHTML = "";
+    return;
+  }
+
+  const required = dayPlan.requirement.earlyNeeded + dayPlan.requirement.lateNeeded;
+  const assigned = dayPlan.earlyAssignments.length + dayPlan.lateAssignments.length;
+  const shortage = Math.max(required - assigned, 0);
+  const fillRate = required ? Math.round((assigned / required) * 100) : 0;
   const cards = [
-    { label: "必要枠", value: `${aggregate.requiredSlots}枠`, tone: "default" },
-    { label: "割当数", value: `${aggregate.assignedSlots}件`, tone: "good" },
-    { label: "不足数", value: `${aggregate.shortageSlots}枠`, tone: aggregate.shortageSlots ? "danger" : "good" },
-    { label: "充足率", value: `${aggregate.fillRate}%`, tone: aggregate.fillRate >= 100 ? "good" : "default" }
+    { label: "必要枠", value: `${required}枠`, tone: "default" },
+    { label: "割当数", value: `${assigned}件`, tone: "good" },
+    { label: "不足数", value: `${shortage}枠`, tone: shortage ? "danger" : "good" },
+    { label: "週不足", value: `${aggregate.shortageSlots}枠`, tone: aggregate.shortageSlots ? "default" : "good" },
+    { label: "当日充足率", value: `${fillRate}%`, tone: fillRate >= 100 ? "good" : "default" }
   ];
 
   elements.summary.innerHTML = cards
@@ -433,18 +483,26 @@ function renderSummary(aggregate) {
     .join("");
 }
 
-function renderJudgmentArea(aggregate, warnings) {
-  const maxShort = aggregate.mostShortDay;
-  const summaryLines = [];
+function renderJudgmentArea(dayPlan, aggregate, warnings) {
+  if (!dayPlan) {
+    elements.judgmentArea.innerHTML = "";
+    return;
+  }
 
-  summaryLines.push(aggregate.shortageSlots ? "不足あり" : "不足なし");
-  summaryLines.push(`${aggregate.totalDays}日中${aggregate.shortageDays.length}日で不足`);
-  summaryLines.push(maxShort ? `優先対応日: ${maxShort.dateKey}（${maxShort.shortage}枠不足）` : "優先対応日: なし");
-  summaryLines.push(warnings.length ? "詳細は展開で確認" : "大きなアラートはありません");
+  const required = dayPlan.requirement.earlyNeeded + dayPlan.requirement.lateNeeded;
+  const assigned = dayPlan.earlyAssignments.length + dayPlan.lateAssignments.length;
+  const shortage = Math.max(required - assigned, 0);
+  const maxShort = aggregate.mostShortDay;
+  const lines = [
+    shortage ? `当日不足あり: ${shortage}枠` : "当日不足なし",
+    `出勤希望: ${dayPlan.availableCount}人 / 未割当: ${dayPlan.offMembers.length}人`,
+    maxShort ? `週最大不足日: ${maxShort.dateKey}（${maxShort.shortage}枠）` : "週最大不足日: なし",
+    warnings.length ? "詳細は展開で確認" : "大きなアラートはありません"
+  ];
 
   elements.judgmentArea.innerHTML = `
-    <div class="alert-summary ${warnings.length ? "danger" : "ok"}">
-      ${summaryLines.map((line) => `<div>${line}</div>`).join("")}
+    <div class="alert-summary ${shortage || warnings.length ? "danger" : "ok"}">
+      ${lines.map((line) => `<div>${line}</div>`).join("")}
     </div>
   `;
 }
@@ -462,118 +520,6 @@ function renderAlertDetails(warnings) {
   `;
 }
 
-function renderResultTable(dailyPlans) {
-  const isMobile = window.innerWidth <= 768;
-
-  if (isMobile) {
-    elements.resultTable.innerHTML = dailyPlans
-      .map((day) => {
-        const assignments = [...day.earlyAssignments, ...day.lateAssignments];
-        const assignmentMarkup = assignments.length
-          ? assignments
-              .map((assignment) => {
-                const shiftLabel = day.earlyAssignments.includes(assignment) ? "早番" : "遅番";
-                return `
-                  <div class="mobile-result-item">
-                    <div class="mobile-result-top">
-                      <strong>${assignment.name}</strong>
-                      <span>${shiftLabel}</span>
-                    </div>
-                    <div>${assignment.area}</div>
-                    <div>${assignment.startTime} - ${assignment.endTime}</div>
-                    <div>${assignment.himeReservation}</div>
-                    <div>${assignment.note || "-"}</div>
-                  </div>
-                `;
-              })
-              .join("")
-          : `<div class="mobile-result-item empty">割り当てなし</div>`;
-
-        return `
-          <article class="mobile-day-card">
-            <div class="mobile-day-head">
-              <strong>${day.dateKey}</strong>
-              <span>${day.weekday}曜</span>
-            </div>
-            <div class="mobile-day-meta">
-              必要人数: 早番 ${day.requirement.earlyNeeded} / 遅番 ${day.requirement.lateNeeded}
-            </div>
-            <div class="mobile-result-list">${assignmentMarkup}</div>
-            <div class="mobile-day-meta">
-              出勤希望: ${day.availableCount}人 / 未割当: ${day.offMembers.length ? day.offMembers.join(", ") : "なし"}
-            </div>
-          </article>
-        `;
-      })
-      .join("");
-    return;
-  }
-
-  const rows = dailyPlans
-    .map((day) => {
-      const assignmentRows = [
-        ...day.earlyAssignments.map((assignment) => renderAssignmentRow(day, assignment, "早番")),
-        ...day.lateAssignments.map((assignment) => renderAssignmentRow(day, assignment, "遅番"))
-      ];
-
-      if (!assignmentRows.length) {
-        assignmentRows.push(`
-          <tr>
-            <td>${day.dateKey}</td>
-            <td>${day.weekday}</td>
-            <td colspan="6">割り当てなし</td>
-          </tr>
-        `);
-      }
-
-      assignmentRows.push(`
-        <tr class="day-meta-row">
-          <td colspan="8">
-            必要人数: 早番 ${day.requirement.earlyNeeded} / 遅番 ${day.requirement.lateNeeded}
-            ・ 出勤希望: ${day.availableCount}人
-            ・ 未割当: ${day.offMembers.length ? day.offMembers.join(", ") : "なし"}
-          </td>
-        </tr>
-      `);
-
-      return assignmentRows.join("");
-    })
-    .join("");
-
-  elements.resultTable.innerHTML = `
-    <table>
-      <thead>
-        <tr>
-          <th>日付</th>
-          <th>曜</th>
-          <th>名前</th>
-          <th>エリア</th>
-          <th>区分</th>
-          <th>時間</th>
-          <th>姫予約</th>
-          <th>備考</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-  `;
-}
-
-function renderAssignmentRow(day, assignment, shiftLabel) {
-  return `
-    <tr>
-      <td>${day.dateKey}</td>
-      <td>${day.weekday}</td>
-      <td>${assignment.name}</td>
-      <td>${assignment.area}</td>
-      <td>${shiftLabel}</td>
-      <td>${assignment.startTime} - ${assignment.endTime}</td>
-      <td>${assignment.himeReservation}</td>
-      <td>${assignment.note || "-"}</td>
-    </tr>
-  `;
-}
-
 function buildDashboardAggregate(dailyPlans) {
   const aggregate = {
     totalDays: dailyPlans.length,
@@ -581,11 +527,10 @@ function buildDashboardAggregate(dailyPlans) {
     assignedSlots: 0,
     shortageSlots: 0,
     shortageDays: [],
-    shortageRanking: [],
     mostShortDay: null,
     fillRate: 0
   };
-  const shortagePerDay = [];
+  const rankedDays = [];
 
   dailyPlans.forEach((day) => {
     const required = day.requirement.earlyNeeded + day.requirement.lateNeeded;
@@ -598,25 +543,58 @@ function buildDashboardAggregate(dailyPlans) {
 
     if (shortage > 0) {
       aggregate.shortageDays.push(day.dateKey);
-      shortagePerDay.push({
-        dateKey: day.dateKey,
-        weekday: day.weekday,
-        required,
-        assigned,
-        shortage
-      });
+      rankedDays.push({ dateKey: day.dateKey, shortage });
     }
   });
 
-  aggregate.fillRate = aggregate.requiredSlots
-    ? Math.round((aggregate.assignedSlots / aggregate.requiredSlots) * 100)
-    : 0;
-
-  const rankedDays = shortagePerDay.sort((left, right) => right.shortage - left.shortage || left.dateKey.localeCompare(right.dateKey));
-  aggregate.shortageRanking = rankedDays;
-  aggregate.mostShortDay = aggregate.shortageRanking[0] || null;
-
+  aggregate.fillRate = aggregate.requiredSlots ? Math.round((aggregate.assignedSlots / aggregate.requiredSlots) * 100) : 0;
+  aggregate.mostShortDay = rankedDays.sort((left, right) => right.shortage - left.shortage || left.dateKey.localeCompare(right.dateKey))[0] || null;
   return aggregate;
+}
+
+function updateDayNavigation(dailyPlans) {
+  const dateList = dailyPlans.map((day) => day.dateKey);
+  const selectedIndex = dateList.indexOf(state.selectedDate);
+  const hasDates = dateList.length > 0;
+
+  elements.prevDayButton.disabled = !hasDates || selectedIndex <= 0;
+  elements.nextDayButton.disabled = !hasDates || selectedIndex === -1 || selectedIndex >= dateList.length - 1;
+  elements.todayButton.disabled = !hasDates;
+}
+
+function moveSelectedDate(offset) {
+  const dateList = state.latestDailyPlans.map((day) => day.dateKey);
+  const currentIndex = dateList.indexOf(state.selectedDate);
+  if (currentIndex === -1) {
+    return;
+  }
+
+  const nextIndex = currentIndex + offset;
+  if (nextIndex < 0 || nextIndex >= dateList.length) {
+    return;
+  }
+
+  state.selectedDate = dateList[nextIndex];
+  handleGenerate();
+}
+
+function jumpToToday() {
+  const dateList = state.latestDailyPlans.map((day) => day.dateKey);
+  const actualToday = formatDate(new Date());
+  state.selectedDate = dateList.includes(actualToday) ? actualToday : dateList[0] || samplePrototypeData.settings.startDate;
+  handleGenerate();
+}
+
+function ensureSelectedDateInRange() {
+  const dateList = createDateList(elements.startDate.value || samplePrototypeData.settings.startDate, Number(elements.days.value) || 7);
+  if (!dateList.includes(state.selectedDate)) {
+    state.selectedDate = dateList[0] || samplePrototypeData.settings.startDate;
+  }
+}
+
+function findCurrentDayPlan(dailyPlans) {
+  ensureSelectedDateInRange();
+  return dailyPlans.find((day) => day.dateKey === state.selectedDate) || dailyPlans[0] || null;
 }
 
 function setActiveView(viewName) {
@@ -632,11 +610,7 @@ function setActiveView(viewName) {
 }
 
 function toggleSidebar(forceState) {
-  const nextState =
-    typeof forceState === "boolean"
-      ? forceState
-      : !elements.sidebar.classList.contains("open");
-
+  const nextState = typeof forceState === "boolean" ? forceState : !elements.sidebar.classList.contains("open");
   elements.sidebar.classList.toggle("open", nextState);
   elements.sidebarOverlay.classList.toggle("visible", nextState);
   elements.menuToggle.setAttribute("aria-expanded", String(nextState));
@@ -659,13 +633,7 @@ function aggregateTherapists(shiftRequests) {
   const map = new Map();
 
   shiftRequests.forEach((request) => {
-    const current = map.get(request.name) || {
-      name: request.name,
-      preferredAreas: new Set(),
-      himeCount: 0,
-      entries: []
-    };
-
+    const current = map.get(request.name) || { name: request.name, preferredAreas: new Set(), himeCount: 0, entries: [] };
     current.preferredAreas.add(request.preferredArea);
     current.himeCount += request.himeReservation === "あり" ? 1 : 0;
     current.entries.push({ ...request });
@@ -677,7 +645,6 @@ function aggregateTherapists(shiftRequests) {
       name: item.name,
       preferredAreas: [...item.preferredAreas],
       himeCount: item.himeCount,
-      availableDays: item.entries.map((entry) => entry.dateKey),
       entries: item.entries.sort((left, right) => left.dateKey.localeCompare(right.dateKey))
     }))
     .sort((left, right) => left.name.localeCompare(right.name, "ja"));
@@ -724,25 +691,12 @@ function parseShiftRequestCsv(csvText) {
 
     const rowNumber = rowIndex + 2;
     const rowErrors = [];
-
-    if (!record.name) {
-      rowErrors.push("名前が空です");
-    }
-    if (!isValidDate(record.dateKey)) {
-      rowErrors.push("出勤可能日が不正です");
-    }
-    if (!isValidTime(record.startTime)) {
-      rowErrors.push("出勤開始時間が不正です");
-    }
-    if (!isValidTime(record.endTime)) {
-      rowErrors.push("出勤終了時間が不正です");
-    }
-    if (!record.preferredArea) {
-      rowErrors.push("希望エリアが空です");
-    }
-    if (!record.himeReservation) {
-      rowErrors.push("姫予約有無が不正です");
-    }
+    if (!record.name) rowErrors.push("名前が空です");
+    if (!isValidDate(record.dateKey)) rowErrors.push("出勤可能日が不正です");
+    if (!isValidTime(record.startTime)) rowErrors.push("出勤開始時間が不正です");
+    if (!isValidTime(record.endTime)) rowErrors.push("出勤終了時間が不正です");
+    if (!record.preferredArea) rowErrors.push("希望エリアが空です");
+    if (!record.himeReservation) rowErrors.push("姫予約有無が不正です");
     if (isValidTime(record.startTime) && isValidTime(record.endTime) && toMinutes(record.startTime) >= toMinutes(record.endTime)) {
       rowErrors.push("終了時間は開始時間より後にしてください");
     }
@@ -792,9 +746,7 @@ function parseCsvRows(text) {
     }
 
     if ((char === "\n" || char === "\r") && !quoted) {
-      if (char === "\r" && next === "\n") {
-        index += 1;
-      }
+      if (char === "\r" && next === "\n") index += 1;
       row.push(current);
       rows.push(row);
       row = [];
@@ -823,26 +775,16 @@ function readColumn(columns, headerMap, name) {
 
 function normalizeTime(value) {
   const text = String(value || "").trim();
-  if (!text) {
-    return "";
-  }
-
+  if (!text) return "";
   const match = text.match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) {
-    return text;
-  }
-
+  if (!match) return text;
   return `${match[1].padStart(2, "0")}:${match[2]}`;
 }
 
 function normalizeHime(value) {
   const text = String(value || "").trim();
-  if (["あり", "有", "yes", "YES", "true", "TRUE", "1"].includes(text)) {
-    return "あり";
-  }
-  if (["なし", "無", "no", "NO", "false", "FALSE", "0"].includes(text)) {
-    return "なし";
-  }
+  if (["あり", "有", "yes", "YES", "true", "TRUE", "1"].includes(text)) return "あり";
+  if (["なし", "無", "no", "NO", "false", "FALSE", "0"].includes(text)) return "なし";
   return "";
 }
 
@@ -851,9 +793,7 @@ function isValidDate(value) {
 }
 
 function isValidTime(value) {
-  if (!/^\d{2}:\d{2}$/.test(String(value || ""))) {
-    return false;
-  }
+  if (!/^\d{2}:\d{2}$/.test(String(value || ""))) return false;
   const [hours, minutes] = value.split(":").map(Number);
   return hours >= 0 && hours <= 24 && minutes >= 0 && minutes < 60;
 }
