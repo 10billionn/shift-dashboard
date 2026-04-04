@@ -1067,7 +1067,10 @@ function renderBoardView(dayPlan) {
                   .map(
                     (block) => `
                       <div class="board-bar ${block.tone}" style="left:${block.left}%;width:${block.width}%;">
-                        <span>${block.label}</span>
+                        <div class="board-bar-body">
+                          <span class="board-bar-title">${block.title}</span>
+                          <span class="board-bar-meta">${block.meta}</span>
+                        </div>
                       </div>
                     `
                   )
@@ -1101,7 +1104,7 @@ function buildBoardRows(dayPlan) {
   boardItems.forEach((item) => {
     const area = item.area || areas[0];
     const areaRows = rowsByArea.get(area) || [];
-    const block = buildBoardBlock(item.startTime, item.endTime, item.label, item.tone);
+    const block = buildBoardBlock(item.startTime, item.endTime, item);
     const targetIndex = areaRows.findIndex((row) => row.lastEnd <= toMinutes(item.startTime));
 
     if (targetIndex === -1) {
@@ -1139,14 +1142,16 @@ function buildBoardItems(dayPlan) {
       startTime: assignment.startTime,
       endTime: assignment.endTime,
       tone: assignment.himeReservation === "あり" ? "booked" : "available",
-      label: `${assignment.name} ${compactTimeRange(assignment.startTime, assignment.endTime)} ${assignment.area}`
+      title: assignment.name,
+      meta: `${compactTimeRange(assignment.startTime, assignment.endTime)} / ${assignment.area}`
     })),
     ...dayPlan.lateAssignments.map((assignment) => ({
       area: assignment.area,
       startTime: assignment.startTime,
       endTime: assignment.endTime,
       tone: assignment.himeReservation === "あり" ? "booked" : "available",
-      label: `${assignment.name} ${compactTimeRange(assignment.startTime, assignment.endTime)} ${assignment.area}`
+      title: assignment.name,
+      meta: `${compactTimeRange(assignment.startTime, assignment.endTime)} / ${assignment.area}`
     }))
   ];
   const cutItems = state.shiftRequests
@@ -1156,21 +1161,23 @@ function buildBoardItems(dayPlan) {
       startTime: request.startTime,
       endTime: request.endTime,
       tone: "cut",
-      label: `${request.name} ${compactTimeRange(request.startTime, request.endTime)} ${request.preferredArea || ""}`
+      title: `${request.name} カット`,
+      meta: `${compactTimeRange(request.startTime, request.endTime)} / ${request.preferredArea || "-"}`
     }));
 
   return [...approvedAssignments, ...buildShortageItems(dayPlan), ...cutItems];
 }
 
-function buildBoardBlock(startTime, endTime, label, tone) {
+function buildBoardBlock(startTime, endTime, item) {
   const boardStart = 11 * 60;
   const boardEnd = 29 * 60;
   const start = Math.max(toMinutes(startTime), boardStart);
   const end = Math.min(toMinutes(endTime), boardEnd);
   const total = boardEnd - boardStart;
   return {
-    label,
-    tone,
+    title: item.title,
+    meta: item.meta,
+    tone: item.tone,
     left: ((start - boardStart) / total) * 100,
     width: (Math.max(end - start, 60) / total) * 100
   };
@@ -1189,7 +1196,8 @@ function buildShortageItems(dayPlan) {
       startTime: "11:00",
       endTime: "19:00",
       tone: "shortage",
-      label: `空き ${compactTimeRange("11:00", "19:00")} ${area}`
+      title: "空き",
+      meta: `${compactTimeRange("11:00", "19:00")} / ${area}`
     });
   }
   for (let index = 0; index < lateShortage; index += 1) {
@@ -1199,7 +1207,8 @@ function buildShortageItems(dayPlan) {
       startTime: "19:00",
       endTime: "29:00",
       tone: "shortage",
-      label: `空き ${compactTimeRange("19:00", "29:00")} ${area}`
+      title: "空き",
+      meta: `${compactTimeRange("19:00", "29:00")} / ${area}`
     });
   }
 

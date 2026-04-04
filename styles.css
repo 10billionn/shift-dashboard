@@ -421,22 +421,40 @@ textarea:focus {
 
 .board-bar {
   position: absolute;
-  top: 5px;
-  bottom: 5px;
+  top: 4px;
+  bottom: 4px;
   border-radius: 8px;
   display: flex;
-  align-items: center;
-  padding: 0 8px;
+  align-items: stretch;
+  padding: 4px 8px;
   overflow: hidden;
   font-size: 0.74rem;
   font-weight: 700;
   color: #fff;
 }
 
-.board-bar span {
-  white-space: nowrap;
+.board-bar-body {
+  display: grid;
+  gap: 1px;
+  align-content: center;
+  min-width: 0;
+}
+
+.board-bar-title,
+.board-bar-meta {
+  overflow: hidden;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-bar-title {
+  font-size: 0.74rem;
+}
+
+.board-bar-meta {
+  font-size: 0.64rem;
+  opacity: 0.92;
 }
 
 .board-bar.booked {
@@ -1428,7 +1446,15 @@ textarea:focus {
 
   .board-bar {
     font-size: 0.68rem;
-    padding: 0 6px;
+    padding: 3px 6px;
+  }
+
+  .board-bar-title {
+    font-size: 0.68rem;
+  }
+
+  .board-bar-meta {
+    font-size: 0.58rem;
   }
 
   .compact-field,
