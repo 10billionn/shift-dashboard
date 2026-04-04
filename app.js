@@ -5,23 +5,28 @@
   therapistList: document.querySelector("#therapistList"),
   therapistTemplate: document.querySelector("#therapistRowTemplate"),
   requirementList: document.querySelector("#requirementList"),
-  explanation: document.querySelector("#explanation"),
   summary: document.querySelector("#summaryCards"),
-  resultTable: document.querySelector("#resultTable"),
+  warningSummary: document.querySelector("#warningSummary"),
   warningBox: document.querySelector("#warningBox"),
   dashboardInsights: document.querySelector("#dashboardInsights"),
+  statusDecision: document.querySelector("#statusDecision"),
+  priorityDay: document.querySelector("#priorityDay"),
   shortageRanking: document.querySelector("#shortageRanking"),
   mostShortDay: document.querySelector("#mostShortDay"),
   areaShortage: document.querySelector("#areaShortage"),
   businessMetrics: document.querySelector("#businessMetrics"),
+  resultTable: document.querySelector("#resultTable"),
   addTherapistButton: document.querySelector("#addTherapistButton"),
   generateButton: document.querySelector("#generateButton"),
+  generationActionButton: document.querySelector("#generationActionButton"),
   loadSampleButton: document.querySelector("#loadSampleButton"),
-  toggleTherapistPanel: document.querySelector("#toggleTherapistPanel"),
-  therapistAdminPanel: document.querySelector("#therapistAdminPanel"),
   modeSwitch: document.querySelector("#modeSwitch"),
   manualDemandPanel: document.querySelector("#manualDemandPanel"),
-  csvDemandPanel: document.querySelector("#csvDemandPanel")
+  csvDemandPanel: document.querySelector("#csvDemandPanel"),
+  sidebar: document.querySelector("#sidebar"),
+  sidebarNav: document.querySelector("#sidebarNav"),
+  menuToggle: document.querySelector("#menuToggle"),
+  views: Array.from(document.querySelectorAll("[data-view-panel]"))
 };
 
 initializePrototype();
@@ -31,16 +36,22 @@ function initializePrototype() {
 
   elements.addTherapistButton.addEventListener("click", () => addTherapistRow());
   elements.generateButton.addEventListener("click", handleGenerate);
+  elements.generationActionButton.addEventListener("click", handleGenerate);
   elements.loadSampleButton.addEventListener("click", loadSampleData);
   elements.startDate.addEventListener("change", syncRequirementRows);
   elements.days.addEventListener("change", syncRequirementRows);
-  elements.toggleTherapistPanel.addEventListener("click", toggleTherapistPanel);
+  elements.menuToggle.addEventListener("click", toggleSidebar);
+
+  elements.sidebarNav.querySelectorAll(".nav-item").forEach((button) => {
+    button.addEventListener("click", () => setActiveView(button.dataset.view));
+  });
 
   elements.modeSwitch.querySelectorAll(".mode-button").forEach((button) => {
     button.addEventListener("click", () => setDemandMode(button.dataset.mode));
   });
 
   setDemandMode("manual");
+  setActiveView("dashboard");
   handleGenerate();
 }
 
@@ -52,9 +63,8 @@ function loadSampleData() {
   elements.therapistList.innerHTML = "";
   samplePrototypeData.therapists.forEach((therapist) => addTherapistRow(therapist));
   syncRequirementRows();
-  renderExplanation();
   setDemandMode("manual");
-  closeTherapistPanel();
+  setActiveView("dashboard");
 }
 
 function addTherapistRow(therapist = emptyTherapist()) {
@@ -117,28 +127,22 @@ function handleGenerate() {
   const model = collectModel();
 
   if (model.errors.length) {
-    renderWarnings(model.errors);
-    elements.summary.innerHTML = "";
-    elements.resultTable.innerHTML = "";
-    elements.dashboardInsights.innerHTML = "";
-    elements.shortageRanking.innerHTML = "";
-    elements.mostShortDay.innerHTML = "";
-    elements.areaShortage.innerHTML = "";
-    elements.businessMetrics.innerHTML = "";
+    renderValidationState(model.errors);
     return;
   }
 
   const result = generateShiftPlan(model);
-  const aggregate = buildDashboardAggregate(result.dailyPlans, result.warnings);
+  const aggregate = buildDashboardAggregate(result.dailyPlans);
+
   renderSummary(result, aggregate);
-  renderWarnings(result.warnings);
-  renderDashboardInsights(result, model, aggregate);
-  renderShortageRanking(aggregate);
-  renderMostShortDay(aggregate);
-  renderAreaShortage(aggregate);
+  renderJudgment(aggregate);
+  renderAlertSummary(aggregate, result.warnings);
+  renderAlertDetails(result.warnings);
+  renderRanking(aggregate.shortageRanking, elements.shortageRanking, "不足日はありません。", "枠不足");
+  renderMostShortDay(aggregate.mostShortDay);
+  renderRanking(aggregate.areaRanking, elements.areaShortage, "エリア別不足はありません。", "枠不足", true);
   renderBusinessMetrics(aggregate);
   renderResultTable(result.dailyPlans);
-  renderExplanation();
 }
 
 function collectModel() {
@@ -178,88 +182,107 @@ function collectModel() {
   return { settings, therapists, requirements, errors };
 }
 
+function renderValidationState(errors) {
+  elements.summary.innerHTML = "";
+  elements.statusDecision.innerHTML = `<span class="danger-text">入力不足</span>`;
+  elements.priorityDay.innerHTML = "-";
+  elements.dashboardInsights.innerHTML = `<div class="decision-comment">${errors.join(" / ")}</div>`;
+  elements.warningSummary.innerHTML = `<div class="alert-summary danger">設定を見直してください。</div>`;
+  renderAlertDetails(errors);
+  elements.shortageRanking.innerHTML = "";
+  elements.mostShortDay.innerHTML = "";
+  elements.areaShortage.innerHTML = "";
+  elements.businessMetrics.innerHTML = "";
+  elements.resultTable.innerHTML = "";
+}
+
 function renderSummary(result, aggregate) {
   const cards = [
-    { label: "必要枠", value: `${aggregate.requiredSlots}枠`, subtext: result.summary.dateRangeText, tone: "default" },
-    { label: "割当数", value: `${aggregate.assignedSlots}件`, subtext: "現在条件での割当", tone: "good" },
-    { label: "不足数", value: `${aggregate.shortageSlots}枠`, subtext: aggregate.shortageSlots ? "優先対応が必要" : "不足なし", tone: aggregate.shortageSlots ? "danger strong" : "good" },
-    { label: "充足率", value: `${aggregate.fillRate}%`, subtext: "必要枠に対する割当率", tone: aggregate.fillRate >= 100 ? "good" : "default" }
+    { label: "必要枠", value: `${aggregate.requiredSlots}枠`, tone: "default" },
+    { label: "割当数", value: `${aggregate.assignedSlots}件`, tone: "good" },
+    { label: "不足数", value: `${aggregate.shortageSlots}枠`, tone: aggregate.shortageSlots ? "danger" : "good" },
+    { label: "充足率", value: `${aggregate.fillRate}%`, tone: aggregate.fillRate >= 100 ? "good" : "default" }
   ];
 
   elements.summary.innerHTML = cards
     .map(
       (card) => `
-        <article class="summary-card ${card.tone.includes("danger") ? "summary-danger" : ""} ${card.tone.includes("good") ? "summary-good" : ""} ${card.tone.includes("strong") ? "strong" : ""}">
+        <article class="summary-card ${card.tone === "danger" ? "summary-danger" : ""} ${card.tone === "good" ? "summary-good" : ""}">
           <p>${card.label}</p>
           <strong>${card.value}</strong>
-          <span class="subtext">${card.subtext || ""}</span>
         </article>
       `
     )
     .join("");
 }
 
-function renderWarnings(warnings) {
+function renderJudgment(aggregate) {
+  elements.statusDecision.innerHTML = aggregate.shortageSlots
+    ? `<span class="danger-text">不足あり</span>`
+    : `<span class="good-text">充足</span>`;
+
+  elements.priorityDay.innerHTML = aggregate.mostShortDay
+    ? `${aggregate.mostShortDay.dateKey} / ${aggregate.mostShortDay.shortage}枠不足`
+    : "優先対応日はありません";
+
+  elements.dashboardInsights.innerHTML = aggregate.shortageSlots
+    ? `<div class="decision-comment">不足の大きい日から先に調整し、問題なければこの状態で生成します。</div>`
+    : `<div class="decision-comment">大きな不足はありません。このまま生成判断して問題ない状態です。</div>`;
+}
+
+function renderAlertSummary(aggregate, warnings) {
+  const maxShort = aggregate.mostShortDay;
+  const summaryLines = [
+    `${aggregate.shortageDays.length}日で不足`,
+    maxShort ? `最大不足日: ${maxShort.dateKey}（${maxShort.shortage}枠不足）` : "最大不足日: なし",
+    `総不足数: ${aggregate.shortageSlots}枠`
+  ];
+
+  elements.warningSummary.innerHTML = `
+    <div class="alert-summary ${warnings.length ? "danger" : "ok"}">
+      ${summaryLines.map((line) => `<div>${line}</div>`).join("")}
+    </div>
+  `;
+}
+
+function renderAlertDetails(warnings) {
   if (!warnings.length) {
-    elements.warningBox.innerHTML = `<div class="ok-box">今週の大きな不足は見つかっていません。生成結果を確認して細部を調整できます。</div>`;
+    elements.warningBox.innerHTML = `<div class="ok-box">アラートはありません。</div>`;
     return;
   }
 
   elements.warningBox.innerHTML = `
     <div class="warning-box">
-      <strong>要確認アラート</strong>
       <ul>${warnings.map((warning) => `<li>${warning}</li>`).join("")}</ul>
     </div>
   `;
 }
 
-function renderDashboardInsights(result, model, aggregate) {
-  const insightItems = [
-    `今週は ${aggregate.shortageDays.length} 日で不足が発生しています。`,
-    aggregate.shortageDays.length
-      ? `特に不足日は ${aggregate.shortageDays.join(" / ")} です。`
-      : "不足日はありません。",
-    aggregate.shortageAreas.length
-      ? `不足が多いエリア候補は ${aggregate.shortageAreas.join(" / ")} です。`
-      : "エリア不足はまだ目立っていません。",
-    model.settings.assignmentRule
-      ? `現在の割り当てメモ: ${model.settings.assignmentRule}`
-      : "割り当てルールメモは未入力です。"
-  ];
-
-  elements.dashboardInsights.innerHTML = insightItems
-    .map((item) => `<div class="insight-item">${item}</div>`)
-    .join("");
-}
-
-function renderShortageRanking(aggregate) {
-  if (!aggregate.shortageRanking.length) {
-    elements.shortageRanking.innerHTML = `<div class="ok-box">不足日はありません。</div>`;
+function renderRanking(items, target, emptyText, suffix, isArea = false) {
+  if (!items.length) {
+    target.innerHTML = `<div class="ok-box">${emptyText}</div>`;
     return;
   }
 
-  elements.shortageRanking.innerHTML = aggregate.shortageRanking
-    .map(
-      (item, index) => `
-        <div class="ranking-item">
-          <div>
-            <strong>${index + 1}. ${item.dateKey}</strong>
-            <p>${item.weekday}曜 / 不足 ${item.shortage}枠</p>
-          </div>
-          <div class="bar-track"><span class="bar-fill" style="width:${item.barWidth}%"></span></div>
+  target.innerHTML = items
+    .map((item, index) => `
+      <div class="ranking-item ${isArea ? "compact" : ""}">
+        <div>
+          <strong>${isArea ? item.label : `${index + 1}. ${item.label}`}</strong>
+          <p>${item.value}${suffix}</p>
         </div>
-      `
-    )
+        <div class="bar-track"><span class="bar-fill" style="width:${item.barWidth}%"></span></div>
+      </div>
+    `)
     .join("");
 }
 
-function renderMostShortDay(aggregate) {
-  if (!aggregate.mostShortDay) {
+function renderMostShortDay(item) {
+  if (!item) {
     elements.mostShortDay.innerHTML = `<div class="ok-box">最も不足している日はありません。</div>`;
     return;
   }
 
-  const item = aggregate.mostShortDay;
   elements.mostShortDay.innerHTML = `
     <div class="focus-day-inner">
       <strong>${item.dateKey}</strong>
@@ -267,27 +290,6 @@ function renderMostShortDay(aggregate) {
       <p>${item.weekday}曜 / 必要 ${item.required} / 割当 ${item.assigned}</p>
     </div>
   `;
-}
-
-function renderAreaShortage(aggregate) {
-  if (!aggregate.areaRanking.length) {
-    elements.areaShortage.innerHTML = `<div class="ok-box">エリア別の大きな偏りはありません。</div>`;
-    return;
-  }
-
-  elements.areaShortage.innerHTML = aggregate.areaRanking
-    .map(
-      (item) => `
-        <div class="ranking-item compact">
-          <div>
-            <strong>${item.area}</strong>
-            <p>不足 ${item.count}枠</p>
-          </div>
-          <div class="bar-track"><span class="bar-fill" style="width:${item.barWidth}%"></span></div>
-        </div>
-      `
-    )
-    .join("");
 }
 
 function renderBusinessMetrics(aggregate) {
@@ -298,14 +300,12 @@ function renderBusinessMetrics(aggregate) {
   ];
 
   elements.businessMetrics.innerHTML = metrics
-    .map(
-      (item) => `
-        <div class="metric-card">
-          <p>${item.label}</p>
-          <strong>${item.value}</strong>
-        </div>
-      `
-    )
+    .map((item) => `
+      <div class="metric-card">
+        <p>${item.label}</p>
+        <strong>${item.value}</strong>
+      </div>
+    `)
     .join("");
 }
 
@@ -371,30 +371,13 @@ function renderAssignmentRow(day, assignment, shiftLabel) {
   `;
 }
 
-function renderExplanation() {
-  elements.explanation.innerHTML = `
-    <div class="info-card">
-      <h3>まず見る場所</h3>
-      <p>最初に見るのは上のダッシュボードです。必要枠、不足数、不足日、アラートを見て今週の状況を判断します。</p>
-    </div>
-    <div class="info-card">
-      <h3>どこを触ればよいか</h3>
-      <p>需要を変えたい時は「実績・需要設定」、在籍情報を変えたい時は「セラピスト管理」を開きます。判断後に右上の「シフトを再生成」を押します。</p>
-    </div>
-    <div class="info-card">
-      <h3>今後の拡張</h3>
-      <p>CSV読込、曜日別実績、時間帯別需要、エリア別需要、売上予測、部屋制約などを後から追加しやすい構成です。</p>
-    </div>
-  `;
-}
-
-function buildDashboardAggregate(dailyPlans, warnings) {
+function buildDashboardAggregate(dailyPlans) {
   const aggregate = {
     requiredSlots: 0,
     assignedSlots: 0,
     shortageSlots: 0,
     shortageDays: [],
-    shortageAreas: [],
+    areaCounts: new Map(),
     shortageRanking: [],
     areaRanking: [],
     mostShortDay: null,
@@ -403,9 +386,8 @@ function buildDashboardAggregate(dailyPlans, warnings) {
     opportunityLoss: 0,
     utilizationRate: 0
   };
-  const areaCounts = new Map();
-  const shortagePerDay = [];
   const unitSales = 18000;
+  const shortagePerDay = [];
 
   dailyPlans.forEach((day) => {
     const required = day.requirement.earlyNeeded + day.requirement.lateNeeded;
@@ -421,13 +403,14 @@ function buildDashboardAggregate(dailyPlans, warnings) {
       shortagePerDay.push({
         dateKey: day.dateKey,
         weekday: day.weekday,
-        shortage,
         required,
-        assigned
+        assigned,
+        shortage
       });
-      const dayAreas = [...day.earlyAssignments, ...day.lateAssignments].map((item) => item.area);
-      const fallbackArea = dayAreas[0] || samplePrototypeData.settings.areas[0];
-      areaCounts.set(fallbackArea, (areaCounts.get(fallbackArea) || 0) + shortage);
+
+      const areas = [...day.earlyAssignments, ...day.lateAssignments].map((item) => item.area);
+      const fallbackArea = areas[0] || samplePrototypeData.settings.areas[0];
+      aggregate.areaCounts.set(fallbackArea, (aggregate.areaCounts.get(fallbackArea) || 0) + shortage);
     }
   });
 
@@ -438,57 +421,45 @@ function buildDashboardAggregate(dailyPlans, warnings) {
   aggregate.opportunityLoss = aggregate.shortageSlots * unitSales;
   aggregate.utilizationRate = aggregate.fillRate;
 
-  const topShortage = shortagePerDay
-    .sort((left, right) => right.shortage - left.shortage || left.dateKey.localeCompare(right.dateKey));
-
-  const maxShortage = topShortage[0]?.shortage || 0;
-  aggregate.shortageRanking = topShortage.slice(0, 5).map((item) => ({
-    ...item,
-    barWidth: maxShortage ? Math.max(18, Math.round((item.shortage / maxShortage) * 100)) : 0
+  const rankedDays = shortagePerDay.sort((left, right) => right.shortage - left.shortage || left.dateKey.localeCompare(right.dateKey));
+  const maxDayShortage = rankedDays[0]?.shortage || 0;
+  aggregate.shortageRanking = rankedDays.slice(0, 5).map((item) => ({
+    label: item.dateKey,
+    value: item.shortage,
+    weekday: item.weekday,
+    dateKey: item.dateKey,
+    required: item.required,
+    assigned: item.assigned,
+    shortage: item.shortage,
+    barWidth: maxDayShortage ? Math.max(18, Math.round((item.shortage / maxDayShortage) * 100)) : 0
   }));
-  aggregate.mostShortDay = topShortage[0] || null;
+  aggregate.mostShortDay = aggregate.shortageRanking[0] || null;
 
-  aggregate.shortageAreas = [...areaCounts.entries()]
-    .sort((left, right) => right[1] - left[1])
-    .slice(0, 3)
-    .map(([area]) => area);
-  const maxArea = Math.max(...areaCounts.values(), 0);
-  aggregate.areaRanking = [...areaCounts.entries()]
-    .sort((left, right) => right[1] - left[1])
-    .slice(0, 5)
-    .map(([area, count]) => ({
-      area,
-      count,
-      barWidth: maxArea ? Math.max(18, Math.round((count / maxArea) * 100)) : 0
-    }));
-
-  aggregate.shortageDaysText = aggregate.shortageDays.length ? aggregate.shortageDays.join(" / ") : "なし";
-  aggregate.shortageAreasText = aggregate.shortageAreas.length ? aggregate.shortageAreas.join(" / ") : "なし";
+  const rankedAreas = [...aggregate.areaCounts.entries()].sort((left, right) => right[1] - left[1]);
+  const maxAreaShortage = rankedAreas[0]?.[1] || 0;
+  aggregate.areaRanking = rankedAreas.slice(0, 5).map(([area, count]) => ({
+    label: area,
+    value: count,
+    barWidth: maxAreaShortage ? Math.max(18, Math.round((count / maxAreaShortage) * 100)) : 0
+  }));
 
   return aggregate;
 }
 
-function formatCurrency(value) {
-  return new Intl.NumberFormat("ja-JP", {
-    style: "currency",
-    currency: "JPY",
-    maximumFractionDigits: 0
-  }).format(value);
+function setActiveView(viewName) {
+  elements.sidebarNav.querySelectorAll(".nav-item").forEach((button) => {
+    button.classList.toggle("active", button.dataset.view === viewName);
+  });
+
+  elements.views.forEach((view) => {
+    view.classList.toggle("active", view.dataset.viewPanel === viewName);
+  });
+
+  elements.sidebar.classList.remove("open");
 }
 
-function toggleTherapistPanel() {
-  const isHidden = elements.therapistAdminPanel.classList.contains("hidden-panel");
-  if (isHidden) {
-    elements.therapistAdminPanel.classList.remove("hidden-panel");
-    elements.toggleTherapistPanel.textContent = "一覧を閉じる";
-  } else {
-    closeTherapistPanel();
-  }
-}
-
-function closeTherapistPanel() {
-  elements.therapistAdminPanel.classList.add("hidden-panel");
-  elements.toggleTherapistPanel.textContent = "一覧を開く";
+function toggleSidebar() {
+  elements.sidebar.classList.toggle("open");
 }
 
 function setDemandMode(mode) {
@@ -515,4 +486,12 @@ function emptyTherapist() {
     preferredArea: samplePrototypeData.settings.areas[0],
     note: ""
   };
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("ja-JP", {
+    style: "currency",
+    currency: "JPY",
+    maximumFractionDigits: 0
+  }).format(value);
 }
