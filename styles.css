@@ -483,6 +483,76 @@ textarea:focus {
   gap: 10px;
 }
 
+.section-note,
+.inline-status {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.import-status,
+.error-list,
+.csv-format-grid,
+.import-stat-grid,
+.request-chip-list {
+  display: grid;
+  gap: 10px;
+}
+
+.import-stat-grid,
+.csv-format-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.import-stat-card,
+.format-card,
+.therapist-card,
+.request-chip {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.import-stat-card strong {
+  display: block;
+  font-size: 1.4rem;
+}
+
+.import-stat-card span,
+.format-card p,
+.therapist-card-meta,
+.request-chip span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.therapist-card {
+  display: grid;
+  gap: 12px;
+}
+
+.therapist-card-head,
+.therapist-card-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.therapist-card-head strong {
+  font-size: 1rem;
+}
+
+.request-chip-list {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.request-chip {
+  display: grid;
+  gap: 4px;
+  background: #f8fafc;
+}
+
 .csv-drop-note {
   padding: 12px 14px;
   border-radius: 12px;
@@ -681,6 +751,8 @@ th {
   .summary-grid,
   .generation-layout,
   .history-grid,
+  .csv-format-grid,
+  .import-stat-grid,
   .therapist-row,
   .requirement-row {
     grid-template-columns: 1fr;
@@ -808,6 +880,12 @@ th {
   .mobile-result-list {
     display: grid;
     gap: 8px;
+  }
+
+  .therapist-card-head,
+  .therapist-card-meta {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .mobile-result-item {
