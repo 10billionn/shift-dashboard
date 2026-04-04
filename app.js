@@ -10,7 +10,8 @@
   selectedDate: "",
   latestDailyPlans: [],
   activeAnalysisTab: "fill",
-  activeDailyShiftTab: "early"
+  activeDailyShiftTab: "early",
+  disabledTherapists: new Set()
 };
 
 const elements = {
@@ -19,7 +20,7 @@ const elements = {
   assignmentRule: document.querySelector("#assignmentRule"),
   therapistList: document.querySelector("#therapistList"),
   therapistImportSummary: document.querySelector("#therapistImportSummary"),
-  requirementList: document.querySelector("#requirementList"),
+  requirementList: document.querySelector("#manualDemandPanel"),
   periodSummary: document.querySelector("#periodSummary"),
   analysisTabs: document.querySelector("#analysisTabs"),
   fillChart: document.querySelector("#fillChart"),
@@ -29,15 +30,19 @@ const elements = {
   todayShiftList: document.querySelector("#todayShiftList"),
   todayAdjustmentAlerts: document.querySelector("#todayAdjustmentAlerts"),
   selectedDateLabel: document.querySelector("#selectedDateLabel"),
+  creationSelectedDateLabel: document.querySelector("#creationSelectedDateLabel"),
+  creationShiftBoard: document.querySelector("#creationShiftBoard"),
+  creationAdjustmentAlerts: document.querySelector("#creationAdjustmentAlerts"),
   prevDayButton: document.querySelector("#prevDayButton"),
   todayButton: document.querySelector("#todayButton"),
   nextDayButton: document.querySelector("#nextDayButton"),
+  creationPrevDayButton: document.querySelector("#creationPrevDayButton"),
+  creationTodayButton: document.querySelector("#creationTodayButton"),
+  creationNextDayButton: document.querySelector("#creationNextDayButton"),
   generationActionButton: document.querySelector("#generationActionButton"),
   generationSourceStatus: document.querySelector("#generationSourceStatus"),
+  creationSummary: document.querySelector("#creationSummaryCards"),
   loadSampleButton: document.querySelector("#loadSampleButton"),
-  modeSwitch: document.querySelector("#modeSwitch"),
-  manualDemandPanel: document.querySelector("#manualDemandPanel"),
-  csvDemandPanel: document.querySelector("#csvDemandPanel"),
   csvFile: document.querySelector("#csvFile"),
   csvImportStatus: document.querySelector("#csvImportStatus"),
   csvPreviewMeta: document.querySelector("#csvPreviewMeta"),
@@ -67,6 +72,9 @@ function initializePrototype() {
   elements.prevDayButton.addEventListener("click", () => moveSelectedDate(-1));
   elements.todayButton.addEventListener("click", () => jumpToToday());
   elements.nextDayButton.addEventListener("click", () => moveSelectedDate(1));
+  elements.creationPrevDayButton.addEventListener("click", () => moveSelectedDate(-1));
+  elements.creationTodayButton.addEventListener("click", () => jumpToToday());
+  elements.creationNextDayButton.addEventListener("click", () => moveSelectedDate(1));
   elements.analysisTabs.querySelectorAll(".analysis-tab").forEach((button) => {
     button.addEventListener("click", () => setAnalysisTab(button.dataset.analysisTab));
   });
@@ -75,11 +83,6 @@ function initializePrototype() {
     button.addEventListener("click", () => setActiveView(button.dataset.view));
   });
 
-  elements.modeSwitch.querySelectorAll(".mode-button").forEach((button) => {
-    button.addEventListener("click", () => setDemandMode(button.dataset.mode));
-  });
-
-  setDemandMode("manual");
   setActiveView("dashboard");
   handleGenerate();
 }
@@ -101,7 +104,6 @@ function loadSampleData() {
 
   syncRequirementRows();
   renderImportedDataState();
-  setDemandMode("manual");
   setActiveView("dashboard");
   handleGenerate();
 }
@@ -178,7 +180,7 @@ function handleCsvUpload(event) {
       ensureSelectedDateInRange();
       renderImportedDataState();
       handleGenerate();
-      setActiveView("history");
+      setActiveView("generation");
       return;
     }
 
@@ -239,7 +241,7 @@ function collectModel() {
   return {
     settings,
     therapists,
-    shiftRequests: state.shiftRequests,
+    shiftRequests: state.shiftRequests.filter((request) => !state.disabledTherapists.has(request.name)),
     requirements,
     errors
   };
@@ -248,8 +250,9 @@ function collectModel() {
 function renderImportedDataState() {
   renderTherapistList();
   renderCsvImportState();
+  const enabledCount = state.shiftRequests.filter((request) => !state.disabledTherapists.has(request.name)).length;
   elements.generationSourceStatus.innerHTML = state.shiftRequests.length
-    ? `${state.shiftRequests.length}件のシフト希望を生成候補として使用中`
+    ? `${enabledCount}件を生成候補として使用中`
     : "CSV未読込";
 }
 
@@ -266,16 +269,23 @@ function renderTherapistList() {
   }
 
   elements.therapistList.innerHTML = therapists
-    .map((therapist) => `
-      <article class="therapist-card">
+    .map((therapist) => {
+      const profile = getTherapistProfile(therapist.name);
+      const enabled = !state.disabledTherapists.has(therapist.name);
+      return `
+      <article class="therapist-card ${enabled ? "" : "disabled"}">
         <div class="therapist-card-head">
           <strong>${therapist.name}</strong>
           <span>${therapist.entries.length}日分</span>
         </div>
         <div class="therapist-card-meta">
           <span>希望エリア: ${therapist.preferredAreas.join(" / ")}</span>
-          <span>姫予約あり: ${therapist.himeCount}件</span>
+          <span>${profile.rank} / ${profile.flags.join(" / ") || "属性なし"}</span>
         </div>
+        <label class="therapist-toggle">
+          <input class="therapist-enable-toggle" type="checkbox" data-therapist-name="${therapist.name}" ${enabled ? "checked" : ""}>
+          <span>${enabled ? "生成対象" : "除外中"}</span>
+        </label>
         <div class="request-chip-list">
           ${therapist.entries
             .map(
@@ -292,8 +302,21 @@ function renderTherapistList() {
             .join("")}
         </div>
       </article>
-    `)
+    `;
+    })
     .join("");
+
+  elements.therapistList.querySelectorAll(".therapist-enable-toggle").forEach((toggle) => {
+    toggle.addEventListener("change", () => {
+      if (toggle.checked) {
+        state.disabledTherapists.delete(toggle.dataset.therapistName);
+      } else {
+        state.disabledTherapists.add(toggle.dataset.therapistName);
+      }
+      renderImportedDataState();
+      handleGenerate();
+    });
+  });
 }
 
 function renderCsvImportState() {
@@ -328,12 +351,16 @@ function renderCsvImportState() {
 
 function renderValidationState(errors) {
   elements.selectedDateLabel.innerHTML = "";
+  elements.creationSelectedDateLabel.innerHTML = "";
   elements.todayShiftList.innerHTML = `<div class="empty-state">CSVを読み込むと当日のシフトがここに表示されます。</div>`;
+  elements.creationShiftBoard.innerHTML = `<div class="empty-state">CSVを読み込むと当日のシフト盤面がここに表示されます。</div>`;
   elements.periodSummary.innerHTML = `<div class="period-card">対象期間を設定してください。</div>`;
   elements.fillChart.innerHTML = `<div class="empty-state">週間の埋まり状況は生成後に表示されます。</div>`;
   elements.salesForecastPanel.innerHTML = `<div class="empty-state">売上予測は生成後に表示されます。</div>`;
   elements.summary.innerHTML = "";
+  elements.creationSummary.innerHTML = "";
   elements.todayAdjustmentAlerts.innerHTML = "";
+  elements.creationAdjustmentAlerts.innerHTML = "";
   elements.distributionList.innerHTML = `<div class="empty-state">生成後に個別配布一覧が表示されます。</div>`;
   elements.distributionPreview.innerHTML = `<div class="empty-state">セラピストを選ぶと個別出力プレビューを表示します。</div>`;
   renderAlertDetails(errors);
@@ -345,19 +372,24 @@ function renderTodayShift(dayPlan) {
   if (!dayPlan) {
     elements.selectedDateLabel.innerHTML = "対象日なし";
     elements.todayShiftList.innerHTML = `<div class="empty-state">表示できる当日シフトがありません。</div>`;
+    elements.creationSelectedDateLabel.innerHTML = "対象日なし";
+    elements.creationShiftBoard.innerHTML = `<div class="empty-state">表示できる当日シフトがありません。</div>`;
     return;
   }
 
-  elements.selectedDateLabel.innerHTML = `${dayPlan.dateKey} (${dayPlan.weekday})`;
+  const dateLabel = `${dayPlan.dateKey} (${dayPlan.weekday})`;
+  elements.selectedDateLabel.innerHTML = dateLabel;
+  elements.creationSelectedDateLabel.innerHTML = dateLabel;
   const earlyAssignments = dayPlan.earlyAssignments.map((assignment) => ({ ...assignment, shiftLabel: "早番" }));
   const lateAssignments = dayPlan.lateAssignments.map((assignment) => ({ ...assignment, shiftLabel: "遅番" }));
 
   if (!earlyAssignments.length && !lateAssignments.length) {
     elements.todayShiftList.innerHTML = `<div class="empty-state">この日は割り当てがありません。</div>`;
+    elements.creationShiftBoard.innerHTML = `<div class="empty-state">この日は割り当てがありません。</div>`;
     return;
   }
 
-  elements.todayShiftList.innerHTML = `
+  const markup = `
     <div class="daily-shift-tabs">
       <button class="daily-shift-tab ${state.activeDailyShiftTab === "early" ? "active" : ""}" type="button" data-daily-tab="early">
         早番 ${earlyAssignments.length}/${dayPlan.requirement.earlyNeeded}
@@ -377,15 +409,11 @@ function renderTodayShift(dayPlan) {
       </section>
     </div>
   `;
+  elements.todayShiftList.innerHTML = markup;
+  elements.creationShiftBoard.innerHTML = markup;
 
-  elements.todayShiftList.querySelectorAll(".daily-shift-tab").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.activeDailyShiftTab = button.dataset.dailyTab;
-      renderTodayShift(dayPlan);
-    });
-  });
-
-  bindShiftAdjustmentEvents();
+  bindShiftBoardEvents(elements.todayShiftList, dayPlan);
+  bindShiftBoardEvents(elements.creationShiftBoard, dayPlan);
   renderTodayAdjustmentAlerts(dayPlan);
 }
 
@@ -475,6 +503,7 @@ function renderFillChart(dailyPlans) {
 function renderSummary(dayPlan, aggregate) {
   if (!dayPlan) {
     elements.summary.innerHTML = "";
+    elements.creationSummary.innerHTML = "";
     return;
   }
 
@@ -491,7 +520,7 @@ function renderSummary(dayPlan, aggregate) {
     { label: "当日充足率", value: `${fillRate}%`, tone: fillRate >= 100 ? "good" : "default" }
   ];
 
-  elements.summary.innerHTML = cards
+  const markup = cards
     .map(
       (card) => `
         <article class="summary-card ${card.tone === "danger" ? "summary-danger" : ""} ${card.tone === "good" ? "summary-good" : ""}">
@@ -501,6 +530,8 @@ function renderSummary(dayPlan, aggregate) {
       `
     )
     .join("");
+  elements.summary.innerHTML = markup;
+  elements.creationSummary.innerHTML = markup;
 }
 
 function renderAlertDetails(warnings) {
@@ -605,6 +636,9 @@ function updateDayNavigation(dailyPlans) {
   elements.prevDayButton.disabled = !hasDates || selectedIndex <= 0;
   elements.nextDayButton.disabled = !hasDates || selectedIndex === -1 || selectedIndex >= dateList.length - 1;
   elements.todayButton.disabled = !hasDates;
+  elements.creationPrevDayButton.disabled = elements.prevDayButton.disabled;
+  elements.creationNextDayButton.disabled = elements.nextDayButton.disabled;
+  elements.creationTodayButton.disabled = elements.todayButton.disabled;
 }
 
 function moveSelectedDate(offset) {
@@ -677,15 +711,6 @@ function toggleSidebar(forceState) {
 
 function closeSidebar() {
   toggleSidebar(false);
-}
-
-function setDemandMode(mode) {
-  elements.modeSwitch.querySelectorAll(".mode-button").forEach((button) => {
-    button.classList.toggle("active", button.dataset.mode === mode);
-  });
-
-  elements.manualDemandPanel.classList.toggle("inactive-panel", mode !== "manual");
-  elements.csvDemandPanel.classList.toggle("inactive-panel", mode !== "csv");
 }
 
 function aggregateTherapists(shiftRequests) {
@@ -1072,31 +1097,38 @@ function renderShiftTeamList(assignments, shift) {
   `;
 }
 
-function bindShiftAdjustmentEvents() {
-  elements.todayShiftList.querySelectorAll(".shift-list-row").forEach((row) => {
+function bindShiftBoardEvents(target, dayPlan) {
+  target.querySelectorAll(".daily-shift-tab").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.activeDailyShiftTab = button.dataset.dailyTab;
+      renderTodayShift(dayPlan);
+    });
+  });
+
+  target.querySelectorAll(".shift-list-row").forEach((row) => {
     row.addEventListener("dragstart", handleShiftRowDragStart);
     row.addEventListener("dragover", handleShiftRowDragOver);
     row.addEventListener("drop", handleShiftRowDrop);
   });
 
-  elements.todayShiftList.querySelectorAll("[data-drop-shift]").forEach((panel) => {
+  target.querySelectorAll("[data-drop-shift]").forEach((panel) => {
     panel.addEventListener("dragover", handleShiftPanelDragOver);
     panel.addEventListener("drop", handleShiftPanelDrop);
   });
 
-  elements.todayShiftList.querySelectorAll(".shift-toggle-button").forEach((button) => {
+  target.querySelectorAll(".shift-toggle-button").forEach((button) => {
     button.addEventListener("click", () => {
       applyShiftToggle(button.dataset.shift, Number(button.dataset.index));
     });
   });
 
-  elements.todayShiftList.querySelectorAll(".shift-area-select").forEach((select) => {
+  target.querySelectorAll(".shift-area-select").forEach((select) => {
     select.addEventListener("change", () => {
       applyAreaChange(select.dataset.shift, Number(select.dataset.index), select.value);
     });
   });
 
-  elements.todayShiftList.querySelectorAll(".shift-time-select").forEach((select) => {
+  target.querySelectorAll(".shift-time-select").forEach((select) => {
     select.addEventListener("change", () => {
       applyTimeChange(select.dataset.shift, Number(select.dataset.index), select.dataset.timeBound, select.value);
     });
@@ -1242,15 +1274,11 @@ function buildCoverageWarnings(dailyPlans) {
 
 function renderTodayAdjustmentAlerts(dayPlan) {
   const warnings = buildAdjustmentWarnings(dayPlan);
-  if (!warnings.length) {
-    elements.todayAdjustmentAlerts.innerHTML = `<div class="ok-box compact">手動調整の警告はありません。</div>`;
-    return;
-  }
-  elements.todayAdjustmentAlerts.innerHTML = `
-    <div class="warning-box compact">
-      <ul>${warnings.map((warning) => `<li>${warning}</li>`).join("")}</ul>
-    </div>
-  `;
+  const markup = !warnings.length
+    ? `<div class="ok-box compact">手動調整の警告はありません。</div>`
+    : `<div class="warning-box compact"><ul>${warnings.map((warning) => `<li>${warning}</li>`).join("")}</ul></div>`;
+  elements.todayAdjustmentAlerts.innerHTML = markup;
+  elements.creationAdjustmentAlerts.innerHTML = markup;
 }
 
 function renderDistributionView(dayPlan) {

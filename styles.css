@@ -264,6 +264,20 @@ textarea:focus {
   min-width: 0;
 }
 
+.shift-creation-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr) 280px;
+  gap: 12px;
+  align-items: start;
+}
+
+.creation-side,
+.creation-main {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
 .selected-date-label {
   color: var(--accent);
   font-weight: 700;
@@ -621,6 +635,10 @@ textarea:focus {
   gap: 10px;
 }
 
+.summary-grid.compact {
+  grid-template-columns: 1fr;
+}
+
 .summary-card {
   padding: 12px;
   border-radius: 14px;
@@ -909,6 +927,23 @@ textarea:focus {
   gap: 10px;
 }
 
+.therapist-card.disabled {
+  opacity: 0.56;
+}
+
+.therapist-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.therapist-toggle input {
+  width: auto;
+  min-height: auto;
+}
+
 .therapist-card-head,
 .therapist-card-meta {
   display: flex;
@@ -939,6 +974,10 @@ textarea:focus {
   .import-stat-grid,
   .csv-format-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .shift-creation-layout {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1119,6 +1158,10 @@ textarea:focus {
   .import-stat-grid,
   .requirement-row,
   .request-chip-list {
+    grid-template-columns: 1fr;
+  }
+
+  .shift-creation-layout {
     grid-template-columns: 1fr;
   }
 
