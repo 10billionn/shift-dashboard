@@ -497,7 +497,7 @@ textarea:focus {
 }
 
 .fixed-grid {
-  grid-template-columns: 1.15fr 1fr 0.95fr 1.15fr 1.35fr;
+  grid-template-columns: 120px 220px 140px 190px minmax(180px, 1fr);
 }
 
 .shift-list-head,
@@ -547,6 +547,26 @@ textarea:focus {
 
 .shift-col {
   min-width: 0;
+}
+
+.shift-col.shift-name {
+  grid-area: name;
+}
+
+.shift-col.shift-attr {
+  grid-area: attr;
+}
+
+.shift-col.shift-area {
+  grid-area: area;
+}
+
+.shift-col.shift-time-col {
+  grid-area: time;
+}
+
+.shift-col.shift-priority {
+  grid-area: priority;
 }
 
 .shift-name {
@@ -716,6 +736,7 @@ textarea:focus {
 .shift-time-col {
   display: grid;
   gap: 6px;
+  align-content: start;
 }
 
 .time-text {
@@ -728,6 +749,7 @@ textarea:focus {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-wrap: nowrap;
 }
 
 .shift-time-select {
@@ -765,6 +787,7 @@ textarea:focus {
 
 .priority-tags {
   align-items: flex-start;
+  align-content: flex-start;
 }
 
 .shift-area-select {
@@ -1377,9 +1400,13 @@ textarea:focus {
   }
 
   .shift-list-row {
-    grid-template-columns: 1fr;
-    gap: 3px;
-    padding: 8px 10px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "name attr"
+      "area time"
+      "priority priority";
+    gap: 8px 10px;
+    padding: 10px;
     font-size: 0.8rem;
     cursor: default;
   }
@@ -1424,31 +1451,55 @@ textarea:focus {
     gap: 6px;
   }
 
-  .shift-col.shift-area {
-    display: grid;
-  }
-
   .shift-col.shift-name {
     font-size: 0.88rem;
   }
 
-  .shift-col.shift-type,
-  .shift-col.shift-state,
-  .shift-col.shift-actions,
   .shift-col.shift-area,
   .shift-col.shift-time-col,
   .shift-col.shift-priority,
   .shift-col.shift-attr {
-    display: flex;
-    align-items: center;
+    display: grid;
     gap: 6px;
+    align-content: start;
+  }
+
+  .shift-col.shift-attr {
+    justify-items: end;
+  }
+
+  .shift-attr-list,
+  .priority-tags {
+    display: flex;
     flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .shift-col.shift-area {
+    justify-items: start;
+  }
+
+  .shift-col.shift-time-col {
+    justify-items: start;
+  }
+
+  .shift-col.shift-priority {
+    grid-template-columns: 1fr;
   }
 
   .shift-area-select,
   .shift-time-select {
-    width: auto;
-    min-height: 28px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .time-selects {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .time-selects span {
+    display: none;
   }
 
   .distribution-layout {
