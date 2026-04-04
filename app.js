@@ -19,6 +19,7 @@
   latestDailyPlans: [],
   activeAnalysisTab: "fill",
   activeDailyShiftTab: "early",
+  activeShiftView: "list",
   disabledTherapists: new Set(),
   distributionDate: "",
   selectedDistributionKey: "",
@@ -517,7 +518,13 @@ function renderTodayShift(dayPlan) {
     return;
   }
 
-  elements.todayShiftList.innerHTML = `
+  const viewTabs = `
+    <div class="shift-view-tabs">
+      <button class="shift-view-tab ${state.activeShiftView === "list" ? "active" : ""}" type="button" data-shift-view="list">リスト表示</button>
+      <button class="shift-view-tab ${state.activeShiftView === "board" ? "active" : ""}" type="button" data-shift-view="board">盤面表示</button>
+    </div>
+  `;
+  const listMarkup = `
     <div class="daily-shift-tabs">
       <button class="daily-shift-tab ${state.activeDailyShiftTab === "early" ? "active" : ""}" type="button" data-daily-tab="early">
         早番 ${earlyAssignments.length}/${dayPlan.requirement.earlyNeeded}
@@ -535,6 +542,21 @@ function renderTodayShift(dayPlan) {
         <div class="shift-team-head">遅番 ${lateAssignments.length}/${dayPlan.requirement.lateNeeded}</div>
         ${renderShiftTeamList(lateAssignments, "late")}
       </section>
+    </div>
+  `;
+  const boardMarkup = `
+    <div class="shift-board-wrap ${state.activeShiftView === "board" ? "active" : ""}">
+      ${renderBoardView(dayPlan)}
+    </div>
+  `;
+
+  elements.todayShiftList.innerHTML = `
+    ${viewTabs}
+    <div class="shift-view-panel ${state.activeShiftView === "list" ? "active" : ""}" data-shift-view-panel="list">
+      ${listMarkup}
+    </div>
+    <div class="shift-view-panel ${state.activeShiftView === "board" ? "active" : ""}" data-shift-view-panel="board">
+      ${boardMarkup}
     </div>
   `;
 
@@ -614,6 +636,13 @@ function renderShiftTeamList(assignments, shift) {
 }
 
 function bindShiftBoardEvents(target) {
+  target.querySelectorAll(".shift-view-tab").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.activeShiftView = button.dataset.shiftView;
+      renderTodayShift(findCurrentDayPlan(state.latestDailyPlans));
+    });
+  });
+
   target.querySelectorAll(".daily-shift-tab").forEach((button) => {
     button.addEventListener("click", () => {
       state.activeDailyShiftTab = button.dataset.dailyTab;
@@ -972,6 +1001,139 @@ function renderAnalysisTab() {
   document.querySelectorAll("[data-analysis-panel]").forEach((panel) => {
     panel.classList.toggle("active", panel.dataset.analysisPanel === state.activeAnalysisTab);
   });
+}
+
+function renderBoardView(dayPlan) {
+  const board = buildBoardRows(dayPlan);
+  const hourLabels = buildBoardHourLabels();
+
+  return `
+    <div class="shift-board-scroll">
+      <div class="shift-board-grid" style="--board-cols:${hourLabels.length};">
+        <div class="shift-board-header board-row-label">枠</div>
+        <div class="shift-board-hours">
+          ${hourLabels.map((label) => `<span>${label}</span>`).join("")}
+        </div>
+        ${board.rows
+          .map(
+            (row) => `
+              <div class="board-row-label">${row.label}</div>
+              <div class="board-row-track">
+                <div class="board-row-grid">
+                  ${hourLabels.map(() => `<span class="board-grid-cell"></span>`).join("")}
+                </div>
+                ${row.blocks
+                  .map(
+                    (block) => `
+                      <div class="board-bar ${block.tone}" style="left:${block.left}%;width:${block.width}%;">
+                        <span>${block.label}</span>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+    <div class="board-legend">
+      <span class="board-legend-chip booked">姫あり</span>
+      <span class="board-legend-chip available">出勤のみ</span>
+      <span class="board-legend-chip shortage">不足</span>
+    </div>
+  `;
+}
+
+function buildBoardRows(dayPlan) {
+  const areas = samplePrototypeData.settings.areas || [];
+  const assignments = [
+    ...dayPlan.earlyAssignments.map((assignment) => ({ ...assignment, shift: "early" })),
+    ...dayPlan.lateAssignments.map((assignment) => ({ ...assignment, shift: "late" }))
+  ].sort((left, right) => toMinutes(left.startTime) - toMinutes(right.startTime));
+  const rowsByArea = new Map(areas.map((area) => [area, []]));
+
+  assignments.forEach((assignment) => {
+    const area = assignment.area || assignment.preferredArea || areas[0];
+    const areaRows = rowsByArea.get(area) || [];
+    const block = buildBoardBlock(assignment.startTime, assignment.endTime, assignment.name, assignment.himeReservation === "あり" ? "booked" : "available");
+    const targetIndex = areaRows.findIndex((row) => row.lastEnd <= toMinutes(assignment.startTime));
+
+    if (targetIndex === -1) {
+      areaRows.push({
+        label: `${area}${String(areaRows.length + 1).padStart(2, "0")}`,
+        blocks: [block],
+        lastEnd: toMinutes(assignment.endTime)
+      });
+    } else {
+      areaRows[targetIndex].blocks.push(block);
+      areaRows[targetIndex].lastEnd = toMinutes(assignment.endTime);
+    }
+
+    rowsByArea.set(area, areaRows);
+  });
+
+  const shortageBlocks = buildShortageBlocks(dayPlan);
+  shortageBlocks.forEach((shortage, index) => {
+    const area = areas[index % Math.max(areas.length, 1)] || "未配置";
+    const areaRows = rowsByArea.get(area) || [];
+    areaRows.push({
+      label: `${area}${String(areaRows.length + 1).padStart(2, "0")}`,
+      blocks: [shortage],
+      lastEnd: 0
+    });
+    rowsByArea.set(area, areaRows);
+  });
+
+  const rows = [];
+  areas.forEach((area) => {
+    const areaRows = rowsByArea.get(area) || [];
+    areaRows.forEach((row, index) => {
+      rows.push({
+        label: `${area}${index + 1}`,
+        blocks: row.blocks
+      });
+    });
+  });
+
+  return { rows: rows.length ? rows : [{ label: "未配置1", blocks: [] }] };
+}
+
+function buildBoardBlock(startTime, endTime, label, tone) {
+  const boardStart = 11 * 60;
+  const boardEnd = 29 * 60;
+  const start = Math.max(toMinutes(startTime), boardStart);
+  const end = Math.min(toMinutes(endTime), boardEnd);
+  const total = boardEnd - boardStart;
+  return {
+    label,
+    tone,
+    left: ((start - boardStart) / total) * 100,
+    width: (Math.max(end - start, 60) / total) * 100
+  };
+}
+
+function buildShortageBlocks(dayPlan) {
+  const blocks = [];
+  const earlyShortage = Math.max(dayPlan.requirement.earlyNeeded - dayPlan.earlyAssignments.length, 0);
+  const lateShortage = Math.max(dayPlan.requirement.lateNeeded - dayPlan.lateAssignments.length, 0);
+
+  for (let index = 0; index < earlyShortage; index += 1) {
+    blocks.push(buildBoardBlock("11:00", "19:00", "不足", "shortage"));
+  }
+  for (let index = 0; index < lateShortage; index += 1) {
+    blocks.push(buildBoardBlock("19:00", "29:00", "不足", "shortage"));
+  }
+
+  return blocks;
+}
+
+function buildBoardHourLabels() {
+  const labels = [];
+  for (let hour = 11; hour <= 29; hour += 1) {
+    labels.push(`${String(hour).padStart(2, "0")}:00`);
+  }
+  return labels;
 }
 
 function toggleSidebar(forceState) {
