@@ -448,7 +448,11 @@ textarea:focus {
 }
 
 .board-bar.shortage {
-  background: linear-gradient(90deg, #ec7272 0%, #cf4949 100%);
+  background: linear-gradient(90deg, #f5a3c4 0%, #e56ba0 100%);
+}
+
+.board-bar.cut {
+  background: linear-gradient(90deg, #a3a8b3 0%, #727782 100%);
 }
 
 .board-legend {
@@ -478,8 +482,13 @@ textarea:focus {
 }
 
 .board-legend-chip.shortage {
-  background: rgba(207, 73, 73, 0.12);
-  color: #cf4949;
+  background: rgba(229, 107, 160, 0.14);
+  color: #c24f84;
+}
+
+.board-legend-chip.cut {
+  background: rgba(114, 119, 130, 0.14);
+  color: #5f6670;
 }
 
 .shift-team-head {

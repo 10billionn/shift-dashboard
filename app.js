@@ -1082,47 +1082,39 @@ function renderBoardView(dayPlan) {
       <span class="board-legend-chip booked">姫あり</span>
       <span class="board-legend-chip available">出勤のみ</span>
       <span class="board-legend-chip shortage">不足</span>
+      <span class="board-legend-chip cut">カット</span>
     </div>
   `;
 }
 
 function buildBoardRows(dayPlan) {
   const areas = samplePrototypeData.settings.areas || [];
-  const assignments = [
-    ...dayPlan.earlyAssignments.map((assignment) => ({ ...assignment, shift: "early" })),
-    ...dayPlan.lateAssignments.map((assignment) => ({ ...assignment, shift: "late" }))
-  ].sort((left, right) => toMinutes(left.startTime) - toMinutes(right.startTime));
+  const boardItems = buildBoardItems(dayPlan).sort((left, right) => {
+    const areaCompare = left.area.localeCompare(right.area, "ja");
+    if (areaCompare !== 0) {
+      return areaCompare;
+    }
+    return toMinutes(left.startTime) - toMinutes(right.startTime);
+  });
   const rowsByArea = new Map(areas.map((area) => [area, []]));
 
-  assignments.forEach((assignment) => {
-    const area = assignment.area || assignment.preferredArea || areas[0];
+  boardItems.forEach((item) => {
+    const area = item.area || areas[0];
     const areaRows = rowsByArea.get(area) || [];
-    const block = buildBoardBlock(assignment.startTime, assignment.endTime, assignment.name, assignment.himeReservation === "あり" ? "booked" : "available");
-    const targetIndex = areaRows.findIndex((row) => row.lastEnd <= toMinutes(assignment.startTime));
+    const block = buildBoardBlock(item.startTime, item.endTime, item.label, item.tone);
+    const targetIndex = areaRows.findIndex((row) => row.lastEnd <= toMinutes(item.startTime));
 
     if (targetIndex === -1) {
       areaRows.push({
-        label: `${area}${String(areaRows.length + 1).padStart(2, "0")}`,
+        label: `${area}${toRoomSuffix(areaRows.length + 1)}`,
         blocks: [block],
-        lastEnd: toMinutes(assignment.endTime)
+        lastEnd: toMinutes(item.endTime)
       });
     } else {
       areaRows[targetIndex].blocks.push(block);
-      areaRows[targetIndex].lastEnd = toMinutes(assignment.endTime);
+      areaRows[targetIndex].lastEnd = toMinutes(item.endTime);
     }
 
-    rowsByArea.set(area, areaRows);
-  });
-
-  const shortageBlocks = buildShortageBlocks(dayPlan);
-  shortageBlocks.forEach((shortage, index) => {
-    const area = areas[index % Math.max(areas.length, 1)] || "未配置";
-    const areaRows = rowsByArea.get(area) || [];
-    areaRows.push({
-      label: `${area}${String(areaRows.length + 1).padStart(2, "0")}`,
-      blocks: [shortage],
-      lastEnd: 0
-    });
     rowsByArea.set(area, areaRows);
   });
 
@@ -1131,13 +1123,43 @@ function buildBoardRows(dayPlan) {
     const areaRows = rowsByArea.get(area) || [];
     areaRows.forEach((row, index) => {
       rows.push({
-        label: `${area}${index + 1}`,
+        label: `${area}${toRoomSuffix(index + 1)}`,
         blocks: row.blocks
       });
     });
   });
 
   return { rows: rows.length ? rows : [{ label: "未配置1", blocks: [] }] };
+}
+
+function buildBoardItems(dayPlan) {
+  const approvedAssignments = [
+    ...dayPlan.earlyAssignments.map((assignment) => ({
+      area: assignment.area,
+      startTime: assignment.startTime,
+      endTime: assignment.endTime,
+      tone: assignment.himeReservation === "あり" ? "booked" : "available",
+      label: `${assignment.name} ${compactTimeRange(assignment.startTime, assignment.endTime)} ${assignment.area}`
+    })),
+    ...dayPlan.lateAssignments.map((assignment) => ({
+      area: assignment.area,
+      startTime: assignment.startTime,
+      endTime: assignment.endTime,
+      tone: assignment.himeReservation === "あり" ? "booked" : "available",
+      label: `${assignment.name} ${compactTimeRange(assignment.startTime, assignment.endTime)} ${assignment.area}`
+    }))
+  ];
+  const cutItems = state.shiftRequests
+    .filter((request) => request.dateKey === dayPlan.dateKey && getTherapistGenerationStatus(request.name) === "cut")
+    .map((request) => ({
+      area: request.preferredArea || samplePrototypeData.settings.areas[0],
+      startTime: request.startTime,
+      endTime: request.endTime,
+      tone: "cut",
+      label: `${request.name} ${compactTimeRange(request.startTime, request.endTime)} ${request.preferredArea || ""}`
+    }));
+
+  return [...approvedAssignments, ...buildShortageItems(dayPlan), ...cutItems];
 }
 
 function buildBoardBlock(startTime, endTime, label, tone) {
@@ -1154,19 +1176,34 @@ function buildBoardBlock(startTime, endTime, label, tone) {
   };
 }
 
-function buildShortageBlocks(dayPlan) {
-  const blocks = [];
+function buildShortageItems(dayPlan) {
+  const items = [];
   const earlyShortage = Math.max(dayPlan.requirement.earlyNeeded - dayPlan.earlyAssignments.length, 0);
   const lateShortage = Math.max(dayPlan.requirement.lateNeeded - dayPlan.lateAssignments.length, 0);
+  const areaOrder = buildAreaPriority(dayPlan);
 
   for (let index = 0; index < earlyShortage; index += 1) {
-    blocks.push(buildBoardBlock("11:00", "19:00", "不足", "shortage"));
+    const area = areaOrder[(index * 2) % areaOrder.length];
+    items.push({
+      area,
+      startTime: "11:00",
+      endTime: "19:00",
+      tone: "shortage",
+      label: `空き ${compactTimeRange("11:00", "19:00")} ${area}`
+    });
   }
   for (let index = 0; index < lateShortage; index += 1) {
-    blocks.push(buildBoardBlock("19:00", "29:00", "不足", "shortage"));
+    const area = areaOrder[(index * 2 + 1) % areaOrder.length];
+    items.push({
+      area,
+      startTime: "19:00",
+      endTime: "29:00",
+      tone: "shortage",
+      label: `空き ${compactTimeRange("19:00", "29:00")} ${area}`
+    });
   }
 
-  return blocks;
+  return items;
 }
 
 function buildBoardHourLabels() {
@@ -1176,6 +1213,24 @@ function buildBoardHourLabels() {
     labels.push(`${String(displayHour).padStart(2, "0")}:00`);
   }
   return labels;
+}
+
+function buildAreaPriority(dayPlan) {
+  const areas = samplePrototypeData.settings.areas || [];
+  const requestCounts = new Map(areas.map((area) => [area, 0]));
+
+  state.shiftRequests
+    .filter((request) => request.dateKey === dayPlan.dateKey && getTherapistGenerationStatus(request.name) !== "cut")
+    .forEach((request) => {
+      requestCounts.set(request.preferredArea, (requestCounts.get(request.preferredArea) || 0) + 1);
+    });
+
+  return [...areas].sort((left, right) => (requestCounts.get(right) || 0) - (requestCounts.get(left) || 0));
+}
+
+function toRoomSuffix(index) {
+  const table = ["", "①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨"];
+  return table[index] || String(index);
 }
 
 function toggleSidebar(forceState) {
