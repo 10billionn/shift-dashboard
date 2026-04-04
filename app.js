@@ -1,6 +1,8 @@
 ﻿const state = {
   selectedDate: "",
-  dateList: []
+  dateList: [],
+  activeView: "list",
+  activeShiftTab: "early"
 };
 
 const elements = {
@@ -9,10 +11,17 @@ const elements = {
   lateShiftList: document.querySelector("#lateShiftList"),
   earlyCount: document.querySelector("#earlyCount"),
   lateCount: document.querySelector("#lateCount"),
+  earlyCountMobile: document.querySelector("#earlyCountMobile"),
+  lateCountMobile: document.querySelector("#lateCountMobile"),
   prevDayButton: document.querySelector("#prevDayButton"),
   todayButton: document.querySelector("#todayButton"),
   nextDayButton: document.querySelector("#nextDayButton"),
-  reloadButton: document.querySelector("#reloadButton")
+  reloadButton: document.querySelector("#reloadButton"),
+  viewTabs: document.querySelector("#viewTabs"),
+  shiftTabs: document.querySelector("#shiftTabs"),
+  listView: document.querySelector("#listView"),
+  boardView: document.querySelector("#boardView"),
+  shiftPanels: Array.from(document.querySelectorAll("[data-shift-panel]"))
 };
 
 initialize();
@@ -26,6 +35,20 @@ function initialize() {
   elements.nextDayButton.addEventListener("click", () => moveDate(1));
   elements.reloadButton.addEventListener("click", renderDashboard);
 
+  elements.viewTabs.querySelectorAll(".view-tab").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.activeView = button.dataset.view;
+      renderViewState();
+    });
+  });
+
+  elements.shiftTabs.querySelectorAll(".shift-tab").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.activeShiftTab = button.dataset.shift;
+      renderShiftTabState();
+    });
+  });
+
   renderDashboard();
 }
 
@@ -35,13 +58,17 @@ function renderDashboard() {
   const lateMembers = dayRequests.filter((request) => isLateShift(request));
 
   elements.selectedDateLabel.textContent = `${state.selectedDate} (${formatWeekday(state.selectedDate)})`;
-  elements.earlyCount.textContent = `${earlyMembers.length}名`;
-  elements.lateCount.textContent = `${lateMembers.length}名`;
+  elements.earlyCount.textContent = `${earlyMembers.length}/${samplePrototypeData.requirements.find((item) => item.dateKey === state.selectedDate)?.earlyNeeded || earlyMembers.length}`;
+  elements.lateCount.textContent = `${lateMembers.length}/${samplePrototypeData.requirements.find((item) => item.dateKey === state.selectedDate)?.lateNeeded || lateMembers.length}`;
+  elements.earlyCountMobile.textContent = elements.earlyCount.textContent;
+  elements.lateCountMobile.textContent = elements.lateCount.textContent;
 
   elements.earlyShiftList.innerHTML = renderShiftCards(earlyMembers, "早番");
   elements.lateShiftList.innerHTML = renderShiftCards(lateMembers, "遅番");
 
   updateDayButtons();
+  renderViewState();
+  renderShiftTabState();
 }
 
 function renderShiftCards(members, shiftLabel) {
@@ -51,22 +78,84 @@ function renderShiftCards(members, shiftLabel) {
 
   return members
     .map((member) => {
-      const profile = samplePrototypeData.therapistProfiles?.[member.name] || { rank: "G" };
+      const profile = samplePrototypeData.therapistProfiles?.[member.name] || { rank: "G", flags: [] };
+      const attendance = selectAttendanceFlag(profile.flags);
+      const priorityTags = buildPriorityTags(member);
       return `
         <article class="shift-card ${member.himeReservation === "あり" ? "has-hime" : ""}">
           <div class="shift-card-top">
             <strong class="therapist-name">${member.name}</strong>
-            <span class="rank-badge">${profile.rank}</span>
+            <div class="status-row">
+              <span class="mini-badge rank">${profile.rank}</span>
+              <span class="mini-badge">${attendance}</span>
+              <span class="mini-badge ${member.himeReservation === "あり" ? "booked" : "normal"}">${member.himeReservation === "あり" ? "姫あり" : "姫なし"}</span>
+            </div>
           </div>
-          <div class="shift-card-meta">
-            <span class="area-badge">${member.preferredArea}</span>
-            <span class="time-badge">${compactTime(member.startTime)}-${compactTime(member.endTime)}</span>
-            <span class="status-badge ${member.himeReservation === "あり" ? "booked" : "normal"}">${member.himeReservation === "あり" ? "姫あり" : "通常"}</span>
+
+          <div class="shift-card-main">
+            <div class="field-block">
+              <span class="field-label">エリア</span>
+              <span class="field-value area-text">${member.preferredArea}</span>
+            </div>
+            <div class="time-grid">
+              <div class="field-block compact">
+                <span class="field-label">開始</span>
+                <span class="field-value">${compactTime(member.startTime)}</span>
+              </div>
+              <div class="field-block compact">
+                <span class="field-label">終了</span>
+                <span class="field-value">${compactTime(member.endTime)}</span>
+              </div>
+              <div class="field-block compact shift-badge-wrap">
+                <span class="field-label">区分</span>
+                <span class="shift-chip ${shiftLabel === "早番" ? "early" : "late"}">${shiftLabel}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="priority-row">
+            ${priorityTags.length ? priorityTags.map((tag) => `<span class="priority-tag">${tag}</span>`).join("") : `<span class="field-label">優先条件なし</span>`}
           </div>
         </article>
       `;
     })
     .join("");
+}
+
+function renderViewState() {
+  const isList = state.activeView === "list";
+  elements.listView.classList.toggle("active", isList);
+  elements.boardView.classList.toggle("active", !isList);
+  elements.viewTabs.querySelectorAll(".view-tab").forEach((button) => {
+    button.classList.toggle("active", button.dataset.view === state.activeView);
+  });
+}
+
+function renderShiftTabState() {
+  elements.shiftTabs.querySelectorAll(".shift-tab").forEach((button) => {
+    button.classList.toggle("active", button.dataset.shift === state.activeShiftTab);
+  });
+
+  elements.shiftPanels.forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.shiftPanel === state.activeShiftTab);
+  });
+}
+
+function buildPriorityTags(member) {
+  const note = String(member.note || "");
+  const tags = [];
+  if (note.includes("終電")) tags.push("終電");
+  if (note.includes("店泊")) tags.push("店泊");
+  if (note.includes("21")) tags.push("21時以降");
+  if (note.includes("葛西")) tags.push("葛西希望");
+  if (note.includes("ラスト")) tags.push("ラスト対応可");
+  if (note.includes("ヘルプ")) tags.push("ヘルプ可");
+  if (note.includes("姫")) tags.push("姫予約あり");
+  return [...new Set(tags)].slice(0, 3);
+}
+
+function selectAttendanceFlag(flags) {
+  return flags.find((flag) => ["勤怠安定", "遅刻注意", "出稼ぎ"].includes(flag)) || "勤怠安定";
 }
 
 function isEarlyShift(request) {
