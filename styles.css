@@ -23,6 +23,7 @@ body {
   font-size: 16px;
   color: var(--text);
   background: #eef2f5;
+  overflow-x: hidden;
 }
 
 button,
@@ -164,6 +165,7 @@ textarea:focus {
   padding: 20px;
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .view {
@@ -228,6 +230,7 @@ textarea:focus {
   border-radius: 18px;
   padding: 18px;
   box-shadow: var(--shadow);
+  min-width: 0;
 }
 
 .summary-grid {
@@ -476,6 +479,7 @@ textarea:focus {
 .table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  min-width: 0;
 }
 
 table {
@@ -516,6 +520,18 @@ th {
 }
 
 @media (max-width: 768px) {
+  html,
+  body,
+  .app-shell,
+  .main-shell,
+  .content-area,
+  .view,
+  .content-panel,
+  .result-panel {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   .app-shell {
     grid-template-columns: 1fr;
   }
@@ -560,7 +576,8 @@ th {
   }
 
   .content-area {
-    padding: 12px;
+    padding: 10px;
+    gap: 12px;
   }
 
   .section-head,
@@ -580,6 +597,38 @@ th {
     grid-template-columns: 1fr;
   }
 
+  .summary-card,
+  .decision-card,
+  .setting-card,
+  .content-panel,
+  .result-panel {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .summary-card strong {
+    font-size: 1.7rem;
+    line-height: 1.2;
+  }
+
+  .decision-value {
+    font-size: 1rem;
+  }
+
+  .section-head h1 {
+    font-size: 1.2rem;
+  }
+
+  .sub-head h2 {
+    font-size: 0.98rem;
+  }
+
+  .mini-label,
+  .summary-card p,
+  .metric-card p {
+    font-size: 0.78rem;
+  }
+
   .action-button,
   .topbar-button,
   .secondary-action,
@@ -591,5 +640,87 @@ th {
 
   .topbar-button {
     display: none;
+  }
+
+  .table-wrap {
+    overflow: visible;
+  }
+
+  table {
+    min-width: 0;
+  }
+
+  table,
+  thead,
+  tbody,
+  tr,
+  th,
+  td {
+    display: block;
+    width: 100%;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tr {
+    margin-bottom: 10px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #fff;
+    overflow: hidden;
+  }
+
+  td {
+    border-bottom: 1px solid var(--line);
+    padding: 10px 12px;
+  }
+
+  .day-meta-row td {
+    border-bottom: none;
+  }
+
+  .mobile-day-card {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: #fff;
+    margin-bottom: 10px;
+  }
+
+  .mobile-day-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    font-size: 0.95rem;
+  }
+
+  .mobile-day-meta {
+    color: var(--muted);
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+
+  .mobile-result-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .mobile-result-item {
+    display: grid;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    font-size: 0.92rem;
+  }
+
+  .mobile-result-item.empty {
+    color: var(--muted);
   }
 }

@@ -312,6 +312,48 @@ function renderBusinessMetrics(aggregate) {
 }
 
 function renderResultTable(dailyPlans) {
+  const isMobile = window.innerWidth <= 768;
+
+  if (isMobile) {
+    elements.resultTable.innerHTML = dailyPlans
+      .map((day) => {
+        const assignments = [...day.earlyAssignments, ...day.lateAssignments];
+        const assignmentMarkup = assignments.length
+          ? assignments
+              .map((assignment) => {
+                const shiftLabel = day.earlyAssignments.includes(assignment) ? "早番" : "遅番";
+                return `
+                  <div class="mobile-result-item">
+                    <strong>${assignment.name}</strong>
+                    <div>${assignment.area}</div>
+                    <div>${shiftLabel}</div>
+                    <div>${assignment.note || "-"}</div>
+                  </div>
+                `;
+              })
+              .join("")
+          : `<div class="mobile-result-item empty">割り当てなし</div>`;
+
+        return `
+          <article class="mobile-day-card">
+            <div class="mobile-day-head">
+              <strong>${day.dateKey}</strong>
+              <span>${day.weekday}曜</span>
+            </div>
+            <div class="mobile-day-meta">
+              必要人数: 早番 ${day.requirement.earlyNeeded} / 遅番 ${day.requirement.lateNeeded}
+            </div>
+            <div class="mobile-result-list">${assignmentMarkup}</div>
+            <div class="mobile-day-meta">
+              出勤可能: ${day.availableCount}人 / 休み: ${day.offMembers.length ? day.offMembers.join(", ") : "なし"}
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+    return;
+  }
+
   const rows = dailyPlans
     .map((day) => {
       const assignmentRows = [
