@@ -74,6 +74,11 @@ textarea:focus {
   display: grid;
   align-content: start;
   gap: 18px;
+  z-index: 40;
+}
+
+.sidebar-overlay {
+  display: none;
 }
 
 .sidebar-brand {
@@ -127,6 +132,11 @@ textarea:focus {
   display: none;
   background: #e5ecef;
   color: var(--text);
+}
+
+.menu-toggle[aria-expanded="true"] {
+  background: #d7e9e6;
+  color: var(--accent-strong);
 }
 
 .topbar-button,
@@ -516,11 +526,27 @@ th {
     width: 260px;
     transform: translateX(-100%);
     transition: transform 180ms ease;
-    z-index: 30;
+    z-index: 50;
   }
 
   .sidebar.open {
     transform: translateX(0);
+  }
+
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 24, 39, 0.36);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+    z-index: 45;
+  }
+
+  .sidebar-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .menu-toggle {

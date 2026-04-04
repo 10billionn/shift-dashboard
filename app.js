@@ -24,6 +24,7 @@
   manualDemandPanel: document.querySelector("#manualDemandPanel"),
   csvDemandPanel: document.querySelector("#csvDemandPanel"),
   sidebar: document.querySelector("#sidebar"),
+  sidebarOverlay: document.querySelector("#sidebarOverlay"),
   sidebarNav: document.querySelector("#sidebarNav"),
   menuToggle: document.querySelector("#menuToggle"),
   views: Array.from(document.querySelectorAll("[data-view-panel]"))
@@ -40,7 +41,8 @@ function initializePrototype() {
   elements.loadSampleButton.addEventListener("click", loadSampleData);
   elements.startDate.addEventListener("change", syncRequirementRows);
   elements.days.addEventListener("change", syncRequirementRows);
-  elements.menuToggle.addEventListener("click", toggleSidebar);
+  elements.menuToggle.addEventListener("click", () => toggleSidebar());
+  elements.sidebarOverlay.addEventListener("click", () => closeSidebar());
 
   elements.sidebarNav.querySelectorAll(".nav-item").forEach((button) => {
     button.addEventListener("click", () => setActiveView(button.dataset.view));
@@ -455,11 +457,22 @@ function setActiveView(viewName) {
     view.classList.toggle("active", view.dataset.viewPanel === viewName);
   });
 
-  elements.sidebar.classList.remove("open");
+  closeSidebar();
 }
 
-function toggleSidebar() {
-  elements.sidebar.classList.toggle("open");
+function toggleSidebar(forceState) {
+  const nextState =
+    typeof forceState === "boolean"
+      ? forceState
+      : !elements.sidebar.classList.contains("open");
+
+  elements.sidebar.classList.toggle("open", nextState);
+  elements.sidebarOverlay.classList.toggle("visible", nextState);
+  elements.menuToggle.setAttribute("aria-expanded", String(nextState));
+}
+
+function closeSidebar() {
+  toggleSidebar(false);
 }
 
 function setDemandMode(mode) {
