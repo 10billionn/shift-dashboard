@@ -3,193 +3,198 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>シフト自動生成ツール ダッシュボード試作</title>
+  <title>シフトダッシュボード</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="page-shell">
-    <header class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">Shift Control Dashboard</p>
-        <h1>シフト自動生成ツールのダッシュボード試作</h1>
-        <p class="lead">
-          管理者が最初に「今週の状況」「不足」「注意点」を把握し、そのまま生成判断と設定確認に進める構成です。
-        </p>
-      </div>
-      <div class="hero-actions">
-        <button id="loadSampleButton" class="ghost-button" type="button">サンプル再読込</button>
-      </div>
-    </header>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">シフトダッシュボード</div>
+      <nav class="sidebar-nav" id="sidebarNav">
+        <button class="nav-item active" type="button" data-view="dashboard">ダッシュボード</button>
+        <button class="nav-item" type="button" data-view="generation">シフト生成</button>
+        <button class="nav-item" type="button" data-view="therapists">セラピスト管理</button>
+        <button class="nav-item" type="button" data-view="history">実績データ</button>
+        <button class="nav-item" type="button" data-view="settings">設定</button>
+      </nav>
+    </aside>
 
-    <main class="dashboard">
-      <section class="panel dashboard-panel">
-        <div class="panel-heading">
-          <div>
-            <p class="section-kicker">1. Dashboard</p>
-            <h2>今週の状況</h2>
-          </div>
-          <div class="panel-actions-inline">
-            <label class="compact-field">
-              対象期間
-              <input id="startDate" type="date">
-            </label>
-            <label class="compact-field">
-              日数
-              <input id="days" type="number" min="1" max="31" value="7">
-            </label>
-          </div>
-        </div>
+    <div class="main-shell">
+      <header class="topbar">
+        <button id="menuToggle" class="menu-toggle" type="button" aria-label="メニューを開く">☰</button>
+        <div class="topbar-title">シフトダッシュボード</div>
+        <button id="loadSampleButton" class="ghost-button topbar-button" type="button">サンプル再読込</button>
+      </header>
 
-        <div id="summaryCards" class="summary-grid"></div>
-
-        <div class="decision-bar">
-          <div class="decision-copy">
-            <strong>この条件で生成判断</strong>
-            <p>不足状況と経営指標を確認したうえで、現在の条件をもとにシフトを更新します。</p>
-          </div>
-          <button id="generateButton" class="primary-button decision-button" type="button">この状態で生成</button>
-        </div>
-
-        <div class="dashboard-lanes">
-          <article class="status-panel">
-            <div class="status-panel-head">
-              <h3>不足と注意点</h3>
-              <span class="status-chip">優先確認</span>
-            </div>
-            <div id="warningBox" class="warning-list"></div>
-          </article>
-
-          <article class="status-panel">
-            <div class="status-panel-head">
-              <h3>判断メモ</h3>
-              <span class="status-chip muted">概要</span>
-            </div>
-            <div id="dashboardInsights" class="insight-list"></div>
-          </article>
-        </div>
-
-        <div class="analytics-grid">
-          <article class="status-panel">
-            <div class="status-panel-head">
-              <h3>不足ランキング</h3>
-              <span class="status-chip">日別</span>
-            </div>
-            <div id="shortageRanking" class="ranking-list"></div>
-          </article>
-
-          <article class="status-panel">
-            <div class="status-panel-head">
-              <h3>最も不足している日</h3>
-              <span class="status-chip">要対策</span>
-            </div>
-            <div id="mostShortDay" class="focus-day-card"></div>
-          </article>
-
-          <article class="status-panel">
-            <div class="status-panel-head">
-              <h3>エリア別不足</h3>
-              <span class="status-chip muted">偏り</span>
-            </div>
-            <div id="areaShortage" class="ranking-list"></div>
-          </article>
-
-          <article class="status-panel">
-            <div class="status-panel-head">
-              <h3>経営指標</h3>
-              <span class="status-chip muted">仮試算</span>
-            </div>
-            <div id="businessMetrics" class="metric-stack"></div>
-          </article>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-heading">
-          <div>
-            <p class="section-kicker">2. Demand</p>
-            <h2>実績・需要設定</h2>
-          </div>
-        </div>
-
-        <div class="mode-switch" id="modeSwitch">
-          <button class="mode-button active" type="button" data-mode="manual">手動設定</button>
-          <button class="mode-button" type="button" data-mode="csv">CSV読込</button>
-        </div>
-
-        <div class="demand-grid">
-          <article class="info-card demand-card">
-            <h3>手動設定</h3>
-            <p>日ごとの必要人数を直接入力します。まずはここで試せる状態にしています。</p>
-            <div id="manualDemandPanel">
-              <div id="requirementList" class="requirement-list"></div>
-            </div>
-          </article>
-
-          <article class="info-card demand-card">
-            <h3>CSV読込</h3>
-            <p>過去実績CSVを読み込み、必要人数に反映する想定のUIです。今は見た目のみで、後からロジックを接続できます。</p>
-            <div id="csvDemandPanel" class="csv-panel inactive-panel">
-              <label>
-                CSVファイル
-                <input id="csvFile" type="file" accept=".csv">
+      <main class="content-area">
+        <section class="view active" data-view-panel="dashboard">
+          <div class="section-head">
+            <h1>ダッシュボード</h1>
+            <div class="inline-filters">
+              <label class="compact-field">
+                対象期間
+                <input id="startDate" type="date">
               </label>
-              <div class="csv-drop-note">
-                想定読込項目: 日付 / 曜日 / 時間帯 / エリア / 来店数 / 必要人数
-              </div>
-              <div class="csv-helper-list">
-                <div>今後追加予定: 曜日別集計</div>
-                <div>今後追加予定: 時間帯別集計</div>
-                <div>今後追加予定: エリア別実績反映</div>
-              </div>
+              <label class="compact-field">
+                日数
+                <input id="days" type="number" min="1" max="31" value="7">
+              </label>
             </div>
-          </article>
-        </div>
-
-        <label class="rule-wide">
-          割り当てルールメモ
-          <textarea id="assignmentRule" rows="3"></textarea>
-        </label>
-      </section>
-
-      <section class="panel collapsed-panel">
-        <div class="panel-heading">
-          <div>
-            <p class="section-kicker">3. Therapists</p>
-            <h2>セラピスト管理</h2>
           </div>
-          <div class="panel-actions-inline">
-            <button id="toggleTherapistPanel" class="secondary-button" type="button">一覧を開く</button>
+
+          <section class="content-panel">
+            <div class="sub-head">
+              <h2>状況サマリー</h2>
+            </div>
+            <div id="summaryCards" class="summary-grid"></div>
+          </section>
+
+          <section class="content-panel">
+            <div class="sub-head">
+              <h2>判断エリア</h2>
+            </div>
+            <div class="judgment-grid">
+              <article class="decision-card">
+                <p class="mini-label">不足の有無</p>
+                <div id="statusDecision" class="decision-value"></div>
+              </article>
+              <article class="decision-card">
+                <p class="mini-label">優先対応日</p>
+                <div id="priorityDay" class="decision-value"></div>
+              </article>
+              <article class="decision-card wide">
+                <p class="mini-label">簡易コメント</p>
+                <div id="dashboardInsights" class="decision-comment"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="content-panel">
+            <div class="sub-head">
+              <h2>行動エリア</h2>
+            </div>
+            <div class="action-row">
+              <button id="generateButton" class="primary-button action-button" type="button">この状態で生成</button>
+            </div>
+          </section>
+
+          <section class="content-panel">
+            <div class="sub-head">
+              <h2>アラート要約</h2>
+            </div>
+            <div id="warningSummary" class="alert-summary"></div>
+            <details class="accordion" id="alertAccordion">
+              <summary>詳細を展開</summary>
+              <div id="warningBox" class="warning-list"></div>
+            </details>
+          </section>
+
+          <section class="content-panel">
+            <div class="sub-head">
+              <h2>不足と経営指標</h2>
+            </div>
+            <div class="history-grid">
+              <article class="setting-card">
+                <h2>日別不足ランキング</h2>
+                <div id="shortageRanking" class="ranking-list"></div>
+                <h2>最も不足している日</h2>
+                <div id="mostShortDay" class="focus-day-card"></div>
+              </article>
+              <article class="setting-card">
+                <h2>エリア別不足</h2>
+                <div id="areaShortage" class="ranking-list"></div>
+                <h2>経営指標</h2>
+                <div id="businessMetrics" class="metric-stack"></div>
+              </article>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view-panel="generation">
+          <div class="section-head">
+            <h1>シフト生成</h1>
+          </div>
+          <section class="content-panel">
+            <div class="mode-switch" id="modeSwitch">
+              <button class="mode-button active" type="button" data-mode="manual">手動設定</button>
+              <button class="mode-button" type="button" data-mode="csv">CSV読込</button>
+            </div>
+            <div class="generation-layout">
+              <article class="setting-card">
+                <h2>手動設定</h2>
+                <div id="manualDemandPanel">
+                  <div id="requirementList" class="requirement-list"></div>
+                </div>
+              </article>
+              <article class="setting-card">
+                <h2>生成補助</h2>
+                <p>必要人数を調整したあと、ダッシュボードで不足状況を確認してから生成判断できます。</p>
+                <button class="secondary-button secondary-action" type="button" id="generationActionButton">この条件で再計算</button>
+              </article>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view-panel="therapists">
+          <div class="section-head">
+            <h1>セラピスト管理</h1>
             <button id="addTherapistButton" class="secondary-button" type="button">セラピスト追加</button>
           </div>
-        </div>
-        <p class="hint">
-          メイン画面ではなく管理項目として整理しています。在籍セラピスト、出勤希望、希望エリア、備考をここで更新します。
-        </p>
-        <div id="therapistAdminPanel" class="hidden-panel">
-          <div id="therapistList" class="stack-list"></div>
-        </div>
+          <section class="content-panel">
+            <div id="therapistList" class="stack-list"></div>
+          </section>
+        </section>
+
+        <section class="view" data-view-panel="history">
+          <div class="section-head">
+            <h1>実績データ</h1>
+          </div>
+          <section class="content-panel">
+            <div class="history-grid">
+              <article class="setting-card">
+                <h2>CSV読込</h2>
+                <div id="csvDemandPanel" class="csv-panel">
+                  <label>
+                    CSVファイル
+                    <input id="csvFile" type="file" accept=".csv">
+                  </label>
+                  <div class="csv-drop-note">
+                    想定読込項目: 日付 / 曜日 / 時間帯 / エリア / 来店数 / 必要人数
+                  </div>
+                </div>
+              </article>
+              <article class="setting-card">
+                <h2>拡張予定</h2>
+                <div class="csv-helper-list">
+                  <div>曜日別実績の読込</div>
+                  <div>時間帯別需要の反映</div>
+                  <div>エリア別不足の自動判定</div>
+                </div>
+              </article>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view-panel="settings">
+          <div class="section-head">
+            <h1>設定</h1>
+          </div>
+        <section class="content-panel settings-panel">
+          <label>
+            割り当てルールメモ
+            <textarea id="assignmentRule" rows="4"></textarea>
+          </label>
+        </section>
       </section>
 
-      <section class="panel panel-results">
-        <div class="panel-heading">
-          <div>
-            <p class="section-kicker">4. Result</p>
+        <section class="content-panel result-panel">
+          <div class="sub-head">
             <h2>結果表示</h2>
           </div>
-        </div>
-        <div id="resultTable" class="table-wrap"></div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-heading">
-          <div>
-            <p class="section-kicker">5. Guide</p>
-            <h2>画面の使い方</h2>
-          </div>
-        </div>
-        <div id="explanation" class="info-grid"></div>
-      </section>
-    </main>
+          <div id="resultTable" class="table-wrap"></div>
+        </section>
+      </main>
+    </div>
   </div>
 
   <template id="therapistRowTemplate">
