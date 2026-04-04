@@ -13,6 +13,10 @@ const elements = {
   lateCount: document.querySelector("#lateCount"),
   earlyCountMobile: document.querySelector("#earlyCountMobile"),
   lateCountMobile: document.querySelector("#lateCountMobile"),
+  earlySummary: document.querySelector("#earlySummary"),
+  lateSummary: document.querySelector("#lateSummary"),
+  bookedSummary: document.querySelector("#bookedSummary"),
+  areaSummary: document.querySelector("#areaSummary"),
   prevDayButton: document.querySelector("#prevDayButton"),
   todayButton: document.querySelector("#todayButton"),
   nextDayButton: document.querySelector("#nextDayButton"),
@@ -62,6 +66,10 @@ function renderDashboard() {
   elements.lateCount.textContent = `${lateMembers.length}/${samplePrototypeData.requirements.find((item) => item.dateKey === state.selectedDate)?.lateNeeded || lateMembers.length}`;
   elements.earlyCountMobile.textContent = elements.earlyCount.textContent;
   elements.lateCountMobile.textContent = elements.lateCount.textContent;
+  elements.earlySummary.textContent = `${earlyMembers.length}名`;
+  elements.lateSummary.textContent = `${lateMembers.length}名`;
+  elements.bookedSummary.textContent = `${dayRequests.filter((request) => request.himeReservation === "あり").length}名`;
+  elements.areaSummary.textContent = `${new Set(dayRequests.map((request) => request.preferredArea)).size}エリア`;
 
   elements.earlyShiftList.innerHTML = renderShiftCards(earlyMembers, "早番");
   elements.lateShiftList.innerHTML = renderShiftCards(lateMembers, "遅番");
