@@ -4,12 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-  <link rel="stylesheet" href="styles.css?v=202604050420">
+  <link rel="stylesheet" href="styles.css?v=202604050700">
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
-      <div class="sidebar-brand">シフトダッシュボード</div>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <p class="brand-kicker">Shift Ops</p>
+        <strong>シフトダッシュボード</strong>
+      </div>
       <nav class="sidebar-nav" id="sidebarNav">
         <button class="nav-item active" type="button" data-view="dashboard">ダッシュボード</button>
         <button class="nav-item" type="button" data-view="generation">シフト作成</button>
@@ -20,147 +23,259 @@
 
     <div class="main-shell">
       <header class="topbar">
-        <div>
-          <p class="eyebrow">Shift App</p>
-          <h1 id="viewTitle">ダッシュボード</h1>
+        <div class="topbar-main">
+          <button id="menuToggle" class="menu-toggle" type="button" aria-label="メニューを開く">☰</button>
+          <div>
+            <p class="eyebrow">Operational OS</p>
+            <h1 id="viewTitle">ダッシュボード</h1>
+            <p id="viewSubtitle" class="view-subtitle">本日の充足と全体状況を一瞬で把握します。</p>
+          </div>
         </div>
-        <button id="reloadButton" class="ghost-button" type="button">サンプル再読込</button>
+        <div class="topbar-actions">
+          <button id="reloadButton" class="ghost-button" type="button">サンプル再読込</button>
+        </div>
       </header>
 
       <main class="content-area">
         <section class="view active" data-view-panel="dashboard">
-          <section class="content-panel summary-panel">
+          <section class="content-panel hero-panel">
             <div class="panel-head">
-              <h2>本日のシフト</h2>
-              <p id="selectedDateLabel" class="selected-date-label"></p>
+              <div>
+                <h2>本日のシフト</h2>
+                <p id="selectedDateLabel" class="selected-date-label"></p>
+              </div>
+              <div class="inline-meta">
+                <span class="meta-chip">見る・把握する画面</span>
+              </div>
             </div>
-            <div class="summary-grid">
-              <article class="summary-card">
-                <p>早番</p>
-                <strong id="earlySummary"></strong>
-              </article>
-              <article class="summary-card">
-                <p>遅番</p>
-                <strong id="lateSummary"></strong>
-              </article>
-              <article class="summary-card">
-                <p>姫予約あり</p>
-                <strong id="bookedSummary"></strong>
-              </article>
-              <article class="summary-card">
-                <p>対象エリア</p>
-                <strong id="areaSummary"></strong>
-              </article>
+            <div class="toolbar-row">
+              <div class="day-switcher">
+                <button id="prevDayButton" class="ghost-button" type="button">◀ 前日</button>
+                <button id="todayButton" class="secondary-button" type="button">今日</button>
+                <button id="nextDayButton" class="ghost-button" type="button">次日 ▶</button>
+              </div>
+              <div class="view-tabs" id="dashboardViewTabs">
+                <button class="view-tab active" type="button" data-dashboard-view="list">リスト表示</button>
+                <button class="view-tab" type="button" data-dashboard-view="board">盤面表示</button>
+              </div>
             </div>
           </section>
 
-          <section class="content-panel controls-panel">
-            <div class="day-switcher">
-              <button id="prevDayButton" class="ghost-button" type="button">◀ 前日</button>
-              <button id="todayButton" class="secondary-button" type="button">今日</button>
-              <button id="nextDayButton" class="ghost-button" type="button">次日 ▶</button>
+          <section class="summary-grid">
+            <article class="summary-card emphasis">
+              <p>売上予測</p>
+              <strong id="salesSummary"></strong>
+            </article>
+            <article class="summary-card">
+              <p>店落ち予測</p>
+              <strong id="storeSummary"></strong>
+            </article>
+            <article class="summary-card warning">
+              <p>不足数</p>
+              <strong id="shortageSummary"></strong>
+            </article>
+            <article class="summary-card ok">
+              <p>当日充足率</p>
+              <strong id="fillSummary"></strong>
+            </article>
+          </section>
+
+          <div id="dashboardListView" class="dashboard-view-panel active">
+            <div class="shift-tabs" id="shiftTabs">
+              <button class="shift-tab active" type="button" data-shift="early">早番 <span id="earlyCountMobile"></span></button>
+              <button class="shift-tab" type="button" data-shift="late">遅番 <span id="lateCountMobile"></span></button>
             </div>
 
-            <div class="view-tabs" id="dashboardViewTabs">
-              <button class="view-tab active" type="button" data-dashboard-view="list">リスト表示</button>
-              <button class="view-tab" type="button" data-dashboard-view="board">盤面表示</button>
-            </div>
-
-            <div id="dashboardListView" class="dashboard-view-panel active">
-              <div class="shift-tabs" id="shiftTabs">
-                <button class="shift-tab active" type="button" data-shift="early">早番 <span id="earlyCountMobile"></span></button>
-                <button class="shift-tab" type="button" data-shift="late">遅番 <span id="lateCountMobile"></span></button>
-              </div>
-
-              <section class="shift-columns">
-                <section class="content-panel shift-panel active" data-shift-panel="early">
-                  <div class="panel-head">
-                    <h3>早番</h3>
-                    <span id="earlyCount" class="panel-count"></span>
-                  </div>
-                  <div id="earlyShiftList" class="shift-list"></div>
-                </section>
-
-                <section class="content-panel shift-panel" data-shift-panel="late">
-                  <div class="panel-head">
-                    <h3>遅番</h3>
-                    <span id="lateCount" class="panel-count"></span>
-                  </div>
-                  <div id="lateShiftList" class="shift-list"></div>
-                </section>
+            <section class="shift-columns">
+              <section class="content-panel shift-panel active" data-shift-panel="early">
+                <div class="panel-head">
+                  <h3>早番</h3>
+                  <span id="earlyCount" class="panel-count"></span>
+                </div>
+                <div id="earlyShiftList" class="shift-list"></div>
               </section>
-            </div>
 
-            <section id="dashboardBoardView" class="content-panel dashboard-view-panel board-placeholder-panel">
-              <div class="panel-head">
-                <h3>盤面表示</h3>
-              </div>
-              <div class="board-placeholder">
-                <strong>盤面表示は次段階で再開します。</strong>
-                <p>まずはアプリ全体の構造とリスト表示を安定状態へ戻しています。</p>
-              </div>
+              <section class="content-panel shift-panel" data-shift-panel="late">
+                <div class="panel-head">
+                  <h3>遅番</h3>
+                  <span id="lateCount" class="panel-count"></span>
+                </div>
+                <div id="lateShiftList" class="shift-list"></div>
+              </section>
             </section>
+          </div>
+
+          <section id="dashboardBoardView" class="content-panel dashboard-view-panel board-placeholder-panel">
+            <div class="panel-head">
+              <div>
+                <h3>盤面表示</h3>
+                <p class="section-note">枠ベース表示は次段階で実装します</p>
+              </div>
+            </div>
+            <div class="board-placeholder">
+              <strong>今はリスト表示を主軸に安定化しています。</strong>
+              <p>横軸 11:00-翌5:00、縦軸 部屋枠/エリア枠 の盤面に差し替えやすい構造で残しています。</p>
+            </div>
+          </section>
+
+          <section class="content-panel">
+            <div class="panel-head">
+              <div>
+                <h2>週間分析</h2>
+                <p class="section-note">補助情報として充足と予測を確認します</p>
+              </div>
+            </div>
+            <div id="weeklyAnalysis" class="weekly-analysis"></div>
           </section>
         </section>
 
         <section class="view" data-view-panel="generation">
-          <section class="content-panel placeholder-panel">
+          <section class="content-panel">
             <div class="panel-head">
-              <h2>シフト作成</h2>
+              <div>
+                <h2>シフト作成</h2>
+                <p class="section-note">読み込み・確認・生成だけに集中する画面です</p>
+              </div>
             </div>
-            <div class="placeholder-grid">
-              <div class="placeholder-card">
-                <strong>CSV読み込み</strong>
-                <p>シフト希望CSVと過去実績データの読込エリアをここに戻します。</p>
-              </div>
-              <div class="placeholder-card">
-                <strong>抜け漏れチェック</strong>
-                <p>未提出、時間未入力、希望エリア未入力などの確認ブロックをここに配置します。</p>
-              </div>
-              <div class="placeholder-card">
-                <strong>生成</strong>
-                <p>生成ボタンと反映件数サマリーをここに置く想定です。</p>
-              </div>
+
+            <div class="generation-layout">
+              <section class="stack-block">
+                <div class="subsection-head">
+                  <h3>読み込み</h3>
+                </div>
+                <div class="import-grid">
+                  <article class="import-card">
+                    <label class="field-label" for="requestCsvInput">シフト希望CSV</label>
+                    <input id="requestCsvInput" type="file" accept=".csv">
+                    <textarea id="requestCsvText" class="data-textarea" spellcheck="false"></textarea>
+                    <div class="action-row">
+                      <button id="applyRequestCsvButton" class="primary-button" type="button">CSV反映</button>
+                      <button id="loadRequestSampleButton" class="ghost-button" type="button">サンプル読込</button>
+                    </div>
+                  </article>
+
+                  <article class="import-card">
+                    <label class="field-label" for="historyCsvInput">過去実績CSV</label>
+                    <input id="historyCsvInput" type="file" accept=".csv">
+                    <textarea id="historyCsvText" class="data-textarea" spellcheck="false"></textarea>
+                    <div class="action-row">
+                      <button id="applyHistoryCsvButton" class="ghost-button" type="button">実績反映</button>
+                      <button id="loadHistorySampleButton" class="ghost-button" type="button">サンプル読込</button>
+                    </div>
+                  </article>
+                </div>
+              </section>
+
+              <section class="stack-block">
+                <div class="subsection-head">
+                  <h3>抜け漏れチェック</h3>
+                </div>
+                <div class="summary-grid compact">
+                  <article class="summary-card">
+                    <p>反映件数</p>
+                    <strong id="importedCount"></strong>
+                  </article>
+                  <article class="summary-card warning">
+                    <p>エラー件数</p>
+                    <strong id="errorCount"></strong>
+                  </article>
+                  <article class="summary-card">
+                    <p>未提出人数</p>
+                    <strong id="missingCount"></strong>
+                  </article>
+                  <article class="summary-card warning">
+                    <p>要確認人数</p>
+                    <strong id="reviewCount"></strong>
+                  </article>
+                </div>
+                <div id="generationAlerts" class="alert-stack"></div>
+              </section>
+
+              <section class="stack-block">
+                <div class="subsection-head">
+                  <h3>採用 / カット / 保留</h3>
+                </div>
+                <div id="requestList" class="request-list"></div>
+              </section>
+
+              <section class="stack-block">
+                <div class="subsection-head">
+                  <h3>人数設定</h3>
+                </div>
+                <div id="requirementsList" class="requirements-list"></div>
+              </section>
+
+              <section class="content-panel accent-panel">
+                <div class="panel-head">
+                  <div>
+                    <h3>生成</h3>
+                    <p class="section-note">生成結果はダッシュボードと配布画面へ反映されます</p>
+                  </div>
+                </div>
+                <div class="action-row">
+                  <button id="generateScheduleButton" class="primary-button" type="button">シフト生成</button>
+                  <p id="generationResultNote" class="generation-result-note"></p>
+                </div>
+              </section>
             </div>
           </section>
         </section>
 
         <section class="view" data-view-panel="distribution">
-          <section class="content-panel placeholder-panel">
+          <section class="content-panel">
             <div class="panel-head">
-              <h2>シフト配布</h2>
+              <div>
+                <h2>シフト配布</h2>
+                <p class="section-note">確定シフトを個別に確認してワンクリックでコピーします</p>
+              </div>
             </div>
-            <div class="placeholder-grid">
-              <div class="placeholder-card">
-                <strong>日付選択</strong>
-                <p>生成済みシフトの日付選択をここに配置します。</p>
-              </div>
-              <div class="placeholder-card">
-                <strong>個別表示</strong>
-                <p>セラピストごとのシフト確認と文言プレビューをここに戻します。</p>
-              </div>
-              <div class="placeholder-card">
-                <strong>コピー</strong>
-                <p>LINE送信用の個別文言コピー導線をここに置きます。</p>
-              </div>
+            <div class="distribution-layout">
+              <section class="stack-block">
+                <label class="field-label" for="distributionDateSelect">日付選択</label>
+                <select id="distributionDateSelect" class="select-input"></select>
+              </section>
+
+              <section class="distribution-grid">
+                <div id="distributionList" class="distribution-list"></div>
+
+                <article class="preview-card">
+                  <div class="panel-head">
+                    <h3>個別シフト表示</h3>
+                    <button id="copyMessageButton" class="primary-button" type="button">コピー</button>
+                  </div>
+                  <pre id="distributionPreview" class="message-preview"></pre>
+                  <p id="copyStatus" class="copy-status"></p>
+                </article>
+              </section>
             </div>
           </section>
         </section>
 
         <section class="view" data-view-panel="settings">
-          <section class="content-panel placeholder-panel">
+          <section class="content-panel">
             <div class="panel-head">
-              <h2>設定</h2>
+              <div>
+                <h2>設定</h2>
+                <p class="section-note">マスタとルールを後から差し込みやすい形で整理します</p>
+              </div>
             </div>
-            <div class="placeholder-grid">
-              <div class="placeholder-card">
-                <strong>期間設定</strong>
-                <p>開始日や日数などの基本設定をここに配置します。</p>
-              </div>
-              <div class="placeholder-card">
-                <strong>ルール設定</strong>
-                <p>必要人数や簡易ルール設定をここに戻します。</p>
-              </div>
+            <div class="settings-grid">
+              <article class="placeholder-card">
+                <strong>セラピストマスタ</strong>
+                <p>ランク、勤怠フラグ、対応エリアの持ち方をここに集約します。</p>
+              </article>
+              <article class="placeholder-card">
+                <strong>エリア / 部屋定義</strong>
+                <p>盤面表示の縦軸になる部屋枠とエリア定義をここで管理します。</p>
+              </article>
+              <article class="placeholder-card">
+                <strong>売上予測ロジック</strong>
+                <p>売上予測、店落ち予測、機会損失の前提条件をここに置きます。</p>
+              </article>
+              <article class="placeholder-card">
+                <strong>例外ルール</strong>
+                <p>金土+1、祝前日+1、将来の詳細ルール差し込み口として残します。</p>
+              </article>
             </div>
           </section>
         </section>
@@ -168,7 +283,7 @@
     </div>
   </div>
 
-  <script src="data.js?v=202604050420"></script>
-  <script src="app.js?v=202604050420"></script>
+  <script src="data.js?v=202604050700"></script>
+  <script src="app.js?v=202604050700"></script>
 </body>
 </html>
