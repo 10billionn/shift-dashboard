@@ -281,34 +281,53 @@ textarea:focus {
   margin-top: 10px;
 }
 
-.shift-row {
-  display: grid;
-  gap: 4px;
-  padding: 10px 12px;
+.shift-list {
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: #fafbfc;
+  overflow: hidden;
+  background: #fff;
 }
 
-.shift-row.has-hime {
-  border-color: #f0c9bc;
-  background: #fff7f3;
-}
-
-.shift-main {
-  display: flex;
+.shift-list-head,
+.shift-list-row {
+  display: grid;
+  grid-template-columns: minmax(84px, 1.1fr) minmax(68px, 0.9fr) 64px minmax(92px, 1fr);
+  gap: 10px;
   align-items: center;
-  gap: 8px;
+  padding: 9px 12px;
+}
+
+.shift-list-head {
+  background: #f5f7fa;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.shift-list-row {
+  border-top: 1px solid var(--line);
+  font-size: 0.84rem;
+}
+
+.shift-list-row.has-hime {
+  background: #fff9f6;
+}
+
+.shift-col {
   min-width: 0;
-  flex-wrap: wrap;
 }
 
-.shift-main strong {
-  font-size: 0.95rem;
+.shift-name {
+  font-weight: 700;
 }
 
-.shift-sub,
-.shift-note,
+.shift-area,
+.shift-state {
+  color: var(--muted);
+}
+
+.state-text,
+.state-note,
 .section-note,
 .inline-status,
 .csv-drop-note,
@@ -343,9 +362,26 @@ textarea:focus {
   color: var(--accent);
 }
 
+.shift-badge.early {
+  background: #e9f5ed;
+  color: var(--ok);
+}
+
+.shift-badge.late {
+  background: #eef2fa;
+  color: #365b9a;
+}
+
 .hime-badge {
   background: #fde6df;
   color: var(--danger);
+}
+
+.shift-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .summary-grid {
@@ -737,6 +773,25 @@ textarea:focus {
     border-radius: 10px;
   }
 
+  .shift-list {
+    border-radius: 10px;
+  }
+
+  .shift-list-head {
+    display: none;
+  }
+
+  .shift-list-row {
+    grid-template-columns: 1fr;
+    gap: 3px;
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+
+  .shift-name::after {
+    content: "（" attr(data-area) "）";
+  }
+
   .section-head h1 {
     font-size: 1.05rem;
   }
@@ -768,8 +823,19 @@ textarea:focus {
     gap: 6px;
   }
 
-  .shift-main strong {
-    font-size: 0.9rem;
+  .shift-col.shift-area {
+    display: none;
+  }
+
+  .shift-col.shift-name {
+    font-size: 0.88rem;
+  }
+
+  .shift-col.shift-type,
+  .shift-col.shift-state {
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 
   .shift-sub,

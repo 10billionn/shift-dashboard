@@ -353,21 +353,34 @@ function renderTodayShift(dayPlan) {
     return;
   }
 
-  elements.todayShiftList.innerHTML = assignments
-    .map(
-      (assignment) => `
-        <article class="shift-row ${assignment.himeReservation === "あり" ? "has-hime" : ""}">
-          <div class="shift-main">
-            <strong>${assignment.name}</strong>
-            <span class="shift-badge">${assignment.shiftLabel}</span>
-            ${assignment.himeReservation === "あり" ? `<span class="hime-badge">姫予約</span>` : ""}
-          </div>
-          <div class="shift-sub">${assignment.area} / ${assignment.startTime} - ${assignment.endTime}</div>
-          <div class="shift-note">${assignment.note || "備考なし"}</div>
-        </article>
-      `
-    )
-    .join("");
+  elements.todayShiftList.innerHTML = `
+    <div class="shift-list">
+      <div class="shift-list-head">
+        <span>名前</span>
+        <span>エリア</span>
+        <span>早遅</span>
+        <span>状態</span>
+      </div>
+      ${assignments
+        .map((assignment) => {
+          const shortNote = compactShiftNote(assignment.note);
+          return `
+            <article class="shift-list-row ${assignment.himeReservation === "あり" ? "has-hime" : ""}">
+              <div class="shift-col shift-name" data-area="${assignment.area}">${assignment.name}</div>
+              <div class="shift-col shift-area">${assignment.area}</div>
+              <div class="shift-col shift-type">
+                <span class="shift-badge ${assignment.shiftLabel === "早番" ? "early" : "late"}">${assignment.shiftLabel}</span>
+              </div>
+              <div class="shift-col shift-state">
+                ${assignment.himeReservation === "あり" ? `<span class="hime-badge">姫</span>` : `<span class="state-text">-</span>`}
+                ${shortNote ? `<span class="state-note">${shortNote}</span>` : ""}
+              </div>
+            </article>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
 }
 
 function renderPeriodSummary(dateRangeText) {
@@ -810,4 +823,36 @@ function formatTimestamp(date) {
   const hours = String(date.getHours()).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");
   return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+function compactShiftNote(note) {
+  const text = String(note || "").trim();
+  if (!text) {
+    return "";
+  }
+  if (text.includes("店泊")) {
+    return "店泊";
+  }
+  if (text.includes("終電")) {
+    return "終電";
+  }
+  if (text.includes("21:00")) {
+    return "21時以降";
+  }
+  if (text.includes("葛西")) {
+    return "葛西";
+  }
+  if (text.includes("浦安")) {
+    return "浦安";
+  }
+  if (text.includes("船橋")) {
+    return "船橋";
+  }
+  if (text.includes("浅草橋")) {
+    return "浅草橋";
+  }
+  if (text.includes("八千代")) {
+    return "八千代";
+  }
+  return text.length > 8 ? `${text.slice(0, 8)}…` : text;
 }
