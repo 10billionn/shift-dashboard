@@ -42,6 +42,8 @@ const elements = {
   csvImportStatus: document.querySelector("#csvImportStatus"),
   csvPreviewMeta: document.querySelector("#csvPreviewMeta"),
   csvErrorList: document.querySelector("#csvErrorList"),
+  distributionList: document.querySelector("#distributionList"),
+  distributionPreview: document.querySelector("#distributionPreview"),
   sidebar: document.querySelector("#sidebar"),
   sidebarOverlay: document.querySelector("#sidebarOverlay"),
   sidebarNav: document.querySelector("#sidebarNav"),
@@ -332,6 +334,8 @@ function renderValidationState(errors) {
   elements.salesForecastPanel.innerHTML = `<div class="empty-state">売上予測は生成後に表示されます。</div>`;
   elements.summary.innerHTML = "";
   elements.todayAdjustmentAlerts.innerHTML = "";
+  elements.distributionList.innerHTML = `<div class="empty-state">生成後に個別配布一覧が表示されます。</div>`;
+  elements.distributionPreview.innerHTML = `<div class="empty-state">セラピストを選ぶと個別出力プレビューを表示します。</div>`;
   renderAlertDetails(errors);
   updateDayNavigation([]);
   renderAnalysisTab();
@@ -590,6 +594,7 @@ function renderDashboardFromState(dateRangeText = elements.periodSummary.textCon
   renderAlertDetails(combinedWarnings);
   updateDayNavigation(state.latestDailyPlans);
   renderAnalysisTab();
+  renderDistributionView(currentDayPlan);
 }
 
 function updateDayNavigation(dailyPlans) {
@@ -849,7 +854,7 @@ function isValidDate(value) {
 function isValidTime(value) {
   if (!/^\d{2}:\d{2}$/.test(String(value || ""))) return false;
   const [hours, minutes] = value.split(":").map(Number);
-  return hours >= 0 && hours <= 24 && minutes >= 0 && minutes < 60;
+  return hours >= 0 && hours <= 27 && minutes >= 0 && minutes < 60;
 }
 
 function toMinutes(timeText) {
@@ -917,7 +922,95 @@ function estimateStoreDrop(dayPlan) {
 }
 
 function formatCompactCurrency(value) {
-  return `${Math.round(value / 1000).toLocaleString("ja-JP")}k`;
+  return `${Math.round(value).toLocaleString("ja-JP")}円`;
+}
+
+function getTherapistProfile(name) {
+  return samplePrototypeData.therapistProfiles?.[name] || { rank: "G", flags: [] };
+}
+
+function renderStatusBadges(profile, hasHime) {
+  const badges = [];
+  if (profile.rank) {
+    badges.push(`<span class="status-badge rank">${profile.rank}</span>`);
+  }
+  profile.flags.slice(0, 2).forEach((flag) => {
+    badges.push(`<span class="status-badge flag">${flag}</span>`);
+  });
+  if (hasHime) {
+    badges.push(`<span class="status-badge hime">姫あり</span>`);
+  }
+  return badges.join("");
+}
+
+function renderAttributeColumn(profile) {
+  const items = [profile.rank, ...profile.flags.slice(0, 2)].filter(Boolean);
+  return items.length
+    ? items.map((item) => `<span class="attr-tag">${item}</span>`).join("")
+    : `<span class="state-text">-</span>`;
+}
+
+function buildPriorityTags(assignment) {
+  const tags = [];
+  if (assignment.himeReservation === "あり") {
+    tags.push("姫予約");
+  }
+  const note = compactShiftNote(assignment.note);
+  if (note) {
+    tags.push(note);
+  }
+  if (!tags.length) {
+    tags.push("通常");
+  }
+  return tags.slice(0, 3);
+}
+
+function areaClassName(area) {
+  return (
+    {
+      "葛西": "kasai",
+      "浦安": "urayasu",
+      "船橋": "funabashi",
+      "浅草橋": "asakusabashi",
+      "八千代": "yachiyo"
+    }[area] || "default"
+  );
+}
+
+function renderTimeOptions(selectedValue) {
+  return buildTimeOptions()
+    .map((time) => `<option value="${time}" ${time === selectedValue ? "selected" : ""}>${shortTime(time)}</option>`)
+    .join("");
+}
+
+function buildTimeOptions() {
+  const options = [];
+  for (let hour = 10; hour <= 27; hour += 1) {
+    options.push(`${String(hour).padStart(2, "0")}:00`);
+    if (hour !== 27) {
+      options.push(`${String(hour).padStart(2, "0")}:30`);
+    }
+  }
+  return options;
+}
+
+function renderMobileChartItem(day) {
+  const required = day.requirement.earlyNeeded + day.requirement.lateNeeded;
+  const assigned = day.earlyAssignments.length + day.lateAssignments.length;
+  const fillRate = required ? Math.round((assigned / required) * 100) : 100;
+  const shortage = Math.max(required - assigned, 0);
+  const toneClass = shortage > 0 ? "danger" : "ok";
+  return `
+    <div class="chart-mobile-item ${toneClass}">
+      <div class="chart-mobile-head">
+        <strong>${day.dateKey.slice(5)} ${day.weekday}</strong>
+        <span>${fillRate}%</span>
+      </div>
+      <div class="chart-mobile-bar">
+        <span class="chart-mobile-bar-fill ${toneClass}" style="width:${Math.min(fillRate, 100)}%"></span>
+      </div>
+    </div>
+  `;
 }
 
 function renderShiftTeamList(assignments, shift) {
@@ -927,33 +1020,49 @@ function renderShiftTeamList(assignments, shift) {
 
   return `
     <div class="shift-list">
-      <div class="shift-list-head">
+      <div class="shift-list-head fixed-grid">
         <span>名前</span>
+        <span>属性</span>
         <span>エリア</span>
         <span>時間</span>
-        <span>調整</span>
+        <span>優先条件</span>
       </div>
       ${assignments
         .map((assignment, index) => {
-          const shortNote = compactShiftNote(assignment.note);
+          const profile = getTherapistProfile(assignment.name);
+          const tags = buildPriorityTags(assignment);
           return `
-            <article class="shift-list-row ${assignment.himeReservation === "あり" ? "has-hime" : ""}" draggable="true" data-shift="${shift}" data-index="${index}">
-              <div class="shift-col shift-name" data-area="${assignment.area}">${assignment.name}</div>
-              <div class="shift-col shift-area">${assignment.area}</div>
-              <div class="shift-col shift-type">
-                <span class="shift-badge ${assignment.shiftLabel === "早番" ? "early" : "late"}">${compactTimeRange(assignment.startTime, assignment.endTime)}</span>
+            <article class="shift-list-row fixed-grid area-${areaClassName(assignment.area)} ${assignment.himeReservation === "あり" ? "has-hime" : ""}" draggable="true" data-shift="${shift}" data-index="${index}">
+              <div class="shift-col shift-name" data-area="${assignment.area}">
+                <div class="name-main">${assignment.name}</div>
+                <div class="name-badges">${renderStatusBadges(profile, assignment.himeReservation === "あり")}</div>
               </div>
-              <div class="shift-col shift-actions">
-                ${assignment.himeReservation === "あり" ? `<span class="hime-badge">姫</span>` : `<span class="state-text">-</span>`}
-                ${shortNote ? `<span class="state-note">${shortNote}</span>` : ""}
-                <button class="shift-toggle-button" type="button" data-shift="${shift}" data-index="${index}">
-                  ${shift === "early" ? "遅へ" : "早へ"}
-                </button>
+              <div class="shift-col shift-attr">${renderAttributeColumn(profile)}</div>
+              <div class="shift-col shift-area">
+                <span class="area-pill area-${areaClassName(assignment.area)}">${assignment.area}</span>
                 <select class="shift-area-select" data-shift="${shift}" data-index="${index}">
                   ${samplePrototypeData.settings.areas
                     .map((area) => `<option value="${area}" ${assignment.area === area ? "selected" : ""}>${area}</option>`)
                     .join("")}
                 </select>
+              </div>
+              <div class="shift-col shift-time-col">
+                <div class="shift-time-badge ${shift === "early" ? "early" : "late"}">${shift === "early" ? "早" : "遅"}</div>
+                <div class="time-selects">
+                  <select class="shift-time-select" data-shift="${shift}" data-index="${index}" data-time-bound="start">
+                    ${renderTimeOptions(assignment.startTime)}
+                  </select>
+                  <span>-</span>
+                  <select class="shift-time-select" data-shift="${shift}" data-index="${index}" data-time-bound="end">
+                    ${renderTimeOptions(assignment.endTime)}
+                  </select>
+                </div>
+              </div>
+              <div class="shift-col shift-priority">
+                <div class="priority-tags">${tags.map((tag) => `<span class="priority-tag">${tag}</span>`).join("")}</div>
+                <button class="shift-toggle-button" type="button" data-shift="${shift}" data-index="${index}">
+                  ${shift === "early" ? "遅へ" : "早へ"}
+                </button>
               </div>
             </article>
           `;
@@ -984,6 +1093,12 @@ function bindShiftAdjustmentEvents() {
   elements.todayShiftList.querySelectorAll(".shift-area-select").forEach((select) => {
     select.addEventListener("change", () => {
       applyAreaChange(select.dataset.shift, Number(select.dataset.index), select.value);
+    });
+  });
+
+  elements.todayShiftList.querySelectorAll(".shift-time-select").forEach((select) => {
+    select.addEventListener("change", () => {
+      applyTimeChange(select.dataset.shift, Number(select.dataset.index), select.dataset.timeBound, select.value);
     });
   });
 }
@@ -1051,6 +1166,16 @@ function applyAreaChange(shift, index, nextArea) {
     return;
   }
   assignment.area = nextArea;
+  renderDashboardFromState();
+}
+
+function applyTimeChange(shift, index, bound, nextValue) {
+  const dayPlan = findCurrentDayPlan(state.latestDailyPlans);
+  const assignment = getShiftAssignments(dayPlan, shift)[index];
+  if (!assignment) {
+    return;
+  }
+  assignment[bound === "start" ? "startTime" : "endTime"] = nextValue;
   renderDashboardFromState();
 }
 
@@ -1126,4 +1251,67 @@ function renderTodayAdjustmentAlerts(dayPlan) {
       <ul>${warnings.map((warning) => `<li>${warning}</li>`).join("")}</ul>
     </div>
   `;
+}
+
+function renderDistributionView(dayPlan) {
+  if (!dayPlan) {
+    elements.distributionList.innerHTML = `<div class="empty-state">配布対象がありません。</div>`;
+    elements.distributionPreview.innerHTML = `<div class="empty-state">個別シフトをここに表示します。</div>`;
+    return;
+  }
+
+  const assignments = [
+    ...dayPlan.earlyAssignments.map((item) => ({ ...item, shiftLabel: "早番" })),
+    ...dayPlan.lateAssignments.map((item) => ({ ...item, shiftLabel: "遅番" }))
+  ];
+
+  elements.distributionList.innerHTML = assignments
+    .map(
+      (assignment, index) => `
+        <div class="distribution-row">
+          <div>
+            <strong>${assignment.name}</strong>
+            <div class="section-note">${assignment.shiftLabel} / ${assignment.area} / ${assignment.startTime}-${assignment.endTime}</div>
+          </div>
+          <div class="distribution-actions">
+            <button class="ghost-button distribution-preview-button" type="button" data-distribution-index="${index}">確認</button>
+            <button class="secondary-button distribution-export-button" type="button" data-distribution-index="${index}">個別出力</button>
+          </div>
+        </div>
+      `
+    )
+    .join("");
+
+  elements.distributionPreview.innerHTML = `<div class="empty-state">確認を押すと個別シフトをここに表示します。</div>`;
+
+  elements.distributionList.querySelectorAll(".distribution-preview-button").forEach((button) => {
+    button.addEventListener("click", () => showDistributionPreview(assignments[Number(button.dataset.distributionIndex)], dayPlan));
+  });
+  elements.distributionList.querySelectorAll(".distribution-export-button").forEach((button) => {
+    button.addEventListener("click", () => exportDistribution(assignments[Number(button.dataset.distributionIndex)], dayPlan));
+  });
+}
+
+function showDistributionPreview(assignment, dayPlan) {
+  elements.distributionPreview.innerHTML = `
+    <div class="distribution-preview-card">
+      <strong>${assignment.name}</strong>
+      <p>${dayPlan.dateKey} ${dayPlan.weekday}曜</p>
+      <p>${assignment.shiftLabel} / ${assignment.area}</p>
+      <p>${assignment.startTime} - ${assignment.endTime}</p>
+      <p>${assignment.himeReservation === "あり" ? "姫予約あり" : "通常出勤"}</p>
+      <p>${assignment.note || "備考なし"}</p>
+    </div>
+  `;
+}
+
+function exportDistribution(assignment, dayPlan) {
+  const text = `${assignment.name}\n${dayPlan.dateKey} ${dayPlan.weekday}曜\n${assignment.shiftLabel} ${assignment.area}\n${assignment.startTime}-${assignment.endTime}\n${assignment.himeReservation === "あり" ? "姫予約あり" : "通常出勤"}\n${assignment.note || "備考なし"}`;
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${assignment.name}_${dayPlan.dateKey}_shift.txt`;
+  link.click();
+  URL.revokeObjectURL(url);
 }

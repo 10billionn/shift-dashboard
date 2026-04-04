@@ -11,6 +11,22 @@
     assignmentRule:
       "CSVで集めた出勤希望を優先し、希望エリアと時間帯をなるべく反映しながら必要人数に合わせて割り当てます。"
   },
+  therapistProfiles: {
+    "れいか": { rank: "S", flags: ["勤怠安定", "写真強"] },
+    "ななみ": { rank: "G", flags: ["勤怠安定"] },
+    "かれん": { rank: "P", flags: ["遅刻注意"] },
+    "つき": { rank: "S", flags: ["姫強"] },
+    "あいり": { rank: "G", flags: ["出稼ぎ"] },
+    "もも": { rank: "P", flags: ["店泊可"] },
+    "りおな": { rank: "G", flags: ["勤怠安定"] },
+    "あすな": { rank: "S", flags: ["写真強"] },
+    "いおり": { rank: "G", flags: ["葛西強"] },
+    "かなえ": { rank: "P", flags: ["ヘルプ可"] },
+    "なほ": { rank: "G", flags: ["終電調整"] },
+    "さき": { rank: "P", flags: ["遅番寄り"] },
+    "あい": { rank: "S", flags: ["姫強"] },
+    "みゆき": { rank: "G", flags: ["店泊可"] }
+  },
   requirements: [
     { dateKey: "2026-04-06", earlyNeeded: 7, lateNeeded: 7 },
     { dateKey: "2026-04-07", earlyNeeded: 5, lateNeeded: 5 },

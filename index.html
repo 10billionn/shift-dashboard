@@ -12,10 +12,9 @@
       <div class="sidebar-brand">シフトダッシュボード</div>
       <nav class="sidebar-nav" id="sidebarNav">
         <button class="nav-item active" type="button" data-view="dashboard">ダッシュボード</button>
-        <button class="nav-item" type="button" data-view="generation">シフト生成</button>
-        <button class="nav-item" type="button" data-view="therapists">セラピスト管理</button>
-        <button class="nav-item" type="button" data-view="history">シフト希望読込</button>
+        <button class="nav-item" type="button" data-view="generation">シフト作成</button>
         <button class="nav-item" type="button" data-view="settings">設定</button>
+        <button class="nav-item" type="button" data-view="distribution">シフト配布</button>
       </nav>
     </aside>
     <button id="sidebarOverlay" class="sidebar-overlay" type="button" aria-label="メニューを閉じる"></button>
@@ -78,97 +77,58 @@
 
         <section class="view" data-view-panel="generation">
           <div class="section-head">
-            <h1>シフト生成</h1>
+            <h1>シフト作成</h1>
           </div>
           <section class="content-panel">
-            <div class="mode-switch" id="modeSwitch">
-              <button class="mode-button active" type="button" data-mode="manual">手動設定</button>
-              <button class="mode-button" type="button" data-mode="csv">CSV反映</button>
-            </div>
-            <div class="generation-layout">
-              <article class="setting-card">
-                <h2>必要人数設定</h2>
-                <label class="compact-field">
-                  日数
-                  <input id="days" type="number" min="1" max="31" value="7">
-                </label>
-                <div id="manualDemandPanel">
-                  <div id="requirementList" class="requirement-list"></div>
-                </div>
-              </article>
-              <article class="setting-card">
-                <h2>生成条件</h2>
-                <div id="csvDemandPanel" class="csv-helper-list inactive-panel">
-                  <div>シフト希望CSVの取込結果をそのまま候補に使います。</div>
-                  <div>1行 = 1人 × 1日 で保持するため、フォーム連携に差し替えやすい構造です。</div>
-                  <div id="generationSourceStatus" class="inline-status"></div>
-                </div>
-                <button class="secondary-button secondary-action" type="button" id="generationActionButton">この条件で再計算</button>
-              </article>
-            </div>
-          </section>
-        </section>
-
-        <section class="view" data-view-panel="therapists">
-          <div class="section-head">
-            <h1>セラピスト管理</h1>
-          </div>
-          <section class="content-panel">
-            <div id="therapistImportSummary" class="section-note"></div>
-            <div id="therapistList" class="stack-list"></div>
-          </section>
-        </section>
-
-        <section class="view" data-view-panel="history">
-          <div class="section-head">
-            <h1>シフト希望読込</h1>
-          </div>
-          <section class="content-panel">
-            <div class="history-grid">
-              <article class="setting-card">
-                <h2>CSVアップロード</h2>
-                <div class="csv-panel">
-                  <label>
-                    シフト希望CSV
-                    <input id="csvFile" type="file" accept=".csv,text/csv">
-                  </label>
-                  <div class="csv-drop-note">
-                    想定列: 名前 / 出勤可能日 / 出勤開始時間 / 出勤終了時間 / 希望エリア / 姫予約有無 / 備考
+            <div class="shift-creation-layout">
+              <aside class="creation-side creation-left">
+                <div class="setting-card">
+                  <h2>データ管理</h2>
+                  <div class="csv-panel">
+                    <label>
+                      シフト希望CSV
+                      <input id="csvFile" type="file" accept=".csv,text/csv">
+                    </label>
+                    <div id="csvImportStatus" class="import-status"></div>
+                    <div id="csvPreviewMeta" class="section-note"></div>
+                    <div id="csvErrorList" class="error-list"></div>
                   </div>
-                  <div id="csvImportStatus" class="import-status"></div>
                 </div>
-              </article>
-              <article class="setting-card">
-                <h2>読込後の使い方</h2>
-                <div class="csv-helper-list">
-                  <div>読込結果はセラピスト管理へ自動反映</div>
-                  <div>同じデータをそのままシフト生成候補に使用</div>
-                  <div>今後は Googleフォーム / スプレッドシート連携の受け皿として流用可能</div>
+                <div class="setting-card">
+                  <h2>セラピスト一覧</h2>
+                  <div id="therapistImportSummary" class="section-note"></div>
+                  <div id="therapistList" class="stack-list"></div>
                 </div>
-              </article>
-            </div>
-          </section>
+              </aside>
 
-          <section class="content-panel">
-            <div class="sub-head">
-              <h2>フォーマット確認</h2>
+              <section class="creation-main">
+                <div class="setting-card">
+                  <div class="sub-head">
+                    <h2>当日シフト盤面</h2>
+                    <div id="creationSelectedDateLabel" class="selected-date-label"></div>
+                  </div>
+                  <div class="day-switcher">
+                    <button id="creationPrevDayButton" class="ghost-button day-nav-button" type="button">◀ 前日</button>
+                    <button id="creationTodayButton" class="secondary-button day-nav-button" type="button">今日</button>
+                    <button id="creationNextDayButton" class="ghost-button day-nav-button" type="button">次日 ▶</button>
+                  </div>
+                  <div id="creationShiftBoard" class="today-shift-list"></div>
+                  <div id="creationAdjustmentAlerts" class="adjustment-alerts"></div>
+                </div>
+              </section>
+
+              <aside class="creation-side creation-right">
+                <div class="setting-card">
+                  <h2>サマリー</h2>
+                  <div id="creationSummaryCards" class="summary-grid compact"></div>
+                </div>
+                <div class="setting-card">
+                  <h2>生成</h2>
+                  <div id="generationSourceStatus" class="inline-status"></div>
+                  <button class="secondary-button secondary-action" type="button" id="generationActionButton">この条件で再計算</button>
+                </div>
+              </aside>
             </div>
-            <div class="csv-format-grid">
-              <div class="format-card">
-                <strong>データ単位</strong>
-                <p>1行 = 1人 × 1日</p>
-              </div>
-              <div class="format-card">
-                <strong>必須列</strong>
-                <p>名前 / 出勤可能日 / 開始 / 終了 / 希望エリア</p>
-              </div>
-              <div class="format-card">
-                <strong>拡張前提</strong>
-                <p>曜日別 / 時間帯別 / エリア別 へ拡張可能</p>
-              </div>
-            </div>
-            <div id="csvPreviewMeta" class="section-note"></div>
-            <div id="csvErrorList" class="error-list"></div>
           </section>
         </section>
 
@@ -181,6 +141,23 @@
               割り当てルールメモ
               <textarea id="assignmentRule" rows="4"></textarea>
             </label>
+            <label class="compact-field">
+              日数
+              <input id="days" type="number" min="1" max="31" value="7">
+            </label>
+            <div id="manualDemandPanel" class="requirement-list"></div>
+          </section>
+        </section>
+
+        <section class="view" data-view-panel="distribution">
+          <div class="section-head">
+            <h1>シフト配布</h1>
+          </div>
+          <section class="content-panel">
+            <div class="distribution-layout">
+              <div id="distributionList" class="distribution-list"></div>
+              <div id="distributionPreview" class="distribution-preview"></div>
+            </div>
           </section>
         </section>
       </main>

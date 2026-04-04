@@ -10,15 +10,13 @@
 
   const dailyPlans = dateList.map((dateKey, index) => {
     const requirement = model.requirements[index] || defaultRequirement(dateKey);
-    const availableTherapists = model.therapists.filter((therapist) =>
-      therapist.availableDays.includes(dateKey)
-    );
+    const availableRequests = model.shiftRequests.filter((request) => request.dateKey === dateKey);
     const assignedToday = [];
 
     const earlyAssignments = assignByShift({
       shiftType: "early",
       needed: requirement.earlyNeeded,
-      availableTherapists,
+      availableRequests,
       assignedToday,
       therapistStats,
       areaLoad,
@@ -28,26 +26,21 @@
     const lateAssignments = assignByShift({
       shiftType: "late",
       needed: requirement.lateNeeded,
-      availableTherapists,
+      availableRequests,
       assignedToday,
       therapistStats,
       areaLoad,
       dateKey
     });
 
-    const offMembers = model.therapists
-      .filter((therapist) => !assignedToday.includes(therapist.name))
-      .map((therapist) => therapist.name);
+    const offMembers = [...new Set(availableRequests.map((request) => request.name))]
+      .filter((name) => !assignedToday.includes(name));
 
     if (earlyAssignments.length < requirement.earlyNeeded) {
-      warnings.push(
-        `${dateKey} \u306e\u65e9\u756a\u304c ${requirement.earlyNeeded - earlyAssignments.length} \u4eba\u4e0d\u8db3\u3057\u3066\u3044\u307e\u3059\u3002`
-      );
+      warnings.push(`${dateKey} の早番が ${requirement.earlyNeeded - earlyAssignments.length} 人不足しています。`);
     }
     if (lateAssignments.length < requirement.lateNeeded) {
-      warnings.push(
-        `${dateKey} \u306e\u9045\u756a\u304c ${requirement.lateNeeded - lateAssignments.length} \u4eba\u4e0d\u8db3\u3057\u3066\u3044\u307e\u3059\u3002`
-      );
+      warnings.push(`${dateKey} の遅番が ${requirement.lateNeeded - lateAssignments.length} 人不足しています。`);
     }
 
     return {
@@ -57,7 +50,7 @@
       earlyAssignments,
       lateAssignments,
       offMembers,
-      availableCount: availableTherapists.length
+      availableCount: offMembers.length + earlyAssignments.length + lateAssignments.length
     };
   });
 
@@ -80,7 +73,7 @@ function assignByShift(context) {
   const {
     shiftType,
     needed,
-    availableTherapists,
+    availableRequests,
     assignedToday,
     therapistStats,
     areaLoad,
@@ -89,8 +82,8 @@ function assignByShift(context) {
   const assignments = [];
 
   for (let count = 0; count < needed; count += 1) {
-    const candidate = availableTherapists
-      .filter((therapist) => !assignedToday.includes(therapist.name))
+    const candidate = availableRequests
+      .filter((request) => !assignedToday.includes(request.name) && supportsShift(request, shiftType))
       .sort((left, right) => rankTherapist(left, right, shiftType, therapistStats, areaLoad, dateKey))[0];
 
     if (!candidate) {
@@ -101,7 +94,10 @@ function assignByShift(context) {
     assignments.push({
       name: candidate.name,
       area,
-      preferredTime: candidate.preferredTime,
+      preferredTime: describeShiftPreference(candidate),
+      startTime: candidate.startTime,
+      endTime: candidate.endTime,
+      himeReservation: candidate.himeReservation,
       note: candidate.note
     });
 
@@ -115,27 +111,57 @@ function assignByShift(context) {
   return assignments;
 }
 
+function supportsShift(request, shiftType) {
+  const startMinutes = toMinutes(request.startTime);
+  const endMinutes = toMinutes(request.endTime);
+
+  if (shiftType === "early") {
+    return startMinutes <= 14 * 60;
+  }
+
+  return endMinutes >= 20 * 60;
+}
+
+function describeShiftPreference(request) {
+  const canEarly = supportsShift(request, "early");
+  const canLate = supportsShift(request, "late");
+
+  if (canEarly && canLate) {
+    return "どちらでも";
+  }
+  if (canEarly) {
+    return "早番";
+  }
+  if (canLate) {
+    return "遅番";
+  }
+  return "時間外";
+}
+
 function rankTherapist(left, right, shiftType, therapistStats, areaLoad, dateKey) {
   const leftScore = scoreTherapist(left, shiftType, therapistStats, areaLoad, dateKey);
   const rightScore = scoreTherapist(right, shiftType, therapistStats, areaLoad, dateKey);
   return rightScore - leftScore || left.name.localeCompare(right.name, "ja");
 }
 
-function scoreTherapist(therapist, shiftType, therapistStats, areaLoad, dateKey) {
-  const stats = therapistStats.get(therapist.name);
+function scoreTherapist(request, shiftType, therapistStats, areaLoad, dateKey) {
+  const stats = therapistStats.get(request.name);
   let score = 100 - stats.assigned * 5;
 
-  if (therapist.preferredTime === "\u3069\u3061\u3089\u3067\u3082") {
+  if (describeShiftPreference(request) === "どちらでも") {
     score += 8;
   }
   if (
-    (shiftType === "early" && therapist.preferredTime === "\u65e9\u756a") ||
-    (shiftType === "late" && therapist.preferredTime === "\u9045\u756a")
+    (shiftType === "early" && describeShiftPreference(request) === "早番") ||
+    (shiftType === "late" && describeShiftPreference(request) === "遅番")
   ) {
     score += 20;
   }
+  if (request.himeReservation === "あり") {
+    score += 12;
+  }
 
-  score += areaBalanceScore(therapist.preferredArea, areaLoad, dateKey);
+  score += areaBalanceScore(request.preferredArea, areaLoad, dateKey);
   return score;
 }
 
@@ -145,10 +171,10 @@ function areaBalanceScore(area, areaLoad, dateKey) {
   return 10 - current * 3;
 }
 
-function pickArea(therapist, areaLoad, dateKey) {
-  const preferredLoad = areaBalanceScore(therapist.preferredArea, areaLoad, dateKey);
+function pickArea(request, areaLoad, dateKey) {
+  const preferredLoad = areaBalanceScore(request.preferredArea, areaLoad, dateKey);
   if (preferredLoad > 3) {
-    return therapist.preferredArea;
+    return request.preferredArea;
   }
 
   const dateMap = areaLoad.get(dateKey) || new Map();
@@ -182,7 +208,7 @@ function formatDate(date) {
 
 function formatWeekday(dateKey) {
   const date = new Date(`${dateKey}T00:00:00`);
-  return ["\u65e5", "\u6708", "\u706b", "\u6c34", "\u6728", "\u91d1", "\u571f"][date.getDay()];
+  return ["日", "月", "火", "水", "木", "金", "土"][date.getDay()];
 }
 
 function defaultRequirement(dateKey) {
@@ -192,4 +218,9 @@ function defaultRequirement(dateKey) {
     earlyNeeded: weekend ? 3 : 2,
     lateNeeded: weekend ? 3 : 2
   };
+}
+
+function toMinutes(timeText) {
+  const [hours, minutes] = String(timeText || "0:00").split(":").map(Number);
+  return (hours || 0) * 60 + (minutes || 0);
 }
