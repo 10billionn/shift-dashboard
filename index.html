@@ -4,175 +4,54 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-  <link rel="stylesheet" href="styles.css?v=202604050320">
+  <link rel="stylesheet" href="styles.css?v=202604050400">
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-brand">シフトダッシュボード</div>
-      <nav class="sidebar-nav" id="sidebarNav">
-        <button class="nav-item active" type="button" data-view="dashboard">ダッシュボード</button>
-        <button class="nav-item" type="button" data-view="generation">シフト作成</button>
-        <button class="nav-item" type="button" data-view="settings">設定</button>
-        <button class="nav-item" type="button" data-view="distribution">シフト配布</button>
-      </nav>
-    </aside>
-    <button id="sidebarOverlay" class="sidebar-overlay" type="button" aria-label="メニューを閉じる"></button>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Dashboard</p>
+        <h1>シフトダッシュボード</h1>
+      </div>
+      <button id="reloadButton" class="ghost-button" type="button">サンプル再読込</button>
+    </header>
 
-    <div class="main-shell">
-      <header class="topbar">
-        <button id="menuToggle" class="menu-toggle" type="button" aria-label="メニューを開く">☰</button>
-        <div class="topbar-title">シフトダッシュボード</div>
-        <button id="loadSampleButton" class="ghost-button topbar-button" type="button">サンプル再読込</button>
-      </header>
-
-      <main class="content-area">
-        <section class="view active" data-view-panel="dashboard">
-          <div class="section-head dashboard-head">
-            <h1>ダッシュボード</h1>
-            <label class="compact-field compact-field-date">
-              開始日
-              <input id="startDate" type="date">
-            </label>
+    <main class="content-area">
+      <section class="content-panel hero-panel">
+        <div class="hero-head">
+          <div>
+            <h2>本日のシフト</h2>
+            <p id="selectedDateLabel" class="selected-date-label"></p>
           </div>
+          <div class="day-switcher">
+            <button id="prevDayButton" class="ghost-button" type="button">◀ 前日</button>
+            <button id="todayButton" class="secondary-button" type="button">今日</button>
+            <button id="nextDayButton" class="ghost-button" type="button">次日 ▶</button>
+          </div>
+        </div>
+      </section>
 
-          <section class="content-panel daily-panel">
-            <div class="sub-head">
-              <h2>本日のシフト</h2>
-              <div id="selectedDateLabel" class="selected-date-label"></div>
-            </div>
-            <div class="day-switcher">
-              <button id="prevDayButton" class="ghost-button day-nav-button" type="button">◀ 前日</button>
-              <button id="todayButton" class="secondary-button day-nav-button" type="button">今日</button>
-              <button id="nextDayButton" class="ghost-button day-nav-button" type="button">次日 ▶</button>
-            </div>
-            <div id="shiftViewTabs" class="shift-view-tabs"></div>
-            <div id="todayShiftList" class="today-shift-list"></div>
-            <div id="todayBoardPanel" class="today-shift-board"></div>
-            <div id="todayAdjustmentAlerts" class="adjustment-alerts"></div>
-          </section>
-
-          <section class="content-panel">
-            <div class="sub-head">
-              <h2>サマリー</h2>
-            </div>
-            <div id="summaryCards" class="summary-grid"></div>
-          </section>
-
-          <section class="content-panel weekly-panel">
-            <div class="sub-head weekly-head">
-              <h2>分析</h2>
-              <div id="periodSummary" class="period-summary"></div>
-            </div>
-            <div class="analysis-tabs" id="analysisTabs">
-              <button class="analysis-tab active" type="button" data-analysis-tab="fill">週間の埋まり状況</button>
-              <button class="analysis-tab" type="button" data-analysis-tab="sales">売上予測</button>
-            </div>
-            <div id="fillChart" class="fill-chart analysis-panel active" data-analysis-panel="fill"></div>
-            <div id="salesForecastPanel" class="analysis-panel" data-analysis-panel="sales"></div>
-            <details class="accordion" id="alertAccordion">
-              <summary>不足詳細を展開</summary>
-              <div id="warningBox" class="warning-list"></div>
-            </details>
-          </section>
+      <section class="shift-layout">
+        <section class="content-panel shift-panel">
+          <div class="panel-head">
+            <h3>早番</h3>
+            <span id="earlyCount" class="panel-count"></span>
+          </div>
+          <div id="earlyShiftList" class="shift-list"></div>
         </section>
 
-        <section class="view" data-view-panel="generation">
-          <div class="section-head">
-            <h1>シフト作成</h1>
+        <section class="content-panel shift-panel">
+          <div class="panel-head">
+            <h3>遅番</h3>
+            <span id="lateCount" class="panel-count"></span>
           </div>
-          <section class="content-panel">
-            <div class="shift-creation-layout">
-              <aside class="creation-side creation-left">
-                <div class="setting-card">
-                  <h2>データ管理</h2>
-                  <div class="csv-panel">
-                    <label>
-                      シフト希望CSV
-                      <input id="csvFile" type="file" accept=".csv,text/csv">
-                    </label>
-                    <label>
-                      過去実績データ
-                      <input id="historyCsvFile" type="file" accept=".csv,text/csv">
-                    </label>
-                    <div id="csvImportStatus" class="import-status"></div>
-                    <div id="historyImportStatus" class="import-status"></div>
-                    <div id="csvPreviewMeta" class="section-note"></div>
-                    <div id="csvErrorList" class="error-list"></div>
-                  </div>
-                </div>
-                <div class="setting-card">
-                  <h2>反映確認</h2>
-                  <div id="therapistImportSummary" class="section-note"></div>
-                  <div id="creationCheckSummary" class="summary-grid compact"></div>
-                </div>
-                <div class="setting-card">
-                  <h2>生成対象ステータス</h2>
-                  <div id="therapistStatusList" class="therapist-status-list"></div>
-                </div>
-              </aside>
-
-              <section class="creation-main">
-                <div class="setting-card">
-                  <h2>抜け漏れチェック</h2>
-                  <div id="creationCheckList" class="creation-check-list"></div>
-                </div>
-              </section>
-
-              <aside class="creation-side creation-right">
-                <div class="setting-card">
-                  <h2>生成</h2>
-                  <div id="generationSourceStatus" class="inline-status"></div>
-                  <button class="secondary-button secondary-action" type="button" id="generationActionButton">シフト生成</button>
-                </div>
-              </aside>
-            </div>
-          </section>
+          <div id="lateShiftList" class="shift-list"></div>
         </section>
-
-        <section class="view" data-view-panel="settings">
-          <div class="section-head">
-            <h1>設定</h1>
-          </div>
-          <section class="content-panel settings-panel">
-            <label>
-              割り当てルールメモ
-              <textarea id="assignmentRule" rows="4"></textarea>
-            </label>
-            <label class="compact-field">
-              日数
-              <input id="days" type="number" min="1" max="31" value="7">
-            </label>
-            <div id="manualDemandPanel" class="requirement-list"></div>
-          </section>
-        </section>
-
-        <section class="view" data-view-panel="distribution">
-          <div class="section-head">
-            <h1>シフト配布</h1>
-          </div>
-          <section class="content-panel">
-            <div class="distribution-layout">
-              <div class="distribution-list-panel">
-                <label class="compact-field">
-                  日付
-                  <select id="distributionDateSelect"></select>
-                </label>
-                <div id="distributionList" class="distribution-list"></div>
-              </div>
-              <div class="distribution-preview-panel">
-                <div id="distributionPreview" class="distribution-preview"></div>
-                <button id="distributionCopyButton" class="secondary-button" type="button">文言をコピー</button>
-              </div>
-            </div>
-          </section>
-        </section>
-      </main>
-    </div>
+      </section>
+    </main>
   </div>
 
-  <script src="data.js?v=202604050320"></script>
-  <script src="scheduler.js?v=202604050320"></script>
-  <script src="app.js?v=202604050320"></script>
+  <script src="data.js?v=202604050400"></script>
+  <script src="app.js?v=202604050400"></script>
 </body>
 </html>
