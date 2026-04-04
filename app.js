@@ -38,7 +38,9 @@ const elements = {
   salesForecastPanel: document.querySelector("#salesForecastPanel"),
   summary: document.querySelector("#summaryCards"),
   warningBox: document.querySelector("#warningBox"),
+  shiftViewTabs: document.querySelector("#shiftViewTabs"),
   todayShiftList: document.querySelector("#todayShiftList"),
+  todayBoardPanel: document.querySelector("#todayBoardPanel"),
   todayAdjustmentAlerts: document.querySelector("#todayAdjustmentAlerts"),
   selectedDateLabel: document.querySelector("#selectedDateLabel"),
   prevDayButton: document.querySelector("#prevDayButton"),
@@ -469,7 +471,9 @@ function buildCreationChecks() {
 
 function renderValidationState(errors) {
   elements.selectedDateLabel.innerHTML = "";
+  elements.shiftViewTabs.innerHTML = "";
   elements.todayShiftList.innerHTML = `<div class="empty-state">生成条件が整うと本日のシフトがここに表示されます。</div>`;
+  elements.todayBoardPanel.innerHTML = "";
   elements.periodSummary.innerHTML = `<div class="period-card">対象期間を設定してください。</div>`;
   elements.fillChart.innerHTML = `<div class="empty-state">週間の埋まり状況は生成後に表示されます。</div>`;
   elements.salesForecastPanel.innerHTML = `<div class="empty-state">売上予測は生成後に表示されます。</div>`;
@@ -504,7 +508,9 @@ function renderDashboardFromState(dateRangeText = elements.periodSummary.textCon
 function renderTodayShift(dayPlan) {
   if (!dayPlan) {
     elements.selectedDateLabel.innerHTML = "対象日なし";
+    elements.shiftViewTabs.innerHTML = "";
     elements.todayShiftList.innerHTML = `<div class="empty-state">表示できる当日シフトがありません。</div>`;
+    elements.todayBoardPanel.innerHTML = "";
     return;
   }
 
@@ -514,15 +520,15 @@ function renderTodayShift(dayPlan) {
   const lateAssignments = dayPlan.lateAssignments.map((assignment) => ({ ...assignment, shiftLabel: "遅番" }));
 
   if (!earlyAssignments.length && !lateAssignments.length) {
+    elements.shiftViewTabs.innerHTML = "";
     elements.todayShiftList.innerHTML = `<div class="empty-state">この日は割り当てがありません。</div>`;
+    elements.todayBoardPanel.innerHTML = "";
     return;
   }
 
   const viewTabs = `
-    <div class="shift-view-tabs">
-      <button class="shift-view-tab ${state.activeShiftView === "list" ? "active" : ""}" type="button" data-shift-view="list">リスト表示</button>
-      <button class="shift-view-tab ${state.activeShiftView === "board" ? "active" : ""}" type="button" data-shift-view="board">盤面表示</button>
-    </div>
+    <button class="shift-view-tab ${state.activeShiftView === "list" ? "active" : ""}" type="button" data-shift-view="list">リスト表示</button>
+    <button class="shift-view-tab ${state.activeShiftView === "board" ? "active" : ""}" type="button" data-shift-view="board">盤面表示</button>
   `;
   const listMarkup = `
     <div class="daily-shift-tabs">
@@ -544,22 +550,13 @@ function renderTodayShift(dayPlan) {
       </section>
     </div>
   `;
-  const boardMarkup = `
-    <div class="shift-board-wrap ${state.activeShiftView === "board" ? "active" : ""}">
-      ${renderBoardView(dayPlan)}
-    </div>
-  `;
+  elements.shiftViewTabs.innerHTML = viewTabs;
+  elements.todayShiftList.innerHTML = listMarkup;
+  elements.todayBoardPanel.innerHTML = renderBoardView(dayPlan);
+  elements.todayShiftList.style.display = state.activeShiftView === "list" ? "grid" : "none";
+  elements.todayBoardPanel.style.display = state.activeShiftView === "board" ? "block" : "none";
 
-  elements.todayShiftList.innerHTML = `
-    ${viewTabs}
-    <div class="shift-view-panel ${state.activeShiftView === "list" ? "active" : ""}" data-shift-view-panel="list">
-      ${listMarkup}
-    </div>
-    <div class="shift-view-panel ${state.activeShiftView === "board" ? "active" : ""}" data-shift-view-panel="board">
-      ${boardMarkup}
-    </div>
-  `;
-
+  bindShiftBoardEvents(elements.shiftViewTabs);
   bindShiftBoardEvents(elements.todayShiftList);
   renderTodayAdjustmentAlerts(dayPlan);
 }
@@ -636,6 +633,10 @@ function renderShiftTeamList(assignments, shift) {
 }
 
 function bindShiftBoardEvents(target) {
+  if (!target) {
+    return;
+  }
+
   target.querySelectorAll(".shift-view-tab").forEach((button) => {
     button.addEventListener("click", () => {
       state.activeShiftView = button.dataset.shiftView;
