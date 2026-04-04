@@ -233,84 +233,92 @@ textarea:focus {
   min-width: 0;
 }
 
-.fill-bars {
+.period-summary,
+.judgment-stack {
   display: grid;
   gap: 10px;
 }
 
-.fill-bar-row {
-  display: grid;
-  grid-template-columns: 138px minmax(0, 1fr) 110px;
-  gap: 12px;
-  align-items: center;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
+.period-card {
+  padding: 14px 16px;
   border-radius: 14px;
+  border: 1px solid var(--line);
   background: #fafbfc;
+  font-weight: 700;
 }
 
-.fill-bar-head {
+.fill-chart {
+  min-width: 0;
+}
+
+.chart-wrap {
+  display: grid;
+  gap: 14px;
+}
+
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.chart-grid-line {
+  stroke: #dbe3ea;
+  stroke-width: 1;
+}
+
+.chart-axis-label,
+.chart-date-label {
+  fill: var(--muted);
+  font-size: 12px;
+}
+
+.chart-line {
+  fill: none;
+  stroke: #1f3a5f;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart-area {
+  fill: rgba(31, 58, 95, 0.08);
+}
+
+.chart-point {
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.chart-point.ok {
+  fill: #2f9e58;
+}
+
+.chart-point.danger {
+  fill: #d64545;
+}
+
+.chart-legend {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.chart-legend-item {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fafbfc;
   display: grid;
   gap: 2px;
 }
 
-.fill-bar-head strong {
-  font-size: 0.98rem;
-}
-
-.fill-bar-head span,
-.fill-bar-meta {
-  color: var(--muted);
-  font-size: 0.84rem;
-}
-
-.fill-bar-main {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-}
-
-.fill-bar-track {
-  height: 12px;
-  border-radius: 999px;
-  background: #e8edf1;
-  overflow: hidden;
-}
-
-.fill-bar-value {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-}
-
-.fill-bar-value.ok {
-  background: linear-gradient(90deg, #7ccf98 0%, #2f9e58 100%);
-}
-
-.fill-bar-value.danger {
-  background: linear-gradient(90deg, #f3a6a6 0%, #d64545 100%);
-}
-
-.fill-bar-rate {
-  min-width: 48px;
-  text-align: right;
-  font-weight: 700;
-  font-size: 1rem;
-}
-
-.fill-bar-row.ok .fill-bar-rate {
+.chart-legend-item.ok strong {
   color: var(--ok);
 }
 
-.fill-bar-row.danger .fill-bar-rate {
+.chart-legend-item.danger strong {
   color: var(--danger);
-}
-
-.fill-bar-meta {
-  display: grid;
-  justify-items: end;
-  gap: 2px;
 }
 
 .empty-state {
@@ -758,22 +766,6 @@ th {
     grid-template-columns: 1fr;
   }
 
-  .fill-bar-row,
-  .fill-bar-main,
-  .fill-bar-meta {
-    grid-template-columns: 1fr;
-  }
-
-  .fill-bar-row {
-    gap: 8px;
-  }
-
-  .fill-bar-rate,
-  .fill-bar-meta {
-    justify-items: start;
-    text-align: left;
-  }
-
   .summary-card,
   .setting-card,
   .content-panel,
@@ -880,6 +872,10 @@ th {
   .mobile-result-list {
     display: grid;
     gap: 8px;
+  }
+
+  .chart-legend {
+    grid-template-columns: 1fr;
   }
 
   .therapist-card-head,

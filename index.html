@@ -14,7 +14,7 @@
         <button class="nav-item active" type="button" data-view="dashboard">ダッシュボード</button>
         <button class="nav-item" type="button" data-view="generation">シフト生成</button>
         <button class="nav-item" type="button" data-view="therapists">セラピスト管理</button>
-        <button class="nav-item" type="button" data-view="history">実績データ</button>
+        <button class="nav-item" type="button" data-view="history">シフト希望読込</button>
         <button class="nav-item" type="button" data-view="settings">設定</button>
       </nav>
     </aside>
@@ -31,30 +31,45 @@
         <section class="view active" data-view-panel="dashboard">
           <div class="section-head">
             <h1>ダッシュボード</h1>
-            <div class="inline-filters">
-              <label class="compact-field">
-                対象期間
-                <input id="startDate" type="date">
-              </label>
-              <label class="compact-field">
-                日数
-                <input id="days" type="number" min="1" max="31" value="7">
-              </label>
-            </div>
+            <label class="compact-field">
+              開始日
+              <input id="startDate" type="date">
+            </label>
           </div>
 
           <section class="content-panel">
             <div class="sub-head">
-              <h2>シフト可視化</h2>
+              <h2>今週のシフト</h2>
             </div>
-            <div id="fillBars" class="fill-bars"></div>
+            <div id="resultTable" class="table-wrap"></div>
           </section>
 
           <section class="content-panel">
             <div class="sub-head">
-              <h2>アラート要約</h2>
+              <h2>対象期間</h2>
             </div>
-            <div id="warningSummary" class="alert-summary"></div>
+            <div id="periodSummary" class="period-summary"></div>
+          </section>
+
+          <section class="content-panel">
+            <div class="sub-head">
+              <h2>週間の埋まり状況</h2>
+            </div>
+            <div id="fillChart" class="fill-chart"></div>
+          </section>
+
+          <section class="content-panel">
+            <div class="sub-head">
+              <h2>サマリー</h2>
+            </div>
+            <div id="summaryCards" class="summary-grid"></div>
+          </section>
+
+          <section class="content-panel">
+            <div class="sub-head">
+              <h2>判断エリア</h2>
+            </div>
+            <div id="judgmentArea" class="judgment-stack"></div>
             <details class="accordion" id="alertAccordion">
               <summary>詳細を展開</summary>
               <div id="warningBox" class="warning-list"></div>
@@ -63,18 +78,11 @@
 
           <section class="content-panel">
             <div class="sub-head">
-              <h2>行動</h2>
+              <h2>行動エリア</h2>
             </div>
             <div class="action-row">
               <button id="generateButton" class="primary-button action-button" type="button">シフト生成</button>
             </div>
-          </section>
-
-          <section class="content-panel">
-            <div class="sub-head">
-              <h2>サマリー</h2>
-            </div>
-            <div id="summaryCards" class="summary-grid"></div>
           </section>
         </section>
 
@@ -85,18 +93,26 @@
           <section class="content-panel">
             <div class="mode-switch" id="modeSwitch">
               <button class="mode-button active" type="button" data-mode="manual">手動設定</button>
-              <button class="mode-button" type="button" data-mode="csv">CSV読込</button>
+              <button class="mode-button" type="button" data-mode="csv">CSV反映</button>
             </div>
             <div class="generation-layout">
               <article class="setting-card">
-                <h2>手動設定</h2>
+                <h2>必要人数設定</h2>
+                <label class="compact-field">
+                  日数
+                  <input id="days" type="number" min="1" max="31" value="7">
+                </label>
                 <div id="manualDemandPanel">
                   <div id="requirementList" class="requirement-list"></div>
                 </div>
               </article>
               <article class="setting-card">
-                <h2>生成補助</h2>
-                <p>必要人数を調整したあと、ダッシュボードで不足状況を確認してから生成判断できます。</p>
+                <h2>生成条件</h2>
+                <div id="csvDemandPanel" class="csv-helper-list inactive-panel">
+                  <div>シフト希望CSVの取込結果をそのまま候補に使います。</div>
+                  <div>1行 = 1人 × 1日 で保持するため、フォーム連携に差し替えやすい構造です。</div>
+                  <div id="generationSourceStatus" class="inline-status"></div>
+                </div>
                 <button class="secondary-button secondary-action" type="button" id="generationActionButton">この条件で再計算</button>
               </article>
             </div>
@@ -106,40 +122,63 @@
         <section class="view" data-view-panel="therapists">
           <div class="section-head">
             <h1>セラピスト管理</h1>
-            <button id="addTherapistButton" class="secondary-button" type="button">セラピスト追加</button>
           </div>
           <section class="content-panel">
+            <div id="therapistImportSummary" class="section-note"></div>
             <div id="therapistList" class="stack-list"></div>
           </section>
         </section>
 
         <section class="view" data-view-panel="history">
           <div class="section-head">
-            <h1>実績データ</h1>
+            <h1>シフト希望読込</h1>
           </div>
           <section class="content-panel">
             <div class="history-grid">
               <article class="setting-card">
-                <h2>CSV読込</h2>
-                <div id="csvDemandPanel" class="csv-panel">
+                <h2>CSVアップロード</h2>
+                <div class="csv-panel">
                   <label>
-                    CSVファイル
-                    <input id="csvFile" type="file" accept=".csv">
+                    シフト希望CSV
+                    <input id="csvFile" type="file" accept=".csv,text/csv">
                   </label>
                   <div class="csv-drop-note">
-                    想定読込項目: 日付 / 曜日 / 時間帯 / エリア / 来店数 / 必要人数
+                    想定列: 名前 / 出勤可能日 / 出勤開始時間 / 出勤終了時間 / 希望エリア / 姫予約有無 / 備考
                   </div>
+                  <div id="csvImportStatus" class="import-status"></div>
                 </div>
               </article>
               <article class="setting-card">
-                <h2>拡張予定</h2>
+                <h2>読込後の使い方</h2>
                 <div class="csv-helper-list">
-                  <div>曜日別実績の読込</div>
-                  <div>時間帯別需要の反映</div>
-                  <div>エリア別不足の自動判定</div>
+                  <div>読込結果はセラピスト管理へ自動反映</div>
+                  <div>同じデータをそのままシフト生成候補に使用</div>
+                  <div>今後は Googleフォーム / スプレッドシート連携の受け皿として流用可能</div>
                 </div>
               </article>
             </div>
+          </section>
+
+          <section class="content-panel">
+            <div class="sub-head">
+              <h2>フォーマット確認</h2>
+            </div>
+            <div class="csv-format-grid">
+              <div class="format-card">
+                <strong>データ単位</strong>
+                <p>1行 = 1人 × 1日</p>
+              </div>
+              <div class="format-card">
+                <strong>必須列</strong>
+                <p>名前 / 出勤可能日 / 開始 / 終了 / 希望エリア</p>
+              </div>
+              <div class="format-card">
+                <strong>拡張前提</strong>
+                <p>曜日別 / 時間帯別 / エリア別 へ拡張可能</p>
+              </div>
+            </div>
+            <div id="csvPreviewMeta" class="section-note"></div>
+            <div id="csvErrorList" class="error-list"></div>
           </section>
         </section>
 
@@ -147,49 +186,17 @@
           <div class="section-head">
             <h1>設定</h1>
           </div>
-        <section class="content-panel settings-panel">
-          <label>
-            割り当てルールメモ
-            <textarea id="assignmentRule" rows="4"></textarea>
-          </label>
+          <section class="content-panel settings-panel">
+            <label>
+              割り当てルールメモ
+              <textarea id="assignmentRule" rows="4"></textarea>
+            </label>
+          </section>
         </section>
-      </section>
 
-        <section class="content-panel result-panel">
-          <div class="sub-head">
-            <h2>結果表示</h2>
-          </div>
-          <div id="resultTable" class="table-wrap"></div>
-        </section>
       </main>
     </div>
   </div>
-
-  <template id="therapistRowTemplate">
-    <div class="data-row therapist-row">
-      <label>
-        名前
-        <input class="therapist-name" type="text" placeholder="田中">
-      </label>
-      <label>
-        出勤可能日
-        <input class="therapist-days" type="text" placeholder="2026-04-06, 2026-04-07">
-      </label>
-      <label>
-        希望時間
-        <input class="therapist-time" type="text" placeholder="早番 / 遅番 / どちらでも">
-      </label>
-      <label>
-        希望エリア
-        <input class="therapist-area" type="text" placeholder="渋谷">
-      </label>
-      <label>
-        備考
-        <input class="therapist-note" type="text" placeholder="平日は早上がり希望">
-      </label>
-      <button class="danger-button remove-row-button" type="button">削除</button>
-    </div>
-  </template>
 
   <script src="data.js"></script>
   <script src="scheduler.js"></script>
