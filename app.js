@@ -20,7 +20,7 @@
   activeAnalysisTab: "fill",
   activeDailyShiftTab: "early",
   activeShiftView: "list",
-  disabledTherapists: new Set(),
+  therapistStatuses: {},
   distributionDate: "",
   selectedDistributionKey: "",
   distributionPreviewText: ""
@@ -31,6 +31,7 @@ const elements = {
   days: document.querySelector("#days"),
   assignmentRule: document.querySelector("#assignmentRule"),
   therapistImportSummary: document.querySelector("#therapistImportSummary"),
+  therapistStatusList: document.querySelector("#therapistStatusList"),
   requirementList: document.querySelector("#manualDemandPanel"),
   periodSummary: document.querySelector("#periodSummary"),
   analysisTabs: document.querySelector("#analysisTabs"),
@@ -121,7 +122,7 @@ function loadSampleData() {
     headers: [],
     errors: []
   };
-  state.disabledTherapists = new Set();
+  state.therapistStatuses = buildInitialTherapistStatuses(samplePrototypeData.shiftRequests);
   state.selectedDate = samplePrototypeData.settings.startDate;
   state.distributionDate = samplePrototypeData.settings.startDate;
   state.selectedDistributionKey = "";
@@ -202,7 +203,7 @@ function handleCsvUpload(event) {
         lastImportedAt: formatTimestamp(new Date()),
         errors: parsed.errors
       };
-      state.disabledTherapists = new Set();
+      state.therapistStatuses = buildInitialTherapistStatuses(parsed.rows);
       ensureSelectedDateInRange();
       renderImportedDataState();
       handleGenerate();
@@ -262,7 +263,7 @@ function handleGenerate() {
 
 function collectModel() {
   const therapists = aggregateTherapists(state.shiftRequests).filter(
-    (therapist) => !state.disabledTherapists.has(therapist.name)
+    (therapist) => getTherapistGenerationStatus(therapist.name) === "approved"
   );
   const settings = {
     startDate: elements.startDate.value,
@@ -289,7 +290,7 @@ function collectModel() {
   return {
     settings,
     therapists,
-    shiftRequests: state.shiftRequests.filter((request) => !state.disabledTherapists.has(request.name)),
+    shiftRequests: state.shiftRequests.filter((request) => getTherapistGenerationStatus(request.name) === "approved"),
     requirements,
     errors
   };
@@ -299,8 +300,9 @@ function renderImportedDataState() {
   renderCsvImportState();
   renderHistoryImportState();
   renderCreationChecks();
+  renderTherapistStatusList();
 
-  const enabledCount = state.shiftRequests.filter((request) => !state.disabledTherapists.has(request.name)).length;
+  const enabledCount = state.shiftRequests.filter((request) => getTherapistGenerationStatus(request.name) === "approved").length;
   const issueSummary = buildCreationChecks();
   elements.generationSourceStatus.innerHTML = state.shiftRequests.length
     ? `${enabledCount}件の希望 / 実績 ${state.historyMeta.appliedCount}件 / 要確認 ${issueSummary.needsConfirmCount}名`
@@ -427,6 +429,42 @@ function renderCreationChecks() {
     .join("");
 }
 
+function renderTherapistStatusList() {
+  const therapists = aggregateTherapists(state.shiftRequests);
+  if (!therapists.length) {
+    elements.therapistStatusList.innerHTML = `<div class="empty-state compact">シフト希望CSVを読み込むと、ここに生成対象の切替が表示されます。</div>`;
+    return;
+  }
+
+  elements.therapistStatusList.innerHTML = therapists
+    .map((therapist) => {
+      const status = getTherapistGenerationStatus(therapist.name);
+      const profile = getTherapistProfile(therapist.name);
+      return `
+        <div class="therapist-status-row status-${status}">
+          <div class="therapist-status-main">
+            <strong>${therapist.name}</strong>
+            <span class="section-note">${profile.rank} / ${therapist.entries.length}件 / ${therapist.preferredAreas.join("・")}</span>
+          </div>
+          <div class="therapist-status-actions">
+            <button class="status-switch ${status === "approved" ? "active approved" : ""}" type="button" data-therapist-name="${therapist.name}" data-status-value="approved">採用</button>
+            <button class="status-switch ${status === "pending" ? "active pending" : ""}" type="button" data-therapist-name="${therapist.name}" data-status-value="pending">保留</button>
+            <button class="status-switch ${status === "cut" ? "active cut" : ""}" type="button" data-therapist-name="${therapist.name}" data-status-value="cut">カット</button>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  elements.therapistStatusList.querySelectorAll(".status-switch").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.therapistStatuses[button.dataset.therapistName] = button.dataset.statusValue;
+      renderImportedDataState();
+      handleGenerate();
+    });
+  });
+}
+
 function buildCreationChecks() {
   const requests = state.shiftRequests;
   const profileNames = Object.keys(samplePrototypeData.therapistProfiles || {});
@@ -446,9 +484,11 @@ function buildCreationChecks() {
   const invalidArea = requests
     .filter((request) => request.preferredArea && !availableAreas.has(request.preferredArea))
     .map((request) => `${request.name} / ${request.dateKey} / ${request.preferredArea}`);
+  const pendingNames = submittedNames.filter((name) => getTherapistGenerationStatus(name) === "pending");
 
   const needsConfirmNames = new Set([
     ...unsubmittedNames,
+    ...pendingNames,
     ...missingTime.map((item) => item.split(" / ")[0]),
     ...missingArea.map((item) => item.split(" / ")[0]),
     ...missingHime.map((item) => item.split(" / ")[0]),
@@ -1621,4 +1661,16 @@ function buildDistributionMessage(assignment, dayPlan) {
 
 function buildDistributionKey(dateKey, assignment) {
   return `${dateKey}__${assignment.name}__${assignment.shiftLabel}`;
+}
+
+function buildInitialTherapistStatuses(shiftRequests) {
+  const statuses = {};
+  aggregateTherapists(shiftRequests).forEach((therapist) => {
+    statuses[therapist.name] = "approved";
+  });
+  return statuses;
+}
+
+function getTherapistGenerationStatus(name) {
+  return state.therapistStatuses[name] || "approved";
 }

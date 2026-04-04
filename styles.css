@@ -857,6 +857,68 @@ textarea:focus {
   font-size: 0.84rem;
 }
 
+.therapist-status-list {
+  display: grid;
+  gap: 8px;
+}
+
+.therapist-status-row {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.therapist-status-main {
+  display: grid;
+  gap: 2px;
+}
+
+.therapist-status-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.status-switch {
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eef2f5;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.status-switch.active.approved {
+  background: #e9f5ed;
+  color: var(--ok);
+}
+
+.status-switch.active.pending {
+  background: #fff4d6;
+  color: #b7791f;
+}
+
+.status-switch.active.cut {
+  background: #fde6df;
+  color: #b9382f;
+}
+
+.therapist-status-row.status-approved {
+  border-left: 4px solid #2f9e58;
+}
+
+.therapist-status-row.status-pending {
+  border-left: 4px solid #d69e2e;
+}
+
+.therapist-status-row.status-cut {
+  border-left: 4px solid #d64545;
+}
+
 .check-group {
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -1509,6 +1571,11 @@ textarea:focus {
   .distribution-row {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .therapist-status-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .shift-sub,
