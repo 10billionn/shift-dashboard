@@ -34,6 +34,47 @@ button {
   min-height: 100vh;
 }
 
+.with-sidebar {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+}
+
+.sidebar {
+  background: #162235;
+  color: #fff;
+  padding: 18px 12px;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+
+.sidebar-brand {
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 10px 12px;
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 6px;
+}
+
+.nav-item {
+  width: 100%;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  text-align: left;
+}
+
+.nav-item.active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.main-shell {
+  min-width: 0;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -76,6 +117,34 @@ button {
 .controls-panel {
   display: grid;
   gap: 12px;
+}
+
+.summary-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summary-card {
+  padding: 12px;
+  border-radius: 14px;
+  background: #f9fafb;
+  border: 1px solid var(--line);
+}
+
+.summary-card p {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.summary-card strong {
+  font-size: 1.2rem;
 }
 
 .day-switcher,
@@ -305,6 +374,14 @@ button {
 }
 
 @media (max-width: 768px) {
+  .with-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
   .topbar {
     flex-direction: column;
     align-items: stretch;
@@ -319,6 +396,10 @@ button {
   .view-tabs {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
   .ghost-button,
