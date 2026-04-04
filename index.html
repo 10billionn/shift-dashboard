@@ -4,99 +4,163 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-  <link rel="stylesheet" href="styles.css?v=202604050345">
+  <link rel="stylesheet" href="styles.css?v=202604050420">
 </head>
 <body>
-  <div class="app-shell with-sidebar">
+  <div class="app-shell">
     <aside class="sidebar">
       <div class="sidebar-brand">シフトダッシュボード</div>
-      <nav class="sidebar-nav">
-        <button class="nav-item active" type="button">ダッシュボード</button>
-        <button class="nav-item" type="button">シフト作成</button>
-        <button class="nav-item" type="button">設定</button>
-        <button class="nav-item" type="button">シフト配布</button>
+      <nav class="sidebar-nav" id="sidebarNav">
+        <button class="nav-item active" type="button" data-view="dashboard">ダッシュボード</button>
+        <button class="nav-item" type="button" data-view="generation">シフト作成</button>
+        <button class="nav-item" type="button" data-view="distribution">シフト配布</button>
+        <button class="nav-item" type="button" data-view="settings">設定</button>
       </nav>
     </aside>
 
     <div class="main-shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Daily Shift</p>
-          <h1>シフトダッシュボード</h1>
+          <p class="eyebrow">Shift App</p>
+          <h1 id="viewTitle">ダッシュボード</h1>
         </div>
         <button id="reloadButton" class="ghost-button" type="button">サンプル再読込</button>
       </header>
 
       <main class="content-area">
-        <section class="content-panel summary-panel">
-          <div class="panel-head">
-            <h2>サマリー</h2>
-            <p id="selectedDateLabel" class="selected-date-label"></p>
-          </div>
-          <div class="summary-grid">
-            <article class="summary-card">
-              <p>早番</p>
-              <strong id="earlySummary"></strong>
-            </article>
-            <article class="summary-card">
-              <p>遅番</p>
-              <strong id="lateSummary"></strong>
-            </article>
-            <article class="summary-card">
-              <p>姫予約あり</p>
-              <strong id="bookedSummary"></strong>
-            </article>
-            <article class="summary-card">
-              <p>対象エリア</p>
-              <strong id="areaSummary"></strong>
-            </article>
-          </div>
+        <section class="view active" data-view-panel="dashboard">
+          <section class="content-panel summary-panel">
+            <div class="panel-head">
+              <h2>本日のシフト</h2>
+              <p id="selectedDateLabel" class="selected-date-label"></p>
+            </div>
+            <div class="summary-grid">
+              <article class="summary-card">
+                <p>早番</p>
+                <strong id="earlySummary"></strong>
+              </article>
+              <article class="summary-card">
+                <p>遅番</p>
+                <strong id="lateSummary"></strong>
+              </article>
+              <article class="summary-card">
+                <p>姫予約あり</p>
+                <strong id="bookedSummary"></strong>
+              </article>
+              <article class="summary-card">
+                <p>対象エリア</p>
+                <strong id="areaSummary"></strong>
+              </article>
+            </div>
+          </section>
+
+          <section class="content-panel controls-panel">
+            <div class="day-switcher">
+              <button id="prevDayButton" class="ghost-button" type="button">◀ 前日</button>
+              <button id="todayButton" class="secondary-button" type="button">今日</button>
+              <button id="nextDayButton" class="ghost-button" type="button">次日 ▶</button>
+            </div>
+
+            <div class="view-tabs" id="dashboardViewTabs">
+              <button class="view-tab active" type="button" data-dashboard-view="list">リスト表示</button>
+              <button class="view-tab" type="button" data-dashboard-view="board">盤面表示</button>
+            </div>
+
+            <div id="dashboardListView" class="dashboard-view-panel active">
+              <div class="shift-tabs" id="shiftTabs">
+                <button class="shift-tab active" type="button" data-shift="early">早番 <span id="earlyCountMobile"></span></button>
+                <button class="shift-tab" type="button" data-shift="late">遅番 <span id="lateCountMobile"></span></button>
+              </div>
+
+              <section class="shift-columns">
+                <section class="content-panel shift-panel active" data-shift-panel="early">
+                  <div class="panel-head">
+                    <h3>早番</h3>
+                    <span id="earlyCount" class="panel-count"></span>
+                  </div>
+                  <div id="earlyShiftList" class="shift-list"></div>
+                </section>
+
+                <section class="content-panel shift-panel" data-shift-panel="late">
+                  <div class="panel-head">
+                    <h3>遅番</h3>
+                    <span id="lateCount" class="panel-count"></span>
+                  </div>
+                  <div id="lateShiftList" class="shift-list"></div>
+                </section>
+              </section>
+            </div>
+
+            <section id="dashboardBoardView" class="content-panel dashboard-view-panel board-placeholder-panel">
+              <div class="panel-head">
+                <h3>盤面表示</h3>
+              </div>
+              <div class="board-placeholder">
+                <strong>盤面表示は次段階で再開します。</strong>
+                <p>まずはアプリ全体の構造とリスト表示を安定状態へ戻しています。</p>
+              </div>
+            </section>
+          </section>
         </section>
 
-        <section class="content-panel controls-panel">
-          <div class="day-switcher">
-            <button id="prevDayButton" class="ghost-button" type="button">◀ 前日</button>
-            <button id="todayButton" class="secondary-button" type="button">今日</button>
-            <button id="nextDayButton" class="ghost-button" type="button">次日 ▶</button>
-          </div>
-
-          <div class="view-tabs" id="viewTabs">
-            <button class="view-tab active" type="button" data-view="list">リスト表示</button>
-            <button class="view-tab" type="button" data-view="board">盤面表示</button>
-          </div>
-
-          <div id="listView" class="view-panel active">
-            <div class="shift-tabs" id="shiftTabs">
-              <button class="shift-tab active" type="button" data-shift="early">早番 <span id="earlyCountMobile"></span></button>
-              <button class="shift-tab" type="button" data-shift="late">遅番 <span id="lateCountMobile"></span></button>
-            </div>
-
-            <section class="shift-columns">
-              <section class="content-panel shift-panel shift-panel-early active" data-shift-panel="early">
-                <div class="panel-head">
-                  <h2>早番</h2>
-                  <span id="earlyCount" class="panel-count"></span>
-                </div>
-                <div id="earlyShiftList" class="shift-list"></div>
-              </section>
-
-              <section class="content-panel shift-panel shift-panel-late" data-shift-panel="late">
-                <div class="panel-head">
-                  <h2>遅番</h2>
-                  <span id="lateCount" class="panel-count"></span>
-                </div>
-                <div id="lateShiftList" class="shift-list"></div>
-              </section>
-            </section>
-          </div>
-
-          <section id="boardView" class="content-panel view-panel board-placeholder-panel">
+        <section class="view" data-view-panel="generation">
+          <section class="content-panel placeholder-panel">
             <div class="panel-head">
-              <h2>盤面表示</h2>
+              <h2>シフト作成</h2>
             </div>
-            <div class="board-placeholder">
-              <strong>盤面表示は次段階で再実装します。</strong>
-              <p>まずはリスト表示と全体構造を安定状態へ戻しています。</p>
+            <div class="placeholder-grid">
+              <div class="placeholder-card">
+                <strong>CSV読み込み</strong>
+                <p>シフト希望CSVと過去実績データの読込エリアをここに戻します。</p>
+              </div>
+              <div class="placeholder-card">
+                <strong>抜け漏れチェック</strong>
+                <p>未提出、時間未入力、希望エリア未入力などの確認ブロックをここに配置します。</p>
+              </div>
+              <div class="placeholder-card">
+                <strong>生成</strong>
+                <p>生成ボタンと反映件数サマリーをここに置く想定です。</p>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view-panel="distribution">
+          <section class="content-panel placeholder-panel">
+            <div class="panel-head">
+              <h2>シフト配布</h2>
+            </div>
+            <div class="placeholder-grid">
+              <div class="placeholder-card">
+                <strong>日付選択</strong>
+                <p>生成済みシフトの日付選択をここに配置します。</p>
+              </div>
+              <div class="placeholder-card">
+                <strong>個別表示</strong>
+                <p>セラピストごとのシフト確認と文言プレビューをここに戻します。</p>
+              </div>
+              <div class="placeholder-card">
+                <strong>コピー</strong>
+                <p>LINE送信用の個別文言コピー導線をここに置きます。</p>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view-panel="settings">
+          <section class="content-panel placeholder-panel">
+            <div class="panel-head">
+              <h2>設定</h2>
+            </div>
+            <div class="placeholder-grid">
+              <div class="placeholder-card">
+                <strong>期間設定</strong>
+                <p>開始日や日数などの基本設定をここに配置します。</p>
+              </div>
+              <div class="placeholder-card">
+                <strong>ルール設定</strong>
+                <p>必要人数や簡易ルール設定をここに戻します。</p>
+              </div>
             </div>
           </section>
         </section>
@@ -104,7 +168,7 @@
     </div>
   </div>
 
-  <script src="data.js?v=202604050345"></script>
-  <script src="app.js?v=202604050345"></script>
+  <script src="data.js?v=202604050420"></script>
+  <script src="app.js?v=202604050420"></script>
 </body>
 </html>
