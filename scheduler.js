@@ -94,6 +94,7 @@ function assignByShift(context) {
     assignments.push({
       name: candidate.name,
       area,
+      preferredArea: candidate.preferredArea,
       preferredTime: describeShiftPreference(candidate),
       startTime: candidate.startTime,
       endTime: candidate.endTime,

@@ -968,8 +968,8 @@ function renderStatusBadges(profile, hasHime) {
   return badges.join("");
 }
 
-function renderAttributeColumn(profile) {
-  const items = [profile.rank, ...profile.flags.slice(0, 2)].filter(Boolean);
+function renderAttributeColumn(profile, attendance, hasHime) {
+  const items = [profile.rank, attendance, hasHime ? "姫あり" : null].filter(Boolean);
   return items.length
     ? items.map((item) => `<span class="attr-tag">${item}</span>`).join("")
     : `<span class="state-text">-</span>`;
@@ -977,17 +977,14 @@ function renderAttributeColumn(profile) {
 
 function buildPriorityTags(assignment) {
   const tags = [];
-  if (assignment.himeReservation === "あり") {
-    tags.push("姫予約");
-  }
   const note = compactShiftNote(assignment.note);
   if (note) {
     tags.push(note);
   }
-  if (!tags.length) {
-    tags.push("通常");
+  if (assignment.areaWarning) {
+    tags.push("要確認");
   }
-  return tags.slice(0, 3);
+  return tags.slice(0, 2);
 }
 
 function areaClassName(area) {
@@ -1017,6 +1014,11 @@ function buildTimeOptions() {
     }
   }
   return options;
+}
+
+function selectAttendanceFlag(profile) {
+  const attendance = profile.flags.find((flag) => ["勤怠安定", "遅刻注意", "出稼ぎ"].includes(flag));
+  return attendance || "勤怠安定";
 }
 
 function renderMobileChartItem(day) {
@@ -1056,14 +1058,24 @@ function renderShiftTeamList(assignments, shift) {
         .map((assignment, index) => {
           const profile = getTherapistProfile(assignment.name);
           const tags = buildPriorityTags(assignment);
+          const attendance = selectAttendanceFlag(profile);
           return `
             <article class="shift-list-row fixed-grid area-${areaClassName(assignment.area)} ${assignment.himeReservation === "あり" ? "has-hime" : ""}" draggable="true" data-shift="${shift}" data-index="${index}">
               <div class="shift-col shift-name" data-area="${assignment.area}">
-                <div class="name-main">${assignment.name}</div>
-                <div class="name-badges">${renderStatusBadges(profile, assignment.himeReservation === "あり")}</div>
+                <div class="shift-line-primary">
+                  <span class="name-main">${assignment.name}</span>
+                  <span class="status-badge rank">${profile.rank}</span>
+                  <span class="status-badge flag">${attendance}</span>
+                  ${assignment.himeReservation === "あり" ? `<span class="status-badge hime">姫</span>` : ""}
+                </div>
+                <div class="shift-line-secondary">
+                  <span class="area-pill area-${areaClassName(assignment.area)}">${assignment.area}</span>
+                  <span class="time-text">${compactTimeRange(assignment.startTime, assignment.endTime)}</span>
+                  ${tags.map((tag) => `<span class="priority-tag ${tag === "要確認" ? "warning" : ""}">${tag}</span>`).join("")}
+                </div>
               </div>
-              <div class="shift-col shift-attr">${renderAttributeColumn(profile)}</div>
-              <div class="shift-col shift-area">
+              <div class="shift-col shift-attr">${renderAttributeColumn(profile, attendance, assignment.himeReservation === "あり")}</div>
+              <div class="shift-col shift-area shift-area-editor">
                 <span class="area-pill area-${areaClassName(assignment.area)}">${assignment.area}</span>
                 <select class="shift-area-select" data-shift="${shift}" data-index="${index}">
                   ${samplePrototypeData.settings.areas
@@ -1072,7 +1084,7 @@ function renderShiftTeamList(assignments, shift) {
                 </select>
               </div>
               <div class="shift-col shift-time-col">
-                <div class="shift-time-badge ${shift === "early" ? "early" : "late"}">${shift === "early" ? "早" : "遅"}</div>
+                <div class="shift-time-badge ${shift === "early" ? "early" : "late"}">${shift === "early" ? "早番" : "遅番"}</div>
                 <div class="time-selects">
                   <select class="shift-time-select" data-shift="${shift}" data-index="${index}" data-time-bound="start">
                     ${renderTimeOptions(assignment.startTime)}
@@ -1084,10 +1096,7 @@ function renderShiftTeamList(assignments, shift) {
                 </div>
               </div>
               <div class="shift-col shift-priority">
-                <div class="priority-tags">${tags.map((tag) => `<span class="priority-tag">${tag}</span>`).join("")}</div>
-                <button class="shift-toggle-button" type="button" data-shift="${shift}" data-index="${index}">
-                  ${shift === "early" ? "遅へ" : "早へ"}
-                </button>
+                <div class="priority-tags">${tags.map((tag) => `<span class="priority-tag ${tag === "要確認" ? "warning" : ""}">${tag}</span>`).join("")}</div>
               </div>
             </article>
           `;
@@ -1114,12 +1123,6 @@ function bindShiftBoardEvents(target, dayPlan) {
   target.querySelectorAll("[data-drop-shift]").forEach((panel) => {
     panel.addEventListener("dragover", handleShiftPanelDragOver);
     panel.addEventListener("drop", handleShiftPanelDrop);
-  });
-
-  target.querySelectorAll(".shift-toggle-button").forEach((button) => {
-    button.addEventListener("click", () => {
-      applyShiftToggle(button.dataset.shift, Number(button.dataset.index));
-    });
   });
 
   target.querySelectorAll(".shift-area-select").forEach((select) => {
@@ -1184,13 +1187,6 @@ function readDragPayload(event) {
   }
 }
 
-function applyShiftToggle(fromShift, fromIndex) {
-  const toShift = fromShift === "early" ? "late" : "early";
-  const dayPlan = findCurrentDayPlan(state.latestDailyPlans);
-  const targetList = getShiftAssignments(dayPlan, toShift);
-  applyAssignmentMove(fromShift, fromIndex, toShift, targetList.length);
-}
-
 function applyAreaChange(shift, index, nextArea) {
   const dayPlan = findCurrentDayPlan(state.latestDailyPlans);
   const assignment = getShiftAssignments(dayPlan, shift)[index];
@@ -1198,6 +1194,7 @@ function applyAreaChange(shift, index, nextArea) {
     return;
   }
   assignment.area = nextArea;
+  assignment.areaWarning = Boolean(assignment.preferredArea && assignment.preferredArea !== nextArea);
   renderDashboardFromState();
 }
 
@@ -1246,6 +1243,9 @@ function buildAdjustmentWarnings(dayPlan) {
       const duration = toMinutes(assignment.endTime) - toMinutes(assignment.startTime);
       if (duration < 120) {
         warnings.push(`${dayPlan.dateKey} の${shift === "early" ? "早番" : "遅番"}で ${assignment.name} の最終受付余白が不足の可能性があります。`);
+      }
+      if (assignment.areaWarning) {
+        warnings.push(`${dayPlan.dateKey} の${assignment.name} は本来希望外エリア (${assignment.area}) のため要確認です。`);
       }
     });
 

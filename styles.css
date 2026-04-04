@@ -406,13 +406,24 @@ textarea:focus {
   font-size: 0.88rem;
 }
 
+.shift-line-primary,
+.shift-line-secondary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.shift-line-secondary {
+  margin-top: 4px;
+}
+
 .name-badges,
 .priority-tags,
 .shift-attr {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 4px;
 }
 
 .shift-area,
@@ -513,6 +524,11 @@ textarea:focus {
   color: var(--danger);
 }
 
+.priority-tag.warning {
+  background: #fff4d6;
+  color: #b7791f;
+}
+
 .area-pill.area-kasai {
   background: rgba(47, 128, 237, 0.12);
   color: #2f80ed;
@@ -550,6 +566,12 @@ textarea:focus {
   gap: 6px;
 }
 
+.time-text {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .time-selects {
   display: flex;
   align-items: center;
@@ -577,14 +599,6 @@ textarea:focus {
 .shift-priority {
   display: grid;
   gap: 6px;
-}
-
-.shift-toggle-button {
-  min-height: 28px;
-  padding: 4px 8px;
-  background: #edf2f7;
-  color: var(--accent);
-  font-size: 0.74rem;
 }
 
 .shift-area-select {
@@ -1137,10 +1151,6 @@ textarea:focus {
     cursor: default;
   }
 
-  .shift-name::after {
-    content: "（" attr(data-area) "）";
-  }
-
   .section-head h1 {
     font-size: 1.05rem;
   }
@@ -1202,7 +1212,6 @@ textarea:focus {
     flex-wrap: wrap;
   }
 
-  .shift-toggle-button,
   .shift-area-select,
   .shift-time-select {
     width: auto;
