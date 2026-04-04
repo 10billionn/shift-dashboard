@@ -1131,7 +1131,8 @@ function buildShortageBlocks(dayPlan) {
 function buildBoardHourLabels() {
   const labels = [];
   for (let hour = 11; hour <= 29; hour += 1) {
-    labels.push(`${String(hour).padStart(2, "0")}:00`);
+    const displayHour = hour >= 24 ? hour - 24 : hour;
+    labels.push(`${String(displayHour).padStart(2, "0")}:00`);
   }
   return labels;
 }
