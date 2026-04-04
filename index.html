@@ -45,38 +45,9 @@
 
           <section class="content-panel">
             <div class="sub-head">
-              <h2>状況サマリー</h2>
+              <h2>シフト可視化</h2>
             </div>
-            <div id="summaryCards" class="summary-grid"></div>
-          </section>
-
-          <section class="content-panel">
-            <div class="sub-head">
-              <h2>判断エリア</h2>
-            </div>
-            <div class="judgment-grid">
-              <article class="decision-card">
-                <p class="mini-label">不足の有無</p>
-                <div id="statusDecision" class="decision-value"></div>
-              </article>
-              <article class="decision-card">
-                <p class="mini-label">優先対応日</p>
-                <div id="priorityDay" class="decision-value"></div>
-              </article>
-              <article class="decision-card wide">
-                <p class="mini-label">簡易コメント</p>
-                <div id="dashboardInsights" class="decision-comment"></div>
-              </article>
-            </div>
-          </section>
-
-          <section class="content-panel">
-            <div class="sub-head">
-              <h2>行動エリア</h2>
-            </div>
-            <div class="action-row">
-              <button id="generateButton" class="primary-button action-button" type="button">この状態で生成</button>
-            </div>
+            <div id="fillBars" class="fill-bars"></div>
           </section>
 
           <section class="content-panel">
@@ -92,22 +63,18 @@
 
           <section class="content-panel">
             <div class="sub-head">
-              <h2>不足と経営指標</h2>
+              <h2>行動</h2>
             </div>
-            <div class="history-grid">
-              <article class="setting-card">
-                <h2>日別不足ランキング</h2>
-                <div id="shortageRanking" class="ranking-list"></div>
-                <h2>最も不足している日</h2>
-                <div id="mostShortDay" class="focus-day-card"></div>
-              </article>
-              <article class="setting-card">
-                <h2>エリア別不足</h2>
-                <div id="areaShortage" class="ranking-list"></div>
-                <h2>経営指標</h2>
-                <div id="businessMetrics" class="metric-stack"></div>
-              </article>
+            <div class="action-row">
+              <button id="generateButton" class="primary-button action-button" type="button">シフト生成</button>
             </div>
+          </section>
+
+          <section class="content-panel">
+            <div class="sub-head">
+              <h2>サマリー</h2>
+            </div>
+            <div id="summaryCards" class="summary-grid"></div>
           </section>
         </section>
 

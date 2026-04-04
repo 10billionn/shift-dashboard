@@ -5,16 +5,10 @@
   therapistList: document.querySelector("#therapistList"),
   therapistTemplate: document.querySelector("#therapistRowTemplate"),
   requirementList: document.querySelector("#requirementList"),
+  fillBars: document.querySelector("#fillBars"),
   summary: document.querySelector("#summaryCards"),
   warningSummary: document.querySelector("#warningSummary"),
   warningBox: document.querySelector("#warningBox"),
-  dashboardInsights: document.querySelector("#dashboardInsights"),
-  statusDecision: document.querySelector("#statusDecision"),
-  priorityDay: document.querySelector("#priorityDay"),
-  shortageRanking: document.querySelector("#shortageRanking"),
-  mostShortDay: document.querySelector("#mostShortDay"),
-  areaShortage: document.querySelector("#areaShortage"),
-  businessMetrics: document.querySelector("#businessMetrics"),
   resultTable: document.querySelector("#resultTable"),
   addTherapistButton: document.querySelector("#addTherapistButton"),
   generateButton: document.querySelector("#generateButton"),
@@ -136,14 +130,10 @@ function handleGenerate() {
   const result = generateShiftPlan(model);
   const aggregate = buildDashboardAggregate(result.dailyPlans);
 
+  renderFillBars(result.dailyPlans);
   renderSummary(result, aggregate);
-  renderJudgment(aggregate);
   renderAlertSummary(aggregate, result.warnings);
   renderAlertDetails(result.warnings);
-  renderRanking(aggregate.shortageRanking, elements.shortageRanking, "不足日はありません。", "枠不足");
-  renderMostShortDay(aggregate.mostShortDay);
-  renderRanking(aggregate.areaRanking, elements.areaShortage, "エリア別不足はありません。", "枠不足", true);
-  renderBusinessMetrics(aggregate);
   renderResultTable(result.dailyPlans);
 }
 
@@ -185,17 +175,43 @@ function collectModel() {
 }
 
 function renderValidationState(errors) {
+  elements.fillBars.innerHTML = `<div class="empty-state">開始日と必要人数を確認すると、1週間の埋まり状況がここに表示されます。</div>`;
   elements.summary.innerHTML = "";
-  elements.statusDecision.innerHTML = `<span class="danger-text">入力不足</span>`;
-  elements.priorityDay.innerHTML = "-";
-  elements.dashboardInsights.innerHTML = `<div class="decision-comment">${errors.join(" / ")}</div>`;
   elements.warningSummary.innerHTML = `<div class="alert-summary danger">設定を見直してください。</div>`;
   renderAlertDetails(errors);
-  elements.shortageRanking.innerHTML = "";
-  elements.mostShortDay.innerHTML = "";
-  elements.areaShortage.innerHTML = "";
-  elements.businessMetrics.innerHTML = "";
   elements.resultTable.innerHTML = "";
+}
+
+function renderFillBars(dailyPlans) {
+  elements.fillBars.innerHTML = dailyPlans
+    .map((day) => {
+      const required = day.requirement.earlyNeeded + day.requirement.lateNeeded;
+      const assigned = day.earlyAssignments.length + day.lateAssignments.length;
+      const fillRate = required ? Math.round((assigned / required) * 100) : 100;
+      const shortage = Math.max(required - assigned, 0);
+      const toneClass = shortage > 0 ? "danger" : "ok";
+      const barWidth = Math.min(fillRate, 100);
+
+      return `
+        <article class="fill-bar-row ${toneClass}">
+          <div class="fill-bar-head">
+            <strong>${day.dateKey}</strong>
+            <span>${day.weekday}曜</span>
+          </div>
+          <div class="fill-bar-main">
+            <div class="fill-bar-track">
+              <span class="fill-bar-value ${toneClass}" style="width:${barWidth}%"></span>
+            </div>
+            <div class="fill-bar-rate">${fillRate}%</div>
+          </div>
+          <div class="fill-bar-meta">
+            <span>${assigned}/${required}枠</span>
+            <span>${shortage > 0 ? `${shortage}枠不足` : "充足"}</span>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
 }
 
 function renderSummary(result, aggregate) {
@@ -218,25 +234,12 @@ function renderSummary(result, aggregate) {
     .join("");
 }
 
-function renderJudgment(aggregate) {
-  elements.statusDecision.innerHTML = aggregate.shortageSlots
-    ? `<span class="danger-text">不足あり</span>`
-    : `<span class="good-text">充足</span>`;
-
-  elements.priorityDay.innerHTML = aggregate.mostShortDay
-    ? `${aggregate.mostShortDay.dateKey} / ${aggregate.mostShortDay.shortage}枠不足`
-    : "優先対応日はありません";
-
-  elements.dashboardInsights.innerHTML = aggregate.shortageSlots
-    ? `<div class="decision-comment">不足の大きい日から先に調整し、問題なければこの状態で生成します。</div>`
-    : `<div class="decision-comment">大きな不足はありません。このまま生成判断して問題ない状態です。</div>`;
-}
-
 function renderAlertSummary(aggregate, warnings) {
   const maxShort = aggregate.mostShortDay;
   const summaryLines = [
-    `${aggregate.shortageDays.length}日で不足`,
-    maxShort ? `最大不足日: ${maxShort.dateKey}（${maxShort.shortage}枠不足）` : "最大不足日: なし",
+    `${aggregate.totalDays}日中${aggregate.shortageDays.length}日で不足`,
+    aggregate.shortageSlots ? "不足あり" : "不足なし",
+    maxShort ? `最大不足日: ${maxShort.dateKey}（${maxShort.shortage}枠）` : "最大不足日: なし",
     `総不足数: ${aggregate.shortageSlots}枠`
   ];
 
@@ -258,57 +261,6 @@ function renderAlertDetails(warnings) {
       <ul>${warnings.map((warning) => `<li>${warning}</li>`).join("")}</ul>
     </div>
   `;
-}
-
-function renderRanking(items, target, emptyText, suffix, isArea = false) {
-  if (!items.length) {
-    target.innerHTML = `<div class="ok-box">${emptyText}</div>`;
-    return;
-  }
-
-  target.innerHTML = items
-    .map((item, index) => `
-      <div class="ranking-item ${isArea ? "compact" : ""}">
-        <div>
-          <strong>${isArea ? item.label : `${index + 1}. ${item.label}`}</strong>
-          <p>${item.value}${suffix}</p>
-        </div>
-        <div class="bar-track"><span class="bar-fill" style="width:${item.barWidth}%"></span></div>
-      </div>
-    `)
-    .join("");
-}
-
-function renderMostShortDay(item) {
-  if (!item) {
-    elements.mostShortDay.innerHTML = `<div class="ok-box">最も不足している日はありません。</div>`;
-    return;
-  }
-
-  elements.mostShortDay.innerHTML = `
-    <div class="focus-day-inner">
-      <strong>${item.dateKey}</strong>
-      <div class="focus-day-value">${item.shortage}枠不足</div>
-      <p>${item.weekday}曜 / 必要 ${item.required} / 割当 ${item.assigned}</p>
-    </div>
-  `;
-}
-
-function renderBusinessMetrics(aggregate) {
-  const metrics = [
-    { label: "想定売上", value: formatCurrency(aggregate.estimatedSales) },
-    { label: "機会損失", value: formatCurrency(aggregate.opportunityLoss) },
-    { label: "稼働効率", value: `${aggregate.utilizationRate}%` }
-  ];
-
-  elements.businessMetrics.innerHTML = metrics
-    .map((item) => `
-      <div class="metric-card">
-        <p>${item.label}</p>
-        <strong>${item.value}</strong>
-      </div>
-    `)
-    .join("");
 }
 
 function renderResultTable(dailyPlans) {
@@ -417,6 +369,7 @@ function renderAssignmentRow(day, assignment, shiftLabel) {
 
 function buildDashboardAggregate(dailyPlans) {
   const aggregate = {
+    totalDays: dailyPlans.length,
     requiredSlots: 0,
     assignedSlots: 0,
     shortageSlots: 0,
@@ -430,7 +383,6 @@ function buildDashboardAggregate(dailyPlans) {
     opportunityLoss: 0,
     utilizationRate: 0
   };
-  const unitSales = 18000;
   const shortagePerDay = [];
 
   dailyPlans.forEach((day) => {
@@ -461,9 +413,6 @@ function buildDashboardAggregate(dailyPlans) {
   aggregate.fillRate = aggregate.requiredSlots
     ? Math.round((aggregate.assignedSlots / aggregate.requiredSlots) * 100)
     : 0;
-  aggregate.estimatedSales = aggregate.assignedSlots * unitSales;
-  aggregate.opportunityLoss = aggregate.shortageSlots * unitSales;
-  aggregate.utilizationRate = aggregate.fillRate;
 
   const rankedDays = shortagePerDay.sort((left, right) => right.shortage - left.shortage || left.dateKey.localeCompare(right.dateKey));
   const maxDayShortage = rankedDays[0]?.shortage || 0;
