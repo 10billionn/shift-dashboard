@@ -1,11 +1,13 @@
 ﻿const state = {
   selectedDate: "",
   dateList: [],
-  activeView: "list",
+  activeAppView: "dashboard",
+  activeDashboardView: "list",
   activeShiftTab: "early"
 };
 
 const elements = {
+  viewTitle: document.querySelector("#viewTitle"),
   selectedDateLabel: document.querySelector("#selectedDateLabel"),
   earlyShiftList: document.querySelector("#earlyShiftList"),
   lateShiftList: document.querySelector("#lateShiftList"),
@@ -21,10 +23,12 @@ const elements = {
   todayButton: document.querySelector("#todayButton"),
   nextDayButton: document.querySelector("#nextDayButton"),
   reloadButton: document.querySelector("#reloadButton"),
-  viewTabs: document.querySelector("#viewTabs"),
+  sidebarNav: document.querySelector("#sidebarNav"),
+  appViews: Array.from(document.querySelectorAll("[data-view-panel]")),
+  dashboardViewTabs: document.querySelector("#dashboardViewTabs"),
+  dashboardListView: document.querySelector("#dashboardListView"),
+  dashboardBoardView: document.querySelector("#dashboardBoardView"),
   shiftTabs: document.querySelector("#shiftTabs"),
-  listView: document.querySelector("#listView"),
-  boardView: document.querySelector("#boardView"),
   shiftPanels: Array.from(document.querySelectorAll("[data-shift-panel]"))
 };
 
@@ -37,12 +41,19 @@ function initialize() {
   elements.prevDayButton.addEventListener("click", () => moveDate(-1));
   elements.todayButton.addEventListener("click", jumpToStartDate);
   elements.nextDayButton.addEventListener("click", () => moveDate(1));
-  elements.reloadButton.addEventListener("click", renderDashboard);
+  elements.reloadButton.addEventListener("click", renderCurrentView);
 
-  elements.viewTabs.querySelectorAll(".view-tab").forEach((button) => {
+  elements.sidebarNav.querySelectorAll(".nav-item").forEach((button) => {
     button.addEventListener("click", () => {
-      state.activeView = button.dataset.view;
-      renderViewState();
+      state.activeAppView = button.dataset.view;
+      renderAppView();
+    });
+  });
+
+  elements.dashboardViewTabs.querySelectorAll(".view-tab").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.activeDashboardView = button.dataset.dashboardView;
+      renderDashboardViewState();
     });
   });
 
@@ -53,17 +64,43 @@ function initialize() {
     });
   });
 
-  renderDashboard();
+  renderAppView();
+}
+
+function renderAppView() {
+  elements.sidebarNav.querySelectorAll(".nav-item").forEach((button) => {
+    button.classList.toggle("active", button.dataset.view === state.activeAppView);
+  });
+
+  elements.appViews.forEach((view) => {
+    view.classList.toggle("active", view.dataset.viewPanel === state.activeAppView);
+  });
+
+  elements.viewTitle.textContent = {
+    dashboard: "ダッシュボード",
+    generation: "シフト作成",
+    distribution: "シフト配布",
+    settings: "設定"
+  }[state.activeAppView];
+
+  renderCurrentView();
+}
+
+function renderCurrentView() {
+  if (state.activeAppView === "dashboard") {
+    renderDashboard();
+  }
 }
 
 function renderDashboard() {
   const dayRequests = samplePrototypeData.shiftRequests.filter((request) => request.dateKey === state.selectedDate);
   const earlyMembers = dayRequests.filter((request) => isEarlyShift(request));
   const lateMembers = dayRequests.filter((request) => isLateShift(request));
+  const requirement = samplePrototypeData.requirements.find((item) => item.dateKey === state.selectedDate);
 
   elements.selectedDateLabel.textContent = `${state.selectedDate} (${formatWeekday(state.selectedDate)})`;
-  elements.earlyCount.textContent = `${earlyMembers.length}/${samplePrototypeData.requirements.find((item) => item.dateKey === state.selectedDate)?.earlyNeeded || earlyMembers.length}`;
-  elements.lateCount.textContent = `${lateMembers.length}/${samplePrototypeData.requirements.find((item) => item.dateKey === state.selectedDate)?.lateNeeded || lateMembers.length}`;
+  elements.earlyCount.textContent = `${earlyMembers.length}/${requirement?.earlyNeeded || earlyMembers.length}`;
+  elements.lateCount.textContent = `${lateMembers.length}/${requirement?.lateNeeded || lateMembers.length}`;
   elements.earlyCountMobile.textContent = elements.earlyCount.textContent;
   elements.lateCountMobile.textContent = elements.lateCount.textContent;
   elements.earlySummary.textContent = `${earlyMembers.length}名`;
@@ -75,7 +112,7 @@ function renderDashboard() {
   elements.lateShiftList.innerHTML = renderShiftCards(lateMembers, "遅番");
 
   updateDayButtons();
-  renderViewState();
+  renderDashboardViewState();
   renderShiftTabState();
 }
 
@@ -130,12 +167,12 @@ function renderShiftCards(members, shiftLabel) {
     .join("");
 }
 
-function renderViewState() {
-  const isList = state.activeView === "list";
-  elements.listView.classList.toggle("active", isList);
-  elements.boardView.classList.toggle("active", !isList);
-  elements.viewTabs.querySelectorAll(".view-tab").forEach((button) => {
-    button.classList.toggle("active", button.dataset.view === state.activeView);
+function renderDashboardViewState() {
+  const isList = state.activeDashboardView === "list";
+  elements.dashboardListView.classList.toggle("active", isList);
+  elements.dashboardBoardView.classList.toggle("active", !isList);
+  elements.dashboardViewTabs.querySelectorAll(".view-tab").forEach((button) => {
+    button.classList.toggle("active", button.dataset.dashboardView === state.activeDashboardView);
   });
 }
 
@@ -167,15 +204,7 @@ function selectAttendanceFlag(flags) {
 }
 
 function areaClassName(area) {
-  return (
-    {
-      "葛西": "kasai",
-      "浦安": "urayasu",
-      "船橋": "funabashi",
-      "浅草橋": "asakusabashi",
-      "八千代": "yachiyo"
-    }[area] || "default"
-  );
+  return ({ "葛西": "kasai", "浦安": "urayasu", "船橋": "funabashi", "浅草橋": "asakusabashi", "八千代": "yachiyo" }[area] || "default");
 }
 
 function isEarlyShift(request) {
@@ -193,12 +222,12 @@ function moveDate(offset) {
     return;
   }
   state.selectedDate = state.dateList[nextIndex];
-  renderDashboard();
+  renderCurrentView();
 }
 
 function jumpToStartDate() {
   state.selectedDate = samplePrototypeData.settings.startDate;
-  renderDashboard();
+  renderCurrentView();
 }
 
 function updateDayButtons() {
