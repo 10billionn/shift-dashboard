@@ -1070,7 +1070,6 @@ function renderBoardView(dayPlan) {
                         <div class="board-bar-body">
                           <span class="board-bar-title">${block.title}</span>
                           <span class="board-bar-meta">${block.meta}</span>
-                          <span class="board-bar-state">${block.state}</span>
                         </div>
                       </div>
                     `
@@ -1144,8 +1143,7 @@ function buildBoardItems(dayPlan) {
       endTime: assignment.endTime,
       tone: assignment.himeReservation === "あり" ? "booked" : "available",
       title: assignment.name,
-      meta: `${assignment.area} / ${compactTimeRange(assignment.startTime, assignment.endTime)}`,
-      state: assignment.himeReservation === "あり" ? "姫あり" : "通常"
+      meta: `${assignment.area} / ${compactTimeRange(assignment.startTime, assignment.endTime)}`
     })),
     ...dayPlan.lateAssignments.map((assignment) => ({
       area: assignment.area,
@@ -1153,8 +1151,7 @@ function buildBoardItems(dayPlan) {
       endTime: assignment.endTime,
       tone: assignment.himeReservation === "あり" ? "booked" : "available",
       title: assignment.name,
-      meta: `${assignment.area} / ${compactTimeRange(assignment.startTime, assignment.endTime)}`,
-      state: assignment.himeReservation === "あり" ? "姫あり" : "通常"
+      meta: `${assignment.area} / ${compactTimeRange(assignment.startTime, assignment.endTime)}`
     }))
   ];
   const cutItems = state.shiftRequests
@@ -1165,8 +1162,7 @@ function buildBoardItems(dayPlan) {
       endTime: request.endTime,
       tone: "cut",
       title: `${request.name} カット`,
-      meta: `${request.preferredArea || "-"} / ${compactTimeRange(request.startTime, request.endTime)}`,
-      state: "カット"
+      meta: `${request.preferredArea || "-"} / ${compactTimeRange(request.startTime, request.endTime)}`
     }));
 
   return [...approvedAssignments, ...buildShortageItems(dayPlan), ...cutItems];
@@ -1181,7 +1177,6 @@ function buildBoardBlock(startTime, endTime, item) {
   return {
     title: item.title,
     meta: item.meta,
-    state: item.state,
     tone: item.tone,
     left: ((start - boardStart) / total) * 100,
     width: (Math.max(end - start, 60) / total) * 100
@@ -1202,8 +1197,7 @@ function buildShortageItems(dayPlan) {
       endTime: "19:00",
       tone: "shortage",
       title: "空き",
-      meta: `${area} / ${compactTimeRange("11:00", "19:00")}`,
-      state: "空き"
+      meta: `${area} / ${compactTimeRange("11:00", "19:00")}`
     });
   }
   for (let index = 0; index < lateShortage; index += 1) {
@@ -1214,8 +1208,7 @@ function buildShortageItems(dayPlan) {
       endTime: "29:00",
       tone: "shortage",
       title: "空き",
-      meta: `${area} / ${compactTimeRange("19:00", "29:00")}`,
-      state: "空き"
+      meta: `${area} / ${compactTimeRange("19:00", "29:00")}`
     });
   }
 

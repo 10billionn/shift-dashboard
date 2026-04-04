@@ -441,8 +441,7 @@ textarea:focus {
 }
 
 .board-bar-title,
-.board-bar-meta,
-.board-bar-state {
+.board-bar-meta {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -455,11 +454,6 @@ textarea:focus {
 .board-bar-meta {
   font-size: 0.64rem;
   opacity: 0.92;
-}
-
-.board-bar-state {
-  font-size: 0.6rem;
-  opacity: 0.95;
 }
 
 .board-bar.booked {
