@@ -3,33 +3,88 @@
   dateList: [],
   activeAppView: "dashboard",
   activeDashboardView: "list",
-  activeShiftTab: "early"
+  activeShiftTab: "early",
+  generationRows: [],
+  generationErrors: [],
+  generationWarnings: [],
+  requirements: [],
+  historyRows: [],
+  generatedSchedule: {},
+  generationSummary: null,
+  selectedDistributionDate: "",
+  selectedDistributionAssignmentId: "",
+  mobileMenuOpen: false
+};
+
+const viewMeta = {
+  dashboard: {
+    title: "ダッシュボード",
+    subtitle: "本日の充足と全体状況を一瞬で把握します。"
+  },
+  generation: {
+    title: "シフト作成",
+    subtitle: "CSV読込、抜け漏れ確認、採用判断、生成までをまとめます。"
+  },
+  distribution: {
+    title: "シフト配布",
+    subtitle: "確定シフトを個別文面にしてすぐ配布できます。"
+  },
+  settings: {
+    title: "設定",
+    subtitle: "マスタとルールを後から育てやすい土台です。"
+  }
 };
 
 const elements = {
+  sidebar: document.querySelector("#sidebar"),
+  menuToggle: document.querySelector("#menuToggle"),
+  sidebarNav: document.querySelector("#sidebarNav"),
+  appViews: Array.from(document.querySelectorAll("[data-view-panel]")),
   viewTitle: document.querySelector("#viewTitle"),
+  viewSubtitle: document.querySelector("#viewSubtitle"),
+  reloadButton: document.querySelector("#reloadButton"),
   selectedDateLabel: document.querySelector("#selectedDateLabel"),
+  prevDayButton: document.querySelector("#prevDayButton"),
+  todayButton: document.querySelector("#todayButton"),
+  nextDayButton: document.querySelector("#nextDayButton"),
+  dashboardViewTabs: document.querySelector("#dashboardViewTabs"),
+  dashboardListView: document.querySelector("#dashboardListView"),
+  dashboardBoardView: document.querySelector("#dashboardBoardView"),
+  shiftTabs: document.querySelector("#shiftTabs"),
+  shiftPanels: Array.from(document.querySelectorAll("[data-shift-panel]")),
   earlyShiftList: document.querySelector("#earlyShiftList"),
   lateShiftList: document.querySelector("#lateShiftList"),
   earlyCount: document.querySelector("#earlyCount"),
   lateCount: document.querySelector("#lateCount"),
   earlyCountMobile: document.querySelector("#earlyCountMobile"),
   lateCountMobile: document.querySelector("#lateCountMobile"),
-  earlySummary: document.querySelector("#earlySummary"),
-  lateSummary: document.querySelector("#lateSummary"),
-  bookedSummary: document.querySelector("#bookedSummary"),
-  areaSummary: document.querySelector("#areaSummary"),
-  prevDayButton: document.querySelector("#prevDayButton"),
-  todayButton: document.querySelector("#todayButton"),
-  nextDayButton: document.querySelector("#nextDayButton"),
-  reloadButton: document.querySelector("#reloadButton"),
-  sidebarNav: document.querySelector("#sidebarNav"),
-  appViews: Array.from(document.querySelectorAll("[data-view-panel]")),
-  dashboardViewTabs: document.querySelector("#dashboardViewTabs"),
-  dashboardListView: document.querySelector("#dashboardListView"),
-  dashboardBoardView: document.querySelector("#dashboardBoardView"),
-  shiftTabs: document.querySelector("#shiftTabs"),
-  shiftPanels: Array.from(document.querySelectorAll("[data-shift-panel]"))
+  salesSummary: document.querySelector("#salesSummary"),
+  storeSummary: document.querySelector("#storeSummary"),
+  shortageSummary: document.querySelector("#shortageSummary"),
+  fillSummary: document.querySelector("#fillSummary"),
+  weeklyAnalysis: document.querySelector("#weeklyAnalysis"),
+  requestCsvInput: document.querySelector("#requestCsvInput"),
+  requestCsvText: document.querySelector("#requestCsvText"),
+  historyCsvInput: document.querySelector("#historyCsvInput"),
+  historyCsvText: document.querySelector("#historyCsvText"),
+  applyRequestCsvButton: document.querySelector("#applyRequestCsvButton"),
+  loadRequestSampleButton: document.querySelector("#loadRequestSampleButton"),
+  applyHistoryCsvButton: document.querySelector("#applyHistoryCsvButton"),
+  loadHistorySampleButton: document.querySelector("#loadHistorySampleButton"),
+  importedCount: document.querySelector("#importedCount"),
+  errorCount: document.querySelector("#errorCount"),
+  missingCount: document.querySelector("#missingCount"),
+  reviewCount: document.querySelector("#reviewCount"),
+  generationAlerts: document.querySelector("#generationAlerts"),
+  requestList: document.querySelector("#requestList"),
+  requirementsList: document.querySelector("#requirementsList"),
+  generateScheduleButton: document.querySelector("#generateScheduleButton"),
+  generationResultNote: document.querySelector("#generationResultNote"),
+  distributionDateSelect: document.querySelector("#distributionDateSelect"),
+  distributionList: document.querySelector("#distributionList"),
+  distributionPreview: document.querySelector("#distributionPreview"),
+  copyMessageButton: document.querySelector("#copyMessageButton"),
+  copyStatus: document.querySelector("#copyStatus")
 };
 
 initialize();
@@ -37,15 +92,41 @@ initialize();
 function initialize() {
   state.dateList = buildDateList();
   state.selectedDate = samplePrototypeData.settings.startDate;
+  state.selectedDistributionDate = samplePrototypeData.settings.startDate;
+  state.requirements = cloneRequirements(samplePrototypeData.requirements);
+  state.generationRows = createGenerationRows(samplePrototypeData.shiftRequests);
+  state.historyRows = [...samplePrototypeData.weeklyPerformance];
+
+  bindEvents();
+  loadSampleCsvTexts();
+  runGeneration("初期サンプルを反映しました。");
+  renderAppView();
+}
+
+function bindEvents() {
+  elements.menuToggle.addEventListener("click", () => {
+    state.mobileMenuOpen = !state.mobileMenuOpen;
+    elements.sidebar.classList.toggle("open", state.mobileMenuOpen);
+  });
+
+  elements.reloadButton.addEventListener("click", () => {
+    state.requirements = cloneRequirements(samplePrototypeData.requirements);
+    state.generationRows = createGenerationRows(samplePrototypeData.shiftRequests);
+    state.historyRows = [...samplePrototypeData.weeklyPerformance];
+    loadSampleCsvTexts();
+    runGeneration("サンプルデータを再読込しました。");
+    renderCurrentView();
+  });
 
   elements.prevDayButton.addEventListener("click", () => moveDate(-1));
   elements.todayButton.addEventListener("click", jumpToStartDate);
   elements.nextDayButton.addEventListener("click", () => moveDate(1));
-  elements.reloadButton.addEventListener("click", renderCurrentView);
 
   elements.sidebarNav.querySelectorAll(".nav-item").forEach((button) => {
     button.addEventListener("click", () => {
       state.activeAppView = button.dataset.view;
+      state.mobileMenuOpen = false;
+      elements.sidebar.classList.remove("open");
       renderAppView();
     });
   });
@@ -64,10 +145,54 @@ function initialize() {
     });
   });
 
-  renderAppView();
+  elements.requestList.addEventListener("click", handleRequestListClick);
+  elements.requirementsList.addEventListener("change", handleRequirementChange);
+  elements.earlyShiftList.addEventListener("change", handleAssignmentFieldChange);
+  elements.lateShiftList.addEventListener("change", handleAssignmentFieldChange);
+
+  elements.applyRequestCsvButton.addEventListener("click", applyRequestCsv);
+  elements.loadRequestSampleButton.addEventListener("click", () => {
+    elements.requestCsvText.value = buildRequestCsv(samplePrototypeData.shiftRequests);
+  });
+  elements.applyHistoryCsvButton.addEventListener("click", applyHistoryCsv);
+  elements.loadHistorySampleButton.addEventListener("click", () => {
+    elements.historyCsvText.value = buildHistoryCsv(samplePrototypeData.weeklyPerformance);
+  });
+  elements.generateScheduleButton.addEventListener("click", () => runGeneration("生成結果を反映しました。"));
+
+  elements.requestCsvInput.addEventListener("change", async (event) => {
+    elements.requestCsvText.value = await readFileText(event.target.files?.[0]);
+  });
+  elements.historyCsvInput.addEventListener("change", async (event) => {
+    elements.historyCsvText.value = await readFileText(event.target.files?.[0]);
+  });
+
+  elements.distributionDateSelect.addEventListener("change", () => {
+    state.selectedDistributionDate = elements.distributionDateSelect.value;
+    syncSelectedDistributionAssignment();
+    renderDistribution();
+  });
+
+  elements.distributionList.addEventListener("click", (event) => {
+    const item = event.target.closest("[data-distribution-id]");
+    if (!item) return;
+    state.selectedDistributionAssignmentId = item.dataset.distributionId;
+    renderDistribution();
+  });
+
+  elements.copyMessageButton.addEventListener("click", copyDistributionMessage);
+}
+
+function loadSampleCsvTexts() {
+  elements.requestCsvText.value = buildRequestCsv(samplePrototypeData.shiftRequests);
+  elements.historyCsvText.value = buildHistoryCsv(samplePrototypeData.weeklyPerformance);
 }
 
 function renderAppView() {
+  const meta = viewMeta[state.activeAppView];
+  elements.viewTitle.textContent = meta.title;
+  elements.viewSubtitle.textContent = meta.subtitle;
+
   elements.sidebarNav.querySelectorAll(".nav-item").forEach((button) => {
     button.classList.toggle("active", button.dataset.view === state.activeAppView);
   });
@@ -76,95 +201,69 @@ function renderAppView() {
     view.classList.toggle("active", view.dataset.viewPanel === state.activeAppView);
   });
 
-  elements.viewTitle.textContent = {
-    dashboard: "ダッシュボード",
-    generation: "シフト作成",
-    distribution: "シフト配布",
-    settings: "設定"
-  }[state.activeAppView];
-
   renderCurrentView();
 }
 
 function renderCurrentView() {
-  if (state.activeAppView === "dashboard") {
-    renderDashboard();
-  }
+  renderDashboard();
+  renderGeneration();
+  renderDistribution();
 }
 
 function renderDashboard() {
-  const dayRequests = samplePrototypeData.shiftRequests.filter((request) => request.dateKey === state.selectedDate);
-  const earlyMembers = dayRequests.filter((request) => isEarlyShift(request));
-  const lateMembers = dayRequests.filter((request) => isLateShift(request));
-  const requirement = samplePrototypeData.requirements.find((item) => item.dateKey === state.selectedDate);
+  const day = state.generatedSchedule[state.selectedDate] || emptyDay(state.selectedDate);
+  const requirement = findRequirement(state.selectedDate);
 
-  elements.selectedDateLabel.textContent = `${state.selectedDate} (${formatWeekday(state.selectedDate)})`;
-  elements.earlyCount.textContent = `${earlyMembers.length}/${requirement?.earlyNeeded || earlyMembers.length}`;
-  elements.lateCount.textContent = `${lateMembers.length}/${requirement?.lateNeeded || lateMembers.length}`;
+  elements.selectedDateLabel.textContent = `${formatDisplayDate(state.selectedDate)} (${formatWeekday(state.selectedDate)})`;
+  elements.earlyCount.textContent = `${day.earlyAssignments.length}/${requirement.earlyNeeded}`;
+  elements.lateCount.textContent = `${day.lateAssignments.length}/${requirement.lateNeeded}`;
   elements.earlyCountMobile.textContent = elements.earlyCount.textContent;
   elements.lateCountMobile.textContent = elements.lateCount.textContent;
-  elements.earlySummary.textContent = `${earlyMembers.length}名`;
-  elements.lateSummary.textContent = `${lateMembers.length}名`;
-  elements.bookedSummary.textContent = `${dayRequests.filter((request) => request.himeReservation === "あり").length}名`;
-  elements.areaSummary.textContent = `${new Set(dayRequests.map((request) => request.preferredArea)).size}エリア`;
-
-  elements.earlyShiftList.innerHTML = renderShiftCards(earlyMembers, "早番");
-  elements.lateShiftList.innerHTML = renderShiftCards(lateMembers, "遅番");
+  elements.salesSummary.textContent = formatYen(day.metrics.salesForecast);
+  elements.storeSummary.textContent = formatYen(day.metrics.storeForecast);
+  elements.shortageSummary.textContent = `${day.metrics.shortage}名`;
+  elements.fillSummary.textContent = `${day.metrics.fillRate}%`;
+  elements.earlyShiftList.innerHTML = renderShiftCards(day.earlyAssignments, "早番");
+  elements.lateShiftList.innerHTML = renderShiftCards(day.lateAssignments, "遅番");
+  elements.weeklyAnalysis.innerHTML = renderWeeklyAnalysis();
 
   updateDayButtons();
   renderDashboardViewState();
   renderShiftTabState();
 }
 
-function renderShiftCards(members, shiftLabel) {
-  if (!members.length) {
-    return `<div class="empty-state">${shiftLabel}のデータはありません。</div>`;
+function renderGeneration() {
+  const reviewRows = state.generationRows.filter((row) => row.issues.length > 0);
+  const missingTherapists = getMissingTherapists();
+  elements.importedCount.textContent = `${state.generationRows.length}件`;
+  elements.errorCount.textContent = `${state.generationErrors.length}件`;
+  elements.missingCount.textContent = `${missingTherapists.length}名`;
+  elements.reviewCount.textContent = `${new Set(reviewRows.map((row) => row.name)).size}名`;
+  elements.generationAlerts.innerHTML = renderGenerationAlerts(missingTherapists);
+  elements.requestList.innerHTML = renderRequestRows();
+  elements.requirementsList.innerHTML = renderRequirements();
+}
+
+function renderDistribution() {
+  elements.distributionDateSelect.innerHTML = state.dateList
+    .map((dateKey) => `<option value="${dateKey}" ${dateKey === state.selectedDistributionDate ? "selected" : ""}>${formatDisplayDate(dateKey)} (${formatWeekday(dateKey)})</option>`)
+    .join("");
+
+  const items = getAssignmentsForDate(state.selectedDistributionDate);
+  syncSelectedDistributionAssignment();
+
+  if (!items.length) {
+    elements.distributionList.innerHTML = `<div class="empty-state">この日の確定シフトはまだありません。</div>`;
+    elements.distributionPreview.textContent = "シフトを生成するとここに個別文言が出ます。";
+    elements.copyStatus.textContent = "";
+    return;
   }
 
-  return members
-    .map((member) => {
-      const profile = samplePrototypeData.therapistProfiles?.[member.name] || { rank: "G", flags: [] };
-      const attendance = selectAttendanceFlag(profile.flags);
-      const priorityTags = buildPriorityTags(member);
-      return `
-        <article class="shift-card area-${areaClassName(member.preferredArea)} ${member.himeReservation === "あり" ? "has-hime" : ""}">
-          <div class="shift-card-top">
-            <strong class="therapist-name">${member.name}</strong>
-            <div class="status-row">
-              <span class="mini-badge rank">${profile.rank}</span>
-              <span class="mini-badge">${attendance}</span>
-              <span class="mini-badge ${member.himeReservation === "あり" ? "booked" : "normal"}">${member.himeReservation === "あり" ? "姫あり" : "姫なし"}</span>
-            </div>
-          </div>
-
-          <div class="shift-card-main">
-            <div class="field-block">
-              <span class="field-label">エリア</span>
-              <span class="field-value area-text">${member.preferredArea}</span>
-            </div>
-            <div class="time-grid">
-              <div class="field-block compact">
-                <span class="field-label">開始</span>
-                <span class="field-value">${compactTime(member.startTime)}</span>
-              </div>
-              <div class="field-block compact">
-                <span class="field-label">終了</span>
-                <span class="field-value">${compactTime(member.endTime)}</span>
-              </div>
-              <div class="field-block compact shift-badge-wrap">
-                <span class="field-label">区分</span>
-                <span class="shift-chip ${shiftLabel === "早番" ? "early" : "late"}">${shiftLabel}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="priority-row">
-            ${priorityTags.length ? priorityTags.map((tag) => `<span class="priority-tag">${tag}</span>`).join("") : `<span class="field-label">優先条件なし</span>`}
-          </div>
-        </article>
-      `;
-    })
-    .join("");
+  elements.distributionList.innerHTML = items.map((item) => renderDistributionItem(item)).join("");
+  const selected = items.find((item) => item.id === state.selectedDistributionAssignmentId) || items[0];
+  elements.distributionPreview.textContent = buildDistributionMessage(selected);
+  elements.copyStatus.textContent = `${selected.name} の文面を表示中`;
+  elements.copyStatus.className = "copy-status";
 }
 
 function renderDashboardViewState() {
@@ -185,49 +284,565 @@ function renderShiftTabState() {
     panel.classList.toggle("active", panel.dataset.shiftPanel === state.activeShiftTab);
   });
 }
+function renderShiftCards(assignments, shiftLabel) {
+  if (!assignments.length) {
+    return `<div class="empty-state">${shiftLabel}の確定データはありません。</div>`;
+  }
 
-function buildPriorityTags(member) {
-  const note = String(member.note || "");
+  return assignments.map((assignment) => {
+    const profile = samplePrototypeData.therapistProfiles[assignment.name] || { rank: "G", flags: [] };
+    const attendance = selectAttendanceFlag(profile.flags || []);
+    const tags = buildPriorityTags(assignment);
+    if (assignment.warningArea) tags.unshift("要確認");
+
+    return `
+      <article class="shift-card area-${areaClassName(assignment.assignedArea)} ${assignment.himeReservation === "あり" ? "has-hime" : ""}">
+        <div class="shift-card-top">
+          <div>
+            <strong class="therapist-name">${assignment.name}</strong>
+            <div class="field-help">${shiftLabel} / 希望 ${assignment.preferredArea || "-"}</div>
+          </div>
+          <div class="status-row tight">
+            <span class="mini-badge rank">${profile.rank}</span>
+            <span class="mini-badge">${attendance}</span>
+            <span class="mini-badge ${assignment.himeReservation === "あり" ? "booked" : "gray"}">${assignment.himeReservation === "あり" ? "姫あり" : "姫なし"}</span>
+          </div>
+        </div>
+
+        <div class="shift-summary-grid">
+          <div class="shift-summary-item">
+            <span class="field-label">エリア</span>
+            <span class="field-value">${assignment.assignedArea}</span>
+          </div>
+          <div class="shift-summary-item">
+            <span class="field-label">開始</span>
+            <span class="field-value">${assignment.startTime}</span>
+          </div>
+          <div class="shift-summary-item">
+            <span class="field-label">終了</span>
+            <span class="field-value">${assignment.endTime}</span>
+          </div>
+        </div>
+
+        <div class="status-row">
+          <span class="shift-chip ${assignment.shiftType}">${assignment.shiftLabel}</span>
+          ${assignment.warningArea ? `<span class="priority-tag warning">要確認</span>` : ""}
+        </div>
+
+        <div class="priority-row">
+          ${tags.length ? tags.filter((tag) => tag !== "要確認").map((tag) => `<span class="priority-tag ${tag === "姫予約あり" ? "hime" : ""}">${tag}</span>`).join("") : `<span class="field-label">優先条件なし</span>`}
+        </div>
+
+        <div class="shift-edit-block">
+          <div class="field-help">調整が必要なときだけ下の項目を変更します</div>
+          <div class="shift-edit-grid" data-assignment-id="${assignment.id}">
+            <label class="field-block">
+              <span class="field-label">エリア変更</span>
+              <select class="select-input" data-field="assignedArea">
+                ${samplePrototypeData.settings.areas.map((area) => `<option value="${area}" ${area === assignment.assignedArea ? "selected" : ""}>${area}</option>`).join("")}
+              </select>
+            </label>
+            <label class="field-block">
+              <span class="field-label">開始変更</span>
+              <input class="time-input" type="time" value="${assignment.startTime}" data-field="startTime">
+            </label>
+            <label class="field-block">
+              <span class="field-label">終了変更</span>
+              <input class="time-input" type="time" value="${assignment.endTime}" data-field="endTime">
+            </label>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderWeeklyAnalysis() {
+  return state.dateList.map((dateKey) => {
+    const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
+    return `
+      <article class="weekly-day">
+        <strong>${formatShortDate(dateKey)}</strong>
+        <span class="field-label">${formatWeekday(dateKey)}</span>
+        <div class="fill-bar"><span style="width:${Math.min(day.metrics.fillRate, 100)}%"></span></div>
+        <span class="field-value">充足率 ${day.metrics.fillRate}%</span>
+        <span class="field-value">売上 ${formatCompactYen(day.metrics.salesForecast)}</span>
+        <span class="field-value">不足 ${day.metrics.shortage}名</span>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderGenerationAlerts(missingTherapists) {
+  const blocks = [];
+  if (state.generationErrors.length) {
+    blocks.push(`
+      <article class="alert-box danger">
+        <strong>CSVエラー</strong>
+        <div>${state.generationErrors.map((error) => `<div>${error}</div>`).join("")}</div>
+      </article>
+    `);
+  }
+
+  if (missingTherapists.length) {
+    blocks.push(`
+      <article class="alert-box warning">
+        <strong>未提出</strong>
+        <div>${missingTherapists.join(" / ")}</div>
+      </article>
+    `);
+  }
+
+  if (state.generationWarnings.length) {
+    blocks.push(`
+      <article class="alert-box warning">
+        <strong>要確認</strong>
+        <div>${state.generationWarnings.slice(0, 8).map((warning) => `<div>${warning}</div>`).join("")}</div>
+      </article>
+    `);
+  }
+
+  if (!blocks.length) {
+    blocks.push(`
+      <article class="alert-box ok">
+        <strong>チェック結果</strong>
+        <div>大きな不備はありません。必要人数を見直して生成できます。</div>
+      </article>
+    `);
+  }
+
+  return blocks.join("");
+}
+
+function renderRequestRows() {
+  if (!state.generationRows.length) {
+    return `<div class="empty-state">CSVを反映すると希望一覧が表示されます。</div>`;
+  }
+
+  return state.generationRows
+    .slice()
+    .sort((left, right) => left.dateKey.localeCompare(right.dateKey) || left.name.localeCompare(right.name, "ja"))
+    .map((row) => `
+      <article class="request-card" data-row-id="${row.id}">
+        <div class="request-card-top">
+          <div>
+            <strong>${row.name}</strong>
+            <div class="section-note">${formatDisplayDate(row.dateKey)} (${formatWeekday(row.dateKey)}) / ${row.startTime} - ${row.endTime}</div>
+          </div>
+          <span class="status-pill ${row.status}">${statusLabel(row.status)}</span>
+        </div>
+
+        <div class="status-row">
+          <span class="field-value">希望エリア ${row.preferredArea || "未入力"}</span>
+          <span class="field-value">姫予約 ${row.himeReservation || "未設定"}</span>
+          ${row.issues.map((issue) => `<span class="alert-tag warning">${issue}</span>`).join("")}
+        </div>
+
+        <div class="status-toggle-group">
+          <button class="status-toggle ${row.status === "accepted" ? "active" : ""}" type="button" data-row-id="${row.id}" data-status="accepted">採用</button>
+          <button class="status-toggle ${row.status === "hold" ? "active" : ""}" type="button" data-row-id="${row.id}" data-status="hold">保留</button>
+          <button class="status-toggle ${row.status === "cut" ? "active" : ""}" type="button" data-row-id="${row.id}" data-status="cut">カット</button>
+        </div>
+      </article>
+    `).join("");
+}
+
+function renderRequirements() {
+  return state.requirements.map((requirement) => `
+    <article class="requirement-card">
+      <div class="requirement-row">
+        <div>
+          <strong>${formatDisplayDate(requirement.dateKey)} (${formatWeekday(requirement.dateKey)})</strong>
+        </div>
+        <div class="requirement-inputs">
+          <label class="field-block">
+            <span class="field-label">早番</span>
+            <input type="number" min="0" value="${requirement.earlyNeeded}" data-date-key="${requirement.dateKey}" data-req-field="earlyNeeded">
+          </label>
+          <label class="field-block">
+            <span class="field-label">遅番</span>
+            <input type="number" min="0" value="${requirement.lateNeeded}" data-date-key="${requirement.dateKey}" data-req-field="lateNeeded">
+          </label>
+        </div>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderDistributionItem(item) {
+  return `
+    <article class="distribution-item ${item.id === state.selectedDistributionAssignmentId ? "active" : ""}" data-distribution-id="${item.id}">
+      <div class="distribution-item-top">
+        <div>
+          <strong>${item.name}</strong>
+          <div class="field-help">${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})</div>
+        </div>
+        <span class="shift-chip ${item.shiftType}">${item.shiftLabel}</span>
+      </div>
+      <div class="distribution-summary-grid">
+        <div class="distribution-summary-item">
+          <span class="field-label">エリア</span>
+          <span class="field-value">${item.assignedArea}</span>
+        </div>
+        <div class="distribution-summary-item">
+          <span class="field-label">時間</span>
+          <span class="field-value">${item.startTime} - ${item.endTime}</span>
+        </div>
+        <div class="distribution-summary-item">
+          <span class="field-label">予約</span>
+          <span class="field-value">${item.himeReservation === "あり" ? "姫予約あり" : "通常"}</span>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function handleRequestListClick(event) {
+  const button = event.target.closest("[data-row-id][data-status]");
+  if (!button) return;
+
+  const row = state.generationRows.find((item) => item.id === button.dataset.rowId);
+  if (!row) return;
+
+  row.status = button.dataset.status;
+  renderGeneration();
+}
+
+function handleRequirementChange(event) {
+  const input = event.target.closest("[data-date-key][data-req-field]");
+  if (!input) return;
+  const requirement = state.requirements.find((item) => item.dateKey === input.dataset.dateKey);
+  if (!requirement) return;
+  requirement[input.dataset.reqField] = Math.max(0, Number(input.value) || 0);
+}
+
+function handleAssignmentFieldChange(event) {
+  const input = event.target.closest("[data-field]");
+  if (!input) return;
+  const container = input.closest("[data-assignment-id]");
+  const assignment = findAssignmentById(container?.dataset.assignmentId);
+  if (!assignment) return;
+
+  assignment[input.dataset.field] = input.value;
+  assignment.warningArea = !supportsArea(assignment.name, assignment.assignedArea);
+  refreshDayMetrics(assignment.dateKey);
+  if (assignment.dateKey === state.selectedDistributionDate) {
+    renderDistribution();
+  }
+  renderDashboard();
+}
+
+function applyRequestCsv() {
+  const parsed = parseRequestCsv(elements.requestCsvText.value);
+  state.generationRows = createGenerationRows(parsed.rows);
+  state.generationErrors = parsed.errors;
+  state.generationWarnings = collectGenerationWarnings(state.generationRows);
+  renderGeneration();
+}
+
+function applyHistoryCsv() {
+  const parsed = parseHistoryCsv(elements.historyCsvText.value);
+  state.historyRows = parsed.rows;
+  state.generationErrors = [...state.generationErrors.filter((item) => !item.startsWith("実績CSV")), ...parsed.errors.map((error) => `実績CSV: ${error}`)];
+  runGeneration("過去実績を反映しました。");
+}
+
+function runGeneration(note) {
+  state.generationWarnings = collectGenerationWarnings(state.generationRows);
+  state.generatedSchedule = buildGeneratedSchedule();
+  state.generationSummary = summarizeGeneration();
+  elements.generationResultNote.textContent = note;
+  syncSelectedDistributionAssignment();
+  renderCurrentView();
+}
+
+function buildGeneratedSchedule() {
+  const schedule = {};
+
+  state.dateList.forEach((dateKey) => {
+    const requirement = findRequirement(dateKey);
+    const acceptedRows = state.generationRows
+      .filter((row) => row.dateKey === dateKey && row.status === "accepted")
+      .sort(compareGenerationRows);
+
+    const earlyPool = acceptedRows.filter((row) => supportsShift(row, "early"));
+    const pickedEarly = earlyPool.slice(0, requirement.earlyNeeded);
+    const earlyAssignedNames = new Set(pickedEarly.map((item) => item.name));
+    const latePool = acceptedRows.filter((row) => supportsShift(row, "late") && !earlyAssignedNames.has(row.name));
+
+    const earlyAssignments = pickedEarly.map((row) => toAssignment(row, "early", dateKey));
+    const lateAssignments = latePool.slice(0, requirement.lateNeeded).map((row) => toAssignment(row, "late", dateKey));
+
+    const filled = earlyAssignments.length + lateAssignments.length;
+    const needed = requirement.earlyNeeded + requirement.lateNeeded;
+    const shortage = Math.max(needed - filled, 0);
+    const history = state.historyRows.find((row) => row.dateKey === dateKey);
+    const salesForecast = history?.salesForecast || filled * samplePrototypeData.settings.averageUnitPrice * 2;
+    const storeForecast = history?.storeForecast || Math.round(salesForecast * (samplePrototypeData.settings.storeRate / 100));
+
+    schedule[dateKey] = {
+      dateKey,
+      requirement,
+      earlyAssignments,
+      lateAssignments,
+      metrics: {
+        shortage,
+        fillRate: needed ? Math.round((filled / needed) * 100) : 100,
+        salesForecast,
+        storeForecast
+      }
+    };
+  });
+
+  return schedule;
+}
+
+function summarizeGeneration() {
+  return state.dateList.reduce((summary, dateKey) => {
+    const day = state.generatedSchedule[dateKey];
+    summary.sales += day.metrics.salesForecast;
+    summary.store += day.metrics.storeForecast;
+    summary.shortage += day.metrics.shortage;
+    return summary;
+  }, { sales: 0, store: 0, shortage: 0 });
+}
+
+function toAssignment(row, shiftType, dateKey) {
+  return {
+    id: row.id,
+    dateKey,
+    name: row.name,
+    shiftType,
+    shiftLabel: shiftType === "early" ? samplePrototypeData.settings.shiftLabels.early : samplePrototypeData.settings.shiftLabels.late,
+    preferredArea: row.preferredArea,
+    assignedArea: row.preferredArea,
+    startTime: row.startTime,
+    endTime: row.endTime,
+    himeReservation: row.himeReservation,
+    note: row.note,
+    warningArea: !supportsArea(row.name, row.preferredArea)
+  };
+}
+
+function refreshDayMetrics(dateKey) {
+  const day = state.generatedSchedule[dateKey];
+  if (!day) return;
+  const requirement = day.requirement;
+  const filled = day.earlyAssignments.length + day.lateAssignments.length;
+  const needed = requirement.earlyNeeded + requirement.lateNeeded;
+  day.metrics.shortage = Math.max(needed - filled, 0);
+  day.metrics.fillRate = needed ? Math.round((filled / needed) * 100) : 100;
+}
+function parseRequestCsv(text) {
+  const rows = parseCsvText(text);
+  if (!rows.length) {
+    return { rows: [], errors: ["シフト希望CSVが空です。"] };
+  }
+
+  const headers = rows[0];
+  const expected = ["名前", "出勤可能日", "出勤開始時間", "出勤終了時間", "希望エリア", "姫予約有無", "備考"];
+  const missingHeaders = expected.filter((header) => !headers.includes(header));
+  if (missingHeaders.length) {
+    return { rows: [], errors: [`必要な列が不足しています: ${missingHeaders.join(", ")}`] };
+  }
+
+  const parsedRows = [];
+  const errors = [];
+
+  rows.slice(1).forEach((columns, index) => {
+    if (!columns.some(Boolean)) return;
+    const record = mapCsvRecord(headers, columns);
+    const row = {
+      name: sanitizeText(record["名前"]),
+      dateKey: sanitizeText(record["出勤可能日"]),
+      startTime: normalizeTime(record["出勤開始時間"]),
+      endTime: normalizeTime(record["出勤終了時間"]),
+      preferredArea: sanitizeText(record["希望エリア"]),
+      himeReservation: sanitizeText(record["姫予約有無"]),
+      note: sanitizeText(record["備考"])
+    };
+
+    if (!row.name || !row.dateKey) {
+      errors.push(`${index + 2}行目: 名前または日付が不足しています。`);
+      return;
+    }
+
+    parsedRows.push(row);
+  });
+
+  return { rows: parsedRows, errors };
+}
+
+function parseHistoryCsv(text) {
+  const rows = parseCsvText(text);
+  if (!rows.length) {
+    return { rows: [], errors: ["実績CSVが空です。"] };
+  }
+
+  const headers = rows[0];
+  const expected = ["日付", "売上予測", "店落ち予測"];
+  const missingHeaders = expected.filter((header) => !headers.includes(header));
+  if (missingHeaders.length) {
+    return { rows: [], errors: [`必要な列が不足しています: ${missingHeaders.join(", ")}`] };
+  }
+
+  const parsedRows = rows.slice(1)
+    .map((columns) => mapCsvRecord(headers, columns))
+    .filter((record) => sanitizeText(record["日付"]))
+    .map((record) => ({
+      dateKey: sanitizeText(record["日付"]),
+      salesForecast: Number(String(record["売上予測"] || "0").replace(/,/g, "")) || 0,
+      storeForecast: Number(String(record["店落ち予測"] || "0").replace(/,/g, "")) || 0
+    }));
+
+  return { rows: parsedRows, errors: [] };
+}
+
+function createGenerationRows(rows) {
+  return rows.map((row, index) => {
+    const cloned = {
+      id: `${row.dateKey}-${row.name}-${index}`,
+      name: row.name,
+      dateKey: row.dateKey,
+      startTime: normalizeTime(row.startTime),
+      endTime: normalizeTime(row.endTime),
+      preferredArea: sanitizeText(row.preferredArea),
+      himeReservation: sanitizeText(row.himeReservation) || "未設定",
+      note: sanitizeText(row.note),
+      status: "accepted"
+    };
+    cloned.issues = collectRowIssues(cloned);
+    return cloned;
+  });
+}
+
+function collectRowIssues(row) {
+  const issues = [];
+  if (!row.startTime || !row.endTime) issues.push("時間未入力");
+  if (!row.preferredArea) issues.push("希望エリア未入力");
+  if (row.himeReservation !== "あり" && row.himeReservation !== "なし") issues.push("姫予約未設定");
+  if (row.preferredArea && !samplePrototypeData.settings.areas.includes(row.preferredArea)) issues.push("非対応エリア含む");
+  return issues;
+}
+
+function collectGenerationWarnings(rows) {
+  return rows.flatMap((row) => row.issues.map((issue) => `${formatDisplayDate(row.dateKey)} ${row.name}: ${issue}`));
+}
+
+function getMissingTherapists() {
+  const submittedNames = new Set(state.generationRows.map((row) => row.name));
+  return Object.keys(samplePrototypeData.therapistProfiles).filter((name) => !submittedNames.has(name));
+}
+
+function supportsShift(row, shiftType) {
+  const start = toMinutes(row.startTime);
+  const end = toMinutes(row.endTime);
+  if (shiftType === "early") return start <= 14 * 60;
+  return end >= 21 * 60;
+}
+
+function compareGenerationRows(left, right) {
+  const leftScore = scoreGenerationRow(left);
+  const rightScore = scoreGenerationRow(right);
+  return rightScore - leftScore || left.name.localeCompare(right.name, "ja");
+}
+
+function scoreGenerationRow(row) {
+  let score = 100;
+  if (row.himeReservation === "あり") score += 15;
+  if (!row.issues.length) score += 10;
+  if (row.note.includes("終電")) score -= 4;
+  if (row.note.includes("店泊")) score += 3;
+  return score;
+}
+
+function supportsArea(name, area) {
+  const profile = samplePrototypeData.therapistProfiles[name];
+  return !profile || !profile.areas || profile.areas.includes(area);
+}
+
+function buildPriorityTags(item) {
+  const note = String(item.note || "");
   const tags = [];
   if (note.includes("終電")) tags.push("終電");
   if (note.includes("店泊")) tags.push("店泊");
   if (note.includes("21")) tags.push("21時以降");
-  if (note.includes("葛西")) tags.push("葛西希望");
   if (note.includes("ラスト")) tags.push("ラスト対応可");
   if (note.includes("ヘルプ")) tags.push("ヘルプ可");
-  if (note.includes("姫")) tags.push("姫予約あり");
+  if (item.himeReservation === "あり") tags.push("姫予約あり");
   return [...new Set(tags)].slice(0, 3);
+}
+
+function statusLabel(status) {
+  return ({ accepted: "採用", hold: "保留", cut: "カット" }[status] || "採用");
 }
 
 function selectAttendanceFlag(flags) {
   return flags.find((flag) => ["勤怠安定", "遅刻注意", "出稼ぎ"].includes(flag)) || "勤怠安定";
 }
 
-function areaClassName(area) {
-  return ({ "葛西": "kasai", "浦安": "urayasu", "船橋": "funabashi", "浅草橋": "asakusabashi", "八千代": "yachiyo" }[area] || "default");
+function findRequirement(dateKey) {
+  return state.requirements.find((item) => item.dateKey === dateKey) || { dateKey, earlyNeeded: 0, lateNeeded: 0 };
 }
 
-function isEarlyShift(request) {
-  return toMinutes(request.startTime) < 15 * 60;
+function cloneRequirements(rows) {
+  return rows.map((row) => ({ ...row }));
 }
 
-function isLateShift(request) {
-  return toMinutes(request.endTime) >= 21 * 60;
+function getAssignmentsForDate(dateKey) {
+  const day = state.generatedSchedule[dateKey];
+  if (!day) return [];
+  return [...day.earlyAssignments, ...day.lateAssignments].sort((left, right) => left.name.localeCompare(right.name, "ja"));
+}
+
+function syncSelectedDistributionAssignment() {
+  const items = getAssignmentsForDate(state.selectedDistributionDate);
+  if (!items.length) {
+    state.selectedDistributionAssignmentId = "";
+    return;
+  }
+
+  if (!items.some((item) => item.id === state.selectedDistributionAssignmentId)) {
+    state.selectedDistributionAssignmentId = items[0].id;
+  }
+}
+
+function buildDistributionMessage(item) {
+  return `${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})\n${item.assignedArea}\n${item.startTime}-${normalizeDistributionEnd(item.endTime)}\n${item.himeReservation === "あり" ? "姫予約あり" : "通常出勤"}\nよろしくお願いします`;
+}
+
+async function copyDistributionMessage() {
+  const text = elements.distributionPreview.textContent;
+  if (!text) return;
+
+  try {
+    await navigator.clipboard.writeText(text);
+    elements.copyStatus.textContent = "コピーしました。";
+    elements.copyStatus.className = "copy-status success";
+  } catch (error) {
+    elements.copyStatus.textContent = "コピーに失敗しました。";
+    elements.copyStatus.className = "copy-status error";
+  }
+}
+
+function findAssignmentById(id) {
+  if (!id) return null;
+  return Object.values(state.generatedSchedule)
+    .flatMap((day) => [...day.earlyAssignments, ...day.lateAssignments])
+    .find((item) => item.id === id) || null;
 }
 
 function moveDate(offset) {
   const currentIndex = state.dateList.indexOf(state.selectedDate);
   const nextIndex = currentIndex + offset;
-  if (nextIndex < 0 || nextIndex >= state.dateList.length) {
-    return;
-  }
+  if (nextIndex < 0 || nextIndex >= state.dateList.length) return;
   state.selectedDate = state.dateList[nextIndex];
-  renderCurrentView();
+  renderDashboard();
 }
 
 function jumpToStartDate() {
   state.selectedDate = samplePrototypeData.settings.startDate;
-  renderCurrentView();
+  renderDashboard();
 }
 
 function updateDayButtons() {
@@ -244,6 +859,61 @@ function buildDateList() {
     return formatDate(current);
   });
 }
+function buildRequestCsv(rows) {
+  const header = ["名前", "出勤可能日", "出勤開始時間", "出勤終了時間", "希望エリア", "姫予約有無", "備考"];
+  const body = rows.map((row) => [row.name, row.dateKey, row.startTime, row.endTime, row.preferredArea, row.himeReservation, row.note || ""]);
+  return [header, ...body].map((line) => line.join(",")).join("\n");
+}
+
+function buildHistoryCsv(rows) {
+  const header = ["日付", "売上予測", "店落ち予測"];
+  const body = rows.map((row) => [row.dateKey, row.salesForecast, row.storeForecast]);
+  return [header, ...body].map((line) => line.join(",")).join("\n");
+}
+
+function parseCsvText(text) {
+  return String(text || "")
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => line.split(",").map((cell) => cell.trim()));
+}
+
+function mapCsvRecord(headers, columns) {
+  return headers.reduce((record, header, index) => {
+    record[header] = columns[index] || "";
+    return record;
+  }, {});
+}
+
+function sanitizeText(value) {
+  return String(value || "").trim();
+}
+
+function normalizeTime(value) {
+  const text = sanitizeText(value);
+  if (!text) return "";
+  const [hoursText, minutesText = "00"] = text.split(":");
+  const hourNumber = Number(hoursText);
+  const minuteNumber = Number(minutesText);
+  if (Number.isNaN(hourNumber) || Number.isNaN(minuteNumber)) return "";
+  const hours = String(hourNumber).padStart(2, "0");
+  const minutes = String(minuteNumber).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+function normalizeDistributionEnd(timeText) {
+  const minutes = toMinutes(timeText);
+  const hours = String(Math.floor(minutes / 60)).padStart(2, "0");
+  const mins = String(minutes % 60).padStart(2, "0");
+  return `${hours}:${mins}`;
+}
+
+function toMinutes(timeText) {
+  const safe = String(timeText || "00:00");
+  const [hours, minutes] = safe.split(":").map(Number);
+  return (hours || 0) * 60 + (minutes || 0);
+}
 
 function formatDate(date) {
   const year = date.getFullYear();
@@ -257,11 +927,53 @@ function formatWeekday(dateKey) {
   return ["日", "月", "火", "水", "木", "金", "土"][date.getDay()];
 }
 
-function compactTime(timeText) {
-  return String(timeText || "").replace(":00", "");
+function formatDisplayDate(dateKey) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return `${year}/${month}/${day}`;
 }
 
-function toMinutes(timeText) {
-  const [hours, minutes] = String(timeText || "00:00").split(":").map(Number);
-  return (hours || 0) * 60 + (minutes || 0);
+function formatShortDate(dateKey) {
+  const [, month, day] = dateKey.split("-").map(Number);
+  return `${month}/${day}`;
+}
+
+function formatSlashDate(dateKey) {
+  const [, month, day] = dateKey.split("-").map(Number);
+  return `${month}/${day}`;
+}
+
+function formatYen(value) {
+  return `${Number(value || 0).toLocaleString("ja-JP")}円`;
+}
+
+function formatCompactYen(value) {
+  return `${Math.round((Number(value || 0) / 1000))}千円`;
+}
+
+function areaClassName(area) {
+  return ({ "葛西": "kasai", "浦安": "urayasu", "船橋": "funabashi", "浅草橋": "asakusabashi", "八千代": "yachiyo" }[area] || "default");
+}
+
+function emptyDay(dateKey) {
+  return {
+    dateKey,
+    earlyAssignments: [],
+    lateAssignments: [],
+    metrics: {
+      shortage: 0,
+      fillRate: 0,
+      salesForecast: 0,
+      storeForecast: 0
+    }
+  };
+}
+
+function readFileText(file) {
+  if (!file) return Promise.resolve("");
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file, "utf-8");
+  });
 }
