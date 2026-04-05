@@ -50,6 +50,11 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 textarea,
 input,
 select {
@@ -617,6 +622,14 @@ pre {
 .request-edit-grid {
   padding-top: 10px;
   border-top: 1px solid var(--line);
+}
+
+.field-block.wide {
+  grid-column: 1 / -1;
+}
+
+.text-input {
+  width: 100%;
 }
 
 .status-pill.accepted { background: var(--green-soft); color: var(--green); }

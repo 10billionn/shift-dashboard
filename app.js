@@ -16,6 +16,8 @@
   mobileMenuOpen: false
 };
 
+const STORAGE_KEY = "shift-dashboard-state-v1";
+
 const viewMeta = {
   dashboard: {
     title: "ダッシュボード",
@@ -83,6 +85,7 @@ const elements = {
   distributionDateSelect: document.querySelector("#distributionDateSelect"),
   distributionList: document.querySelector("#distributionList"),
   distributionPreview: document.querySelector("#distributionPreview"),
+  copyAllMessagesButton: document.querySelector("#copyAllMessagesButton"),
   copyMessageButton: document.querySelector("#copyMessageButton"),
   copyStatus: document.querySelector("#copyStatus")
 };
@@ -91,15 +94,11 @@ initialize();
 
 function initialize() {
   state.dateList = buildDateList();
-  state.selectedDate = samplePrototypeData.settings.startDate;
-  state.selectedDistributionDate = samplePrototypeData.settings.startDate;
-  state.requirements = cloneRequirements(samplePrototypeData.requirements);
-  state.generationRows = createGenerationRows(samplePrototypeData.shiftRequests);
-  state.historyRows = [...samplePrototypeData.weeklyPerformance];
+  hydrateState(loadPersistedState());
 
   bindEvents();
-  loadSampleCsvTexts();
-  runGeneration("初期サンプルを反映しました。");
+  syncCsvTextsFromState();
+  runGeneration(hasPersistedState() ? "保存済みデータを復元しました。" : "初期サンプルを反映しました。");
   renderAppView();
 }
 
@@ -110,10 +109,9 @@ function bindEvents() {
   });
 
   elements.reloadButton.addEventListener("click", () => {
-    state.requirements = cloneRequirements(samplePrototypeData.requirements);
-    state.generationRows = createGenerationRows(samplePrototypeData.shiftRequests);
-    state.historyRows = [...samplePrototypeData.weeklyPerformance];
-    loadSampleCsvTexts();
+    clearPersistedState();
+    hydrateState(null);
+    syncCsvTextsFromState();
     runGeneration("サンプルデータを再読込しました。");
     renderCurrentView();
   });
@@ -127,6 +125,7 @@ function bindEvents() {
       state.activeAppView = button.dataset.view;
       state.mobileMenuOpen = false;
       elements.sidebar.classList.remove("open");
+      persistState();
       renderAppView();
     });
   });
@@ -169,6 +168,7 @@ function bindEvents() {
   elements.distributionDateSelect.addEventListener("change", () => {
     state.selectedDistributionDate = elements.distributionDateSelect.value;
     syncSelectedDistributionAssignment();
+    persistState();
     renderDistribution();
   });
 
@@ -176,15 +176,54 @@ function bindEvents() {
     const item = event.target.closest("[data-distribution-id]");
     if (!item) return;
     state.selectedDistributionAssignmentId = item.dataset.distributionId;
+    persistState();
     renderDistribution();
   });
 
+  elements.copyAllMessagesButton.addEventListener("click", copyAllDistributionMessages);
   elements.copyMessageButton.addEventListener("click", copyDistributionMessage);
 }
 
-function loadSampleCsvTexts() {
-  elements.requestCsvText.value = buildRequestCsv(samplePrototypeData.shiftRequests);
-  elements.historyCsvText.value = buildHistoryCsv(samplePrototypeData.weeklyPerformance);
+function hydrateState(saved) {
+  if (!saved) {
+    loadSampleState();
+    return;
+  }
+
+  state.selectedDate = normalizeDateKey(saved.selectedDate) || samplePrototypeData.settings.startDate;
+  state.selectedDistributionDate = normalizeDateKey(saved.selectedDistributionDate) || state.selectedDate;
+  state.activeAppView = saved.activeAppView || "dashboard";
+  state.activeDashboardView = saved.activeDashboardView || "list";
+  state.activeShiftTab = saved.activeShiftTab || "early";
+  state.requirements = Array.isArray(saved.requirements) && saved.requirements.length
+    ? cloneRequirements(saved.requirements)
+    : cloneRequirements(samplePrototypeData.requirements);
+  state.generationRows = Array.isArray(saved.generationRows) && saved.generationRows.length
+    ? restoreGenerationRows(saved.generationRows)
+    : createGenerationRows(samplePrototypeData.shiftRequests);
+  state.historyRows = Array.isArray(saved.historyRows) && saved.historyRows.length
+    ? saved.historyRows.map((row) => ({
+      dateKey: normalizeDateKey(row.dateKey),
+      salesForecast: Number(row.salesForecast) || 0,
+      storeForecast: Number(row.storeForecast) || 0
+    }))
+    : [...samplePrototypeData.weeklyPerformance];
+}
+
+function loadSampleState() {
+  state.selectedDate = samplePrototypeData.settings.startDate;
+  state.selectedDistributionDate = samplePrototypeData.settings.startDate;
+  state.activeAppView = "dashboard";
+  state.activeDashboardView = "list";
+  state.activeShiftTab = "early";
+  state.requirements = cloneRequirements(samplePrototypeData.requirements);
+  state.generationRows = createGenerationRows(samplePrototypeData.shiftRequests);
+  state.historyRows = [...samplePrototypeData.weeklyPerformance];
+}
+
+function syncCsvTextsFromState() {
+  elements.requestCsvText.value = buildRequestCsv(state.generationRows);
+  elements.historyCsvText.value = buildHistoryCsv(state.historyRows);
 }
 
 function renderAppView() {
@@ -256,9 +295,11 @@ function renderDistribution() {
     elements.distributionList.innerHTML = `<div class="empty-state">この日の確定シフトはまだありません。</div>`;
     elements.distributionPreview.textContent = "シフトを生成するとここに個別文言が出ます。";
     elements.copyStatus.textContent = "";
+    elements.copyAllMessagesButton.disabled = true;
     return;
   }
 
+  elements.copyAllMessagesButton.disabled = false;
   elements.distributionList.innerHTML = items.map((item) => renderDistributionItem(item)).join("");
   const selected = items.find((item) => item.id === state.selectedDistributionAssignmentId) || items[0];
   elements.distributionPreview.textContent = buildDistributionMessage(selected);
@@ -382,6 +423,15 @@ function renderGenerationAlerts(checkSummary) {
     `);
   }
 
+  if (checkSummary.shortages.length) {
+    blocks.push(`
+      <article class="alert-box warning">
+        <strong>生成後の不足</strong>
+        <div>${checkSummary.shortages.map((item) => `<div>${item}</div>`).join("")}</div>
+      </article>
+    `);
+  }
+
   if (!blocks.length) {
     blocks.push(`
       <article class="alert-box ok">
@@ -422,6 +472,7 @@ function renderRequestRows() {
           <label class="field-block">
             <span class="field-label">エリア調整</span>
             <select class="select-input" data-row-field="preferredArea">
+              <option value="">未設定</option>
               ${samplePrototypeData.settings.areas.map((area) => `<option value="${area}" ${area === row.preferredArea ? "selected" : ""}>${area}</option>`).join("")}
             </select>
           </label>
@@ -432,6 +483,18 @@ function renderRequestRows() {
           <label class="field-block">
             <span class="field-label">終了時間</span>
             <input class="time-input" type="time" value="${row.endTime}" data-row-field="endTime">
+          </label>
+          <label class="field-block">
+            <span class="field-label">姫予約</span>
+            <select class="select-input" data-row-field="himeReservation">
+              <option value="未設定" ${row.himeReservation === "未設定" ? "selected" : ""}>未設定</option>
+              <option value="あり" ${row.himeReservation === "あり" ? "selected" : ""}>あり</option>
+              <option value="なし" ${row.himeReservation === "なし" ? "selected" : ""}>なし</option>
+            </select>
+          </label>
+          <label class="field-block wide">
+            <span class="field-label">備考</span>
+            <input class="text-input" type="text" value="${escapeHtml(row.note || "")}" data-row-field="note" placeholder="終電 / 店泊 / ヘルプ可 など">
           </label>
         </div>
 
@@ -502,6 +565,8 @@ function handleRequestListClick(event) {
   if (!row) return;
 
   row.status = button.dataset.status;
+  markGenerationDirty();
+  persistState();
   renderGeneration();
 }
 
@@ -513,9 +578,11 @@ function handleRequestListChange(event) {
   const row = state.generationRows.find((item) => item.id === container?.dataset.rowId);
   if (!row) return;
 
-  row[input.dataset.rowField] = input.value;
+  row[input.dataset.rowField] = input.dataset.rowField.includes("Time") ? normalizeTime(input.value) : input.value;
   row.issues = collectRowIssues(row);
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
+  markGenerationDirty();
+  persistState();
   renderGeneration();
 }
 
@@ -525,6 +592,8 @@ function handleRequirementChange(event) {
   const requirement = state.requirements.find((item) => item.dateKey === input.dataset.dateKey);
   if (!requirement) return;
   requirement[input.dataset.reqField] = Math.max(0, Number(input.value) || 0);
+  markGenerationDirty();
+  persistState();
 }
 
 function applyRequestCsv() {
@@ -532,6 +601,8 @@ function applyRequestCsv() {
   state.generationRows = createGenerationRows(parsed.rows);
   state.generationErrors = parsed.errors;
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
+  markGenerationDirty();
+  persistState();
   renderGeneration();
 }
 
@@ -539,6 +610,7 @@ function applyHistoryCsv() {
   const parsed = parseHistoryCsv(elements.historyCsvText.value);
   state.historyRows = parsed.rows;
   state.generationErrors = [...state.generationErrors.filter((item) => !item.startsWith("実績CSV")), ...parsed.errors.map((error) => `実績CSV: ${error}`)];
+  persistState();
   runGeneration("過去実績を反映しました。");
 }
 
@@ -548,7 +620,12 @@ function runGeneration(note) {
   state.generationSummary = summarizeGeneration();
   elements.generationResultNote.textContent = note;
   syncSelectedDistributionAssignment();
+  persistState();
   renderCurrentView();
+}
+
+function markGenerationDirty() {
+  elements.generationResultNote.textContent = "変更があります。生成を押して反映してください。";
 }
 
 function buildGeneratedSchedule() {
@@ -733,7 +810,13 @@ function buildCheckSummary(rows, missingTherapists) {
 
   return {
     missing: missingTherapists,
-    items: items.filter((item) => item.names.length)
+    items: items.filter((item) => item.names.length),
+    shortages: state.dateList
+      .map((dateKey) => {
+        const day = state.generatedSchedule[dateKey];
+        return day?.metrics.shortage ? `${formatSlashDate(dateKey)}(${formatWeekday(dateKey)}) 不足 ${day.metrics.shortage}名` : "";
+      })
+      .filter(Boolean)
   };
 }
 
@@ -797,6 +880,24 @@ function cloneRequirements(rows) {
   return rows.map((row) => ({ ...row }));
 }
 
+function restoreGenerationRows(rows) {
+  return rows.map((row, index) => {
+    const restored = {
+      id: row.id || `${row.dateKey}-${row.name}-${index}`,
+      name: sanitizeText(row.name),
+      dateKey: normalizeDateKey(row.dateKey),
+      startTime: normalizeTime(row.startTime),
+      endTime: normalizeTime(row.endTime),
+      preferredArea: sanitizeText(row.preferredArea),
+      himeReservation: sanitizeText(row.himeReservation) || "未設定",
+      note: sanitizeText(row.note),
+      status: ["accepted", "hold", "cut"].includes(row.status) ? row.status : "accepted"
+    };
+    restored.issues = collectRowIssues(restored);
+    return restored;
+  });
+}
+
 function getAssignmentsForDate(dateKey) {
   const day = state.generatedSchedule[dateKey];
   if (!day) return [];
@@ -817,6 +918,22 @@ function syncSelectedDistributionAssignment() {
 
 function buildDistributionMessage(item) {
   return `【${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})】\n${item.assignedArea}\n${item.startTime}-${normalizeDistributionEnd(item.endTime)}\n${item.himeReservation === "あり" ? "姫予約あり" : "姫予約なし"}\nよろしくお願いします`;
+}
+
+async function copyAllDistributionMessages() {
+  const items = getAssignmentsForDate(state.selectedDistributionDate);
+  if (!items.length) return;
+
+  const text = items.map((item) => buildDistributionMessage(item)).join("\n\n");
+
+  try {
+    await navigator.clipboard.writeText(text);
+    elements.copyStatus.textContent = `${formatSlashDate(state.selectedDistributionDate)}分をまとめてコピーしました。`;
+    elements.copyStatus.className = "copy-status success";
+  } catch (error) {
+    elements.copyStatus.textContent = "まとめコピーに失敗しました。";
+    elements.copyStatus.className = "copy-status error";
+  }
 }
 
 async function copyDistributionMessage() {
@@ -845,11 +962,13 @@ function moveDate(offset) {
   const nextIndex = currentIndex + offset;
   if (nextIndex < 0 || nextIndex >= state.dateList.length) return;
   state.selectedDate = state.dateList[nextIndex];
+  persistState();
   renderDashboard();
 }
 
 function jumpToStartDate() {
   state.selectedDate = samplePrototypeData.settings.startDate;
+  persistState();
   renderDashboard();
 }
 
@@ -958,6 +1077,14 @@ function formatCompactYen(value) {
   return `${Math.round((Number(value || 0) / 1000))}千円`;
 }
 
+function escapeHtml(text) {
+  return String(text || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
 function areaClassName(area) {
   return ({ "葛西": "kasai", "浦安": "urayasu", "船橋": "funabashi", "浅草橋": "asakusabashi", "八千代": "yachiyo" }[area] || "default");
 }
@@ -974,6 +1101,63 @@ function emptyDay(dateKey) {
       storeForecast: 0
     }
   };
+}
+
+function normalizeDateKey(value) {
+  const text = sanitizeText(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : samplePrototypeData.settings.startDate;
+}
+
+function hasPersistedState() {
+  try {
+    return Boolean(localStorage.getItem(STORAGE_KEY));
+  } catch (error) {
+    return false;
+  }
+}
+
+function loadPersistedState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function persistState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      selectedDate: state.selectedDate,
+      selectedDistributionDate: state.selectedDistributionDate,
+      activeAppView: state.activeAppView,
+      activeDashboardView: state.activeDashboardView,
+      activeShiftTab: state.activeShiftTab,
+      generationRows: state.generationRows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        dateKey: row.dateKey,
+        startTime: row.startTime,
+        endTime: row.endTime,
+        preferredArea: row.preferredArea,
+        himeReservation: row.himeReservation,
+        note: row.note,
+        status: row.status
+      })),
+      requirements: state.requirements,
+      historyRows: state.historyRows
+    }));
+  } catch (error) {
+    // localStorage is optional
+  }
+}
+
+function clearPersistedState() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (error) {
+    // ignore
+  }
 }
 
 function readFileText(file) {
