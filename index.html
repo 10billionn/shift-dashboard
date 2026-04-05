@@ -285,6 +285,10 @@
               <section class="stack-block">
                 <label class="field-label" for="distributionDateSelect">日付選択</label>
                 <select id="distributionDateSelect" class="select-input"></select>
+                <div id="distributionViewModeTabs" class="view-tabs">
+                  <button class="view-tab active" type="button" data-distribution-view="date">日付別</button>
+                  <button class="view-tab" type="button" data-distribution-view="therapist">セラピスト別</button>
+                </div>
                 <label class="filter-check">
                   <input id="distributionPendingOnly" type="checkbox">
                   <span>未配布のみ表示</span>

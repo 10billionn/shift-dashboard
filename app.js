@@ -14,6 +14,7 @@
   generationSummary: null,
   selectedDistributionDate: "",
   selectedDistributionAssignmentId: "",
+  distributionViewMode: "date",
   distributionFormat: "line",
   copiedDistributionIds: [],
   distributionPendingOnly: false,
@@ -102,6 +103,7 @@ const elements = {
   generateScheduleButton: document.querySelector("#generateScheduleButton"),
   generationResultNote: document.querySelector("#generationResultNote"),
   distributionDateSelect: document.querySelector("#distributionDateSelect"),
+  distributionViewModeTabs: document.querySelector("#distributionViewModeTabs"),
   distributionPendingOnly: document.querySelector("#distributionPendingOnly"),
   distributionStatusSummary: document.querySelector("#distributionStatusSummary"),
   distributionList: document.querySelector("#distributionList"),
@@ -239,6 +241,14 @@ function bindEvents() {
     persistState();
     renderDistribution();
   });
+  elements.distributionViewModeTabs.querySelectorAll(".view-tab").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.distributionViewMode = button.dataset.distributionView;
+      syncSelectedDistributionAssignment();
+      persistState();
+      renderDistribution();
+    });
+  });
   elements.distributionPendingOnly.addEventListener("change", () => {
     state.distributionPendingOnly = elements.distributionPendingOnly.checked;
     syncSelectedDistributionAssignment();
@@ -280,6 +290,7 @@ function hydrateState(saved) {
   state.activeAppView = saved.activeAppView || "dashboard";
   state.activeDashboardView = saved.activeDashboardView || "list";
   state.activeShiftTab = saved.activeShiftTab || "early";
+  state.distributionViewMode = ["date", "therapist"].includes(saved.distributionViewMode) ? saved.distributionViewMode : "date";
   state.appSettings = saved.appSettings ? restoreAppSettings(saved.appSettings) : cloneAppSettings(samplePrototypeData.settings);
   state.distributionFormat = ["line", "simple"].includes(saved.distributionFormat) ? saved.distributionFormat : "line";
   state.copiedDistributionIds = Array.isArray(saved.copiedDistributionIds) ? saved.copiedDistributionIds : [];
@@ -312,6 +323,7 @@ function loadSampleState() {
   state.activeDashboardView = "list";
   state.activeShiftTab = "early";
   state.appSettings = cloneAppSettings(samplePrototypeData.settings);
+  state.distributionViewMode = "date";
   state.distributionFormat = "line";
   state.copiedDistributionIds = [];
   state.distributionPendingOnly = false;
@@ -425,25 +437,30 @@ function renderGeneration() {
 function renderDistribution() {
   elements.distributionFormatSelect.value = state.distributionFormat;
   elements.distributionPendingOnly.checked = state.distributionPendingOnly;
+  elements.distributionViewModeTabs.querySelectorAll(".view-tab").forEach((button) => {
+    button.classList.toggle("active", button.dataset.distributionView === state.distributionViewMode);
+  });
   elements.distributionDateSelect.innerHTML = state.dateList
     .map((dateKey) => `<option value="${dateKey}" ${dateKey === state.selectedDistributionDate ? "selected" : ""}>${formatDisplayDate(dateKey)} (${formatWeekday(dateKey)})</option>`)
     .join("");
+  elements.distributionDateSelect.disabled = state.distributionViewMode === "therapist";
 
-  const allItems = getAssignmentsForDate(state.selectedDistributionDate);
-  const copiedCount = allItems.filter((item) => state.copiedDistributionIds.includes(item.id)).length;
+  const allItems = getDistributionItems();
+  const copiedCount = countCopiedDistributionItems(allItems);
   const pendingCount = Math.max(allItems.length - copiedCount, 0);
   elements.distributionStatusSummary.innerHTML = `
     <span class="legend-chip empty">未配布 ${pendingCount}件</span>
     <span class="legend-chip booked">配布済み ${copiedCount}件</span>
+    <span class="legend-chip warning">${state.distributionViewMode === "date" ? "日付別" : "セラピスト別"}</span>
     <span class="legend-chip normal">${state.distributionFormat === "line" ? "LINE用" : "シンプル"}</span>
   `;
   const items = state.distributionPendingOnly
-    ? allItems.filter((item) => !state.copiedDistributionIds.includes(item.id))
+    ? allItems.filter((item) => !isDistributionItemCopied(item))
     : allItems;
   syncSelectedDistributionAssignment();
 
   if (!items.length) {
-    elements.distributionList.innerHTML = `<div class="empty-state">${allItems.length && state.distributionPendingOnly ? "この日の未配布はありません。" : "この日の確定シフトはまだありません。"}</div>`;
+    elements.distributionList.innerHTML = `<div class="empty-state">${allItems.length && state.distributionPendingOnly ? "未配布の対象はありません。" : state.distributionViewMode === "date" ? "この日の確定シフトはまだありません。" : "配布対象のセラピストがいません。"}</div>`;
     elements.distributionPreview.textContent = "シフトを生成するとここに個別文言が出ます。";
     elements.copyStatus.textContent = "";
     elements.copyAllMessagesButton.disabled = true;
@@ -454,7 +471,7 @@ function renderDistribution() {
   elements.distributionList.innerHTML = items.map((item) => renderDistributionItem(item)).join("");
   const selected = items.find((item) => item.id === state.selectedDistributionAssignmentId) || items[0];
   elements.distributionPreview.textContent = buildDistributionMessage(selected);
-  elements.copyStatus.textContent = `${selected.name} の${state.distributionFormat === "line" ? "LINE用" : "シンプル"}文面を表示中`;
+  elements.copyStatus.textContent = `${getDistributionItemLabel(selected)} の${state.distributionFormat === "line" ? "LINE用" : "シンプル"}文面を表示中`;
   elements.copyStatus.className = "copy-status";
 }
 
@@ -1005,34 +1022,45 @@ function renderRequirements() {
 }
 
 function renderDistributionItem(item) {
-  const copied = state.copiedDistributionIds.includes(item.id);
+  const copied = isDistributionItemCopied(item);
+  const isTherapistMode = state.distributionViewMode === "therapist" && item.assignments;
+  const hasPartialPending = isTherapistMode
+    && item.assignments.some((assignment) => state.copiedDistributionIds.includes(assignment.id))
+    && item.assignments.some((assignment) => !state.copiedDistributionIds.includes(assignment.id));
   return `
     <article class="distribution-item ${item.id === state.selectedDistributionAssignmentId ? "active" : ""} ${copied ? "copied" : "pending"}" data-distribution-id="${item.id}">
       <div class="distribution-item-top">
         <div>
           <strong>${item.name}</strong>
-          <div class="field-help">${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})</div>
+          <div class="field-help">${isTherapistMode ? `${item.assignments.length}件のシフト` : `${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})`}</div>
         </div>
         <div class="status-row tight">
-          <span class="shift-chip ${item.shiftType}">${item.shiftLabel}</span>
+          ${isTherapistMode ? `<span class="mini-badge rank">まとめ</span>` : `<span class="shift-chip ${item.shiftType}">${item.shiftLabel}</span>`}
           <span class="mini-badge rank">${state.distributionFormat === "line" ? "LINE" : "簡易"}</span>
-          ${copied ? `<span class="mini-badge booked">配布済み</span>` : `<span class="mini-badge pink">未配布</span>`}
+          ${copied ? `<span class="mini-badge booked">配布済み</span>` : `<span class="mini-badge pink">${hasPartialPending ? "一部未配布" : "未配布"}</span>`}
         </div>
       </div>
-      <div class="distribution-summary-grid">
+      ${isTherapistMode ? `
         <div class="distribution-summary-item">
-          <span class="field-label">エリア</span>
-          <span class="field-value">${item.assignedArea}</span>
+          <span class="field-label">予定</span>
+          <div class="field-value distribution-therapist-lines">${item.assignments.slice(0, 3).map((assignment) => `・${formatSlashDate(assignment.dateKey)} ${assignment.shiftLabel} ${assignment.assignedArea}`).join("<br>")}${item.assignments.length > 3 ? `<br>他${item.assignments.length - 3}件` : ""}</div>
         </div>
-        <div class="distribution-summary-item">
-          <span class="field-label">時間</span>
-          <span class="field-value">${item.startTime} - ${item.endTime}</span>
+      ` : `
+        <div class="distribution-summary-grid">
+          <div class="distribution-summary-item">
+            <span class="field-label">エリア</span>
+            <span class="field-value">${item.assignedArea}</span>
+          </div>
+          <div class="distribution-summary-item">
+            <span class="field-label">時間</span>
+            <span class="field-value">${item.startTime} - ${item.endTime}</span>
+          </div>
+          <div class="distribution-summary-item">
+            <span class="field-label">予約</span>
+            <span class="field-value">${item.himeReservation === "あり" ? "姫予約あり" : "通常"}</span>
+          </div>
         </div>
-        <div class="distribution-summary-item">
-          <span class="field-label">予約</span>
-          <span class="field-value">${item.himeReservation === "あり" ? "姫予約あり" : "通常"}</span>
-        </div>
-      </div>
+      `}
     </article>
   `;
 }
@@ -1927,6 +1955,47 @@ function getAssignmentsForDate(dateKey) {
     .sort((left, right) => left.name.localeCompare(right.name, "ja"));
 }
 
+function getAssignmentsGroupedByTherapist() {
+  return state.dateList.reduce((groups, dateKey) => {
+    getAssignmentsForDate(dateKey).forEach((assignment) => {
+      if (!groups[assignment.name]) groups[assignment.name] = [];
+      groups[assignment.name].push({ ...assignment });
+    });
+    return groups;
+  }, {});
+}
+
+function getDistributionItems() {
+  if (state.distributionViewMode === "date") {
+    return getAssignmentsForDate(state.selectedDistributionDate);
+  }
+
+  return Object.entries(getAssignmentsGroupedByTherapist())
+    .map(([name, assignments]) => ({
+      id: `therapist:${name}`,
+      name,
+      assignments: assignments.slice().sort((left, right) => left.dateKey.localeCompare(right.dateKey) || left.startTime.localeCompare(right.startTime))
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name, "ja"));
+}
+
+function getDistributionItemAssignmentIds(item) {
+  return item.assignments ? item.assignments.map((assignment) => assignment.id) : [item.id];
+}
+
+function isDistributionItemCopied(item) {
+  const ids = getDistributionItemAssignmentIds(item);
+  return ids.length > 0 && ids.every((id) => state.copiedDistributionIds.includes(id));
+}
+
+function countCopiedDistributionItems(items) {
+  return items.filter((item) => isDistributionItemCopied(item)).length;
+}
+
+function getDistributionItemLabel(item) {
+  return state.distributionViewMode === "therapist" && item.assignments ? `${item.name}さん` : item.name;
+}
+
 function getScheduleDay(dateKey) {
   return state.generatedSchedule[dateKey] || emptyDay(dateKey);
 }
@@ -1965,9 +2034,9 @@ function isTimeOverlapping(left, right) {
 }
 
 function syncSelectedDistributionAssignment() {
-  const baseItems = getAssignmentsForDate(state.selectedDistributionDate);
+  const baseItems = getDistributionItems();
   const items = state.distributionPendingOnly
-    ? baseItems.filter((item) => !state.copiedDistributionIds.includes(item.id))
+    ? baseItems.filter((item) => !isDistributionItemCopied(item))
     : baseItems;
   if (!items.length) {
     state.selectedDistributionAssignmentId = "";
@@ -1980,6 +2049,16 @@ function syncSelectedDistributionAssignment() {
 }
 
 function buildDistributionMessage(item) {
+  if (state.distributionViewMode === "therapist" && item.assignments) {
+    const lines = item.assignments
+      .slice()
+      .sort((left, right) => left.dateKey.localeCompare(right.dateKey) || left.startTime.localeCompare(right.startTime))
+      .map((assignment) => `${formatSlashDate(assignment.dateKey)}(${formatWeekday(assignment.dateKey)}) ${assignment.shiftLabel} ${assignment.assignedArea} ${assignment.startTime}-${normalizeDistributionEnd(assignment.endTime)}`);
+    if (state.distributionFormat === "simple") {
+      return `${item.name}さん\n今週のシフトです。\n${lines.join("\n")}\nよろしくお願いします。`;
+    }
+    return `【今週のシフト】\n${item.name}さん\n${lines.join("\n")}\n\nよろしくお願いします。`;
+  }
   const reservationLabel = item.himeReservation === "あり" ? "あり" : "なし";
   if (state.distributionFormat === "simple") {
     return `${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})\nエリア：${item.assignedArea}\n時間：${item.startTime}-${normalizeDistributionEnd(item.endTime)}\n姫予約：${reservationLabel}\nよろしくお願いします。`;
@@ -1988,17 +2067,17 @@ function buildDistributionMessage(item) {
 }
 
 async function copyAllDistributionMessages() {
-  const items = getAssignmentsForDate(state.selectedDistributionDate);
+  const items = getDistributionItems();
   if (!items.length) return;
 
   const text = items.map((item) => buildDistributionMessage(item)).join("\n\n");
 
   try {
     await navigator.clipboard.writeText(text);
-    state.copiedDistributionIds = [...new Set([...state.copiedDistributionIds, ...items.map((item) => item.id)])];
+    state.copiedDistributionIds = [...new Set([...state.copiedDistributionIds, ...items.flatMap((item) => getDistributionItemAssignmentIds(item))])];
     persistState();
     renderDistribution();
-    elements.copyStatus.textContent = `${formatSlashDate(state.selectedDistributionDate)}分をまとめてコピーしました。`;
+    elements.copyStatus.textContent = state.distributionViewMode === "date" ? `${formatSlashDate(state.selectedDistributionDate)}分をまとめてコピーしました。` : "セラピスト別文面をまとめてコピーしました。";
     elements.copyStatus.className = "copy-status success";
   } catch (error) {
     elements.copyStatus.textContent = "まとめコピーに失敗しました。";
@@ -2010,13 +2089,13 @@ async function copyDistributionMessage() {
   const text = elements.distributionPreview.textContent;
   if (!text) return;
 
-  const selected = getAssignmentsForDate(state.selectedDistributionDate)
+  const selected = getDistributionItems()
     .find((item) => item.id === state.selectedDistributionAssignmentId);
 
   try {
     await navigator.clipboard.writeText(text);
     if (selected) {
-      state.copiedDistributionIds = [...new Set([...state.copiedDistributionIds, selected.id])];
+      state.copiedDistributionIds = [...new Set([...state.copiedDistributionIds, ...getDistributionItemAssignmentIds(selected)])];
       persistState();
     }
     renderDistribution();
@@ -2290,6 +2369,7 @@ function persistState() {
       activeAppView: state.activeAppView,
       activeDashboardView: state.activeDashboardView,
       activeShiftTab: state.activeShiftTab,
+      distributionViewMode: state.distributionViewMode,
       distributionFormat: state.distributionFormat,
       copiedDistributionIds: state.copiedDistributionIds,
       distributionPendingOnly: state.distributionPendingOnly,

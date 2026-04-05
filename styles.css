@@ -1206,6 +1206,16 @@ pre {
   opacity: 0.68;
 }
 
+.distribution-item .distribution-summary-item .field-value {
+  justify-content: flex-start;
+  white-space: normal;
+  line-height: 1.5;
+}
+
+.distribution-therapist-lines {
+  display: block;
+}
+
 .distribution-item.active {
   border-color: var(--navy);
   background: #eef4ff;
