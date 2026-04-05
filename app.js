@@ -199,7 +199,7 @@ function bindEvents() {
   elements.loadHistorySampleButton.addEventListener("click", () => {
     elements.historyCsvText.value = buildHistoryCsv(samplePrototypeData.weeklyPerformance);
   });
-  elements.generateScheduleButton.addEventListener("click", () => runGeneration("生成結果を反映しました。"));
+  elements.generateScheduleButton.addEventListener("click", handleGenerateScheduleClick);
 
   elements.requestCsvInput.addEventListener("change", async (event) => {
     elements.requestCsvText.value = await readFileText(event.target.files?.[0]);
@@ -927,6 +927,7 @@ function renderDistributionItem(item) {
         </div>
         <div class="status-row tight">
           <span class="shift-chip ${item.shiftType}">${item.shiftLabel}</span>
+          <span class="mini-badge rank">${state.distributionFormat === "line" ? "LINE" : "簡易"}</span>
           ${state.copiedDistributionIds.includes(item.id) ? `<span class="mini-badge booked">コピー済み</span>` : ""}
         </div>
       </div>
@@ -978,6 +979,13 @@ function handleRequestListChange(event) {
 }
 
 function handleShiftListClick(event) {
+  const dragHandle = event.target.closest(".drag-handle");
+  if (dragHandle && isMobileLikeDevice()) {
+    event.preventDefault();
+    openMobileMovePicker(dragHandle.dataset.dragAssignmentId);
+    return;
+  }
+
   const trigger = event.target.closest("[data-area-trigger]");
   if (!trigger) return;
 
@@ -1045,6 +1053,14 @@ function handleShiftDrop(event) {
   }
 }
 
+function handleGenerateScheduleClick() {
+  if (state.hasUnsavedChanges) {
+    const confirmed = window.confirm("未保存の手動変更があります。再生成すると現在の調整内容が上書きされます。");
+    if (!confirmed) return;
+  }
+  runGeneration("生成結果を反映しました。");
+}
+
 function handleBoardCanvasClick(event) {
   const bar = event.target.closest("[data-board-assignment-id]");
   if (!bar) return;
@@ -1095,7 +1111,9 @@ function applyHistoryCsv() {
 function runGeneration(note) {
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
   state.generatedSchedule = buildGeneratedSchedule();
+  state.dateList.forEach((dateKey) => recomputeAssignmentWarningsForDate(dateKey));
   state.generationSummary = summarizeGeneration();
+  state.copiedDistributionIds = [];
   state.hasUnsavedChanges = false;
   state.editingAreaAssignmentId = "";
   syncSelectedBoardAssignment();
@@ -1209,6 +1227,9 @@ function updateAssignmentArea(assignmentId, nextArea, options = {}) {
   state.updatedBoardAssignmentId = assignmentId;
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
   markManualScheduleDirty();
+  if (row?.dateKey) {
+    recomputeAssignmentWarningsForDate(row.dateKey);
+  }
   persistState();
   flashBoardUpdateStatus(
     supportsArea(row?.name || "", nextArea)
@@ -1229,6 +1250,7 @@ function updateAssignmentArea(assignmentId, nextArea, options = {}) {
 
 function moveAssignmentBetweenSlots(source, target) {
   if (!source?.assignmentId) return;
+  if (source.shiftType === target.shiftType && source.slotIndex === target.slotIndex) return;
   const day = state.generatedSchedule[state.selectedDate];
   if (!day) return;
 
@@ -1267,11 +1289,15 @@ function moveAssignmentBetweenSlots(source, target) {
   markManualScheduleDirty();
   persistState();
   const movedAssignment = findAssignmentById(moving.id);
-  const warnings = collectMoveWarnings(movedAssignment);
+  recomputeAssignmentWarningsForDate(state.selectedDate);
+  const warnings = collectMoveWarnings(findAssignmentById(moving.id));
+  const actionText = swapped
+    ? `${formatSlotLabel(source.shiftType, source.slotIndex)} ↔ ${formatSlotLabel(target.shiftType, target.slotIndex)} を入れ替えました`
+    : `${formatSlotLabel(source.shiftType, source.slotIndex)} → ${formatSlotLabel(target.shiftType, target.slotIndex)} へ移動しました`;
   if (warnings.length) {
-    showToast(`⚠️ ${warnings.join(" / ")}`, "warning");
+    showToast(`${actionText} / ⚠️ ${warnings.join(" / ")}`, "warning");
   } else {
-    showToast(swapped ? "枠を入れ替えました。" : "空き枠へ移動しました。", "success");
+    showToast(actionText, "success");
   }
   renderDashboard();
   renderDistribution();
@@ -1279,9 +1305,9 @@ function moveAssignmentBetweenSlots(source, target) {
 
 function collectMoveWarnings(assignment) {
   if (!assignment) return [];
-  const warnings = [];
+  const warnings = [...(assignment.manualWarnings || [])];
   if (assignment.warningArea) warnings.push("対応外エリア");
-  if (assignment.himeReservation === "あり") warnings.push("姫予約あり注意");
+  if (assignment.himeReservation === "あり" && isWeakHimePlacement(assignment)) warnings.push("姫予約あり注意");
   return warnings;
 }
 
@@ -1300,9 +1326,12 @@ function markManualScheduleDirty() {
 
 function saveManualScheduleChanges() {
   state.hasUnsavedChanges = false;
+  state.updatedBoardAssignmentId = "";
+  state.editingAreaAssignmentId = "";
   persistState();
   renderSaveState();
   showToast("シフトをローカル保存しました。", "success");
+  renderCurrentView();
 }
 
 function showToast(message, tone = "success") {
@@ -1334,6 +1363,75 @@ function refreshDayMetrics(dateKey) {
   const needed = requirement.earlyNeeded + requirement.lateNeeded;
   day.metrics.shortage = Math.max(needed - filled, 0);
   day.metrics.fillRate = needed ? Math.round((filled / needed) * 100) : 100;
+}
+
+function recomputeAssignmentWarningsForDate(dateKey) {
+  const day = state.generatedSchedule[dateKey];
+  if (!day) return;
+  const allAssignments = [...day.earlyAssignments, ...day.lateAssignments].filter(Boolean);
+  allAssignments.forEach((assignment) => {
+    assignment.manualWarnings = buildAssignmentWarnings(assignment, allAssignments);
+  });
+}
+
+function buildAssignmentWarnings(assignment, assignmentsForDay) {
+  const warnings = [];
+  const duplicateCount = assignmentsForDay.filter((item) => item.name === assignment.name).length;
+  if (duplicateCount > 1) warnings.push("同日重複配置");
+  if (!supportsShift(assignment, assignment.shiftType)) warnings.push("時間帯不自然");
+  if (assignment.himeReservation === "あり" && isWeakHimePlacement(assignment)) warnings.push("姫予約の弱い配置");
+  return warnings;
+}
+
+function isWeakHimePlacement(assignment) {
+  return assignment.shiftType !== "late" || toMinutes(assignment.endTime) < 21 * 60;
+}
+
+function formatSlotLabel(shiftType, slotIndex) {
+  return `${shiftType === "early" ? "早番" : "遅番"}${slotIndex + 1}`;
+}
+
+function isMobileLikeDevice() {
+  return window.matchMedia("(max-width: 768px)").matches || window.matchMedia("(pointer: coarse)").matches;
+}
+
+function openMobileMovePicker(assignmentId) {
+  const assignment = findAssignmentById(assignmentId);
+  const source = findAssignmentPosition(state.selectedDate, assignmentId);
+  if (!assignment || !source) return;
+
+  const raw = window.prompt("移動先を入力してください。例: 早番3 / 遅番2 / e3 / l2", `${assignment.shiftType === "early" ? "遅番" : "早番"}1`);
+  if (!raw) return;
+  const target = parseMoveTarget(raw);
+  if (!target) {
+    showToast("移動先の形式を読み取れませんでした。", "error");
+    return;
+  }
+  moveAssignmentBetweenSlots(source, target);
+}
+
+function parseMoveTarget(value) {
+  const text = String(value || "").trim().toLowerCase();
+  const earlyMatch = text.match(/^(早番|e)\s*(\d)$/);
+  const lateMatch = text.match(/^(遅番|l)\s*(\d)$/);
+  const matched = earlyMatch || lateMatch;
+  if (!matched) return null;
+  const slotIndex = Number(matched[2]) - 1;
+  if (slotIndex < 0 || slotIndex >= DASHBOARD_SLOT_COUNT) return null;
+  return {
+    shiftType: earlyMatch ? "early" : "late",
+    slotIndex
+  };
+}
+
+function findAssignmentPosition(dateKey, assignmentId) {
+  const day = state.generatedSchedule[dateKey];
+  if (!day) return null;
+  const earlyIndex = day.earlyAssignments.findIndex((item) => item?.id === assignmentId);
+  if (earlyIndex >= 0) return { shiftType: "early", slotIndex: earlyIndex, assignmentId };
+  const lateIndex = day.lateAssignments.findIndex((item) => item?.id === assignmentId);
+  if (lateIndex >= 0) return { shiftType: "late", slotIndex: lateIndex, assignmentId };
+  return null;
 }
 function parseRequestCsv(text) {
   const rows = parseCsvText(text);
@@ -1543,16 +1641,18 @@ function analyzeAssignmentStatus(assignment, profile) {
   const isWarningArea = Boolean(assignment.warningArea);
   const isHime = assignment.himeReservation === "あり";
   const riskyAttendance = attendance === "遅刻注意";
+  const manualWarnings = assignment.manualWarnings || [];
 
   if (isHime) reasons.push("姫予約あり");
   if (isWarningArea) reasons.push("非対応エリア");
   if (riskyAttendance) reasons.push("勤怠不安");
+  reasons.push(...manualWarnings);
 
-  if (isHime && (isWarningArea || riskyAttendance)) {
+  if (isHime && (isWarningArea || riskyAttendance || manualWarnings.length)) {
     return { level: "danger", label: "危険", reasons: reasons.length ? reasons : ["姫予約あり"] };
   }
 
-  if (isWarningArea) {
+  if (isWarningArea || manualWarnings.length) {
     return { level: "warning", label: "要確認", reasons: reasons.length ? reasons : ["非対応エリア"] };
   }
 
@@ -1595,6 +1695,7 @@ function buildPriorityTags(item) {
   if (note.includes("ラスト")) tags.push("ラスト対応可");
   if (note.includes("ヘルプ")) tags.push("ヘルプ可");
   if (item.himeReservation === "あり") tags.push("姫予約あり");
+  (item.manualWarnings || []).forEach((warning) => tags.push(warning));
   return [...new Set(tags)].slice(0, 3);
 }
 
