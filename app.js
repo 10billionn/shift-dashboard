@@ -73,6 +73,7 @@ const elements = {
   storeSummary: document.querySelector("#storeSummary"),
   shortageSummary: document.querySelector("#shortageSummary"),
   fillSummary: document.querySelector("#fillSummary"),
+  dashboardRiskSummary: document.querySelector("#dashboardRiskSummary"),
   weeklyAnalysis: document.querySelector("#weeklyAnalysis"),
   requestCsvInput: document.querySelector("#requestCsvInput"),
   requestCsvText: document.querySelector("#requestCsvText"),
@@ -288,6 +289,7 @@ function renderDashboard() {
   elements.storeSummary.textContent = formatYen(day.metrics.storeForecast);
   elements.shortageSummary.textContent = `${displayShortage}枠`;
   elements.fillSummary.textContent = `${displayFillRate}%`;
+  elements.dashboardRiskSummary.innerHTML = renderDashboardRiskSummary();
   elements.earlyShiftList.innerHTML = renderShiftSlots(day.earlyAssignments, "早番", earlySlotTotal);
   elements.lateShiftList.innerHTML = renderShiftSlots(day.lateAssignments, "遅番", lateSlotTotal);
   elements.cutShiftList.innerHTML = renderCutRows(cutRows);
@@ -392,12 +394,22 @@ function renderShiftSlots(assignments, shiftLabel, slotTotal) {
     const profile = samplePrototypeData.therapistProfiles[assignment.name] || { rank: "G", flags: [] };
     const attendance = selectAttendanceFlag(profile.flags || []);
     const tags = buildPriorityTags(assignment);
-    if (assignment.warningArea) tags.unshift("要確認");
-    const cardClass = assignment.warningArea
+    const status = analyzeAssignmentStatus(assignment, profile);
+    if (status.level !== "normal") tags.unshift(status.label);
+    const cardClass = status.level === "danger"
+      ? "danger-slot"
+      : assignment.warningArea
       ? "warning-slot"
       : assignment.himeReservation === "あり"
         ? "booked-slot"
         : "";
+    const statusBadgeClass = status.level === "danger"
+      ? "danger"
+      : assignment.warningArea
+        ? "warning"
+        : assignment.himeReservation === "あり"
+          ? "booked"
+          : "gray";
 
     return `
       <article class="shift-card slot-card area-${areaClassName(assignment.assignedArea)} ${cardClass}">
@@ -409,7 +421,7 @@ function renderShiftSlots(assignments, shiftLabel, slotTotal) {
           <div class="status-row tight">
             <span class="mini-badge rank">${profile.rank}</span>
             <span class="mini-badge">${attendance}</span>
-            <span class="mini-badge ${assignment.warningArea ? "warning" : assignment.himeReservation === "あり" ? "booked" : "gray"}">${assignment.warningArea ? "要確認" : assignment.himeReservation === "あり" ? "姫あり" : "通常"}</span>
+            <span class="mini-badge ${statusBadgeClass} ${assignment.himeReservation === "あり" ? "hime-accent" : ""}">${status.level === "danger" ? "危険" : assignment.warningArea ? "要確認" : assignment.himeReservation === "あり" ? "姫あり" : "通常"}</span>
           </div>
         </div>
 
@@ -430,7 +442,7 @@ function renderShiftSlots(assignments, shiftLabel, slotTotal) {
 
         <div class="status-row">
           <span class="shift-chip ${assignment.shiftType}">${shiftLabel}</span>
-          ${assignment.warningArea ? `<span class="priority-tag warning">要確認</span>` : ""}
+          ${status.level !== "normal" ? `<span class="priority-tag ${status.level === "danger" ? "danger" : "warning"}">${status.label}</span>` : ""}
         </div>
 
         <div class="priority-row">
@@ -566,6 +578,7 @@ function renderBoardLaneRow(group, lane, index) {
 }
 
 function renderBoardBar(assignment) {
+  const profile = samplePrototypeData.therapistProfiles[assignment.name] || { flags: [], rank: "G" };
   const start = toMinutes(assignment.startTime);
   const end = toMinutes(assignment.endTime);
   const timelineStart = 10 * 60;
@@ -576,20 +589,24 @@ function renderBoardBar(assignment) {
   const total = timelineEnd - timelineStart;
   const left = ((clampedStart - timelineStart) / total) * 100;
   const width = Math.max((duration / total) * 100, 8);
-  const barClass = assignment.warningArea
-    ? "warning"
-    : assignment.himeReservation === "あり"
-      ? "booked"
-      : "normal";
+  const status = analyzeAssignmentStatus(assignment, profile);
+  const barClass = status.level === "danger"
+    ? "danger"
+    : assignment.warningArea
+      ? "warning"
+      : assignment.himeReservation === "あり"
+        ? "booked"
+        : "normal";
   const compactTime = `${assignment.startTime}-${assignment.endTime}`;
   const reservationLabel = assignment.himeReservation === "あり" ? "姫" : "";
 
   return `
     <button
-      class="board-bar ${barClass} ${assignment.id === state.selectedBoardAssignmentId ? "selected" : ""} ${assignment.id === state.updatedBoardAssignmentId ? "updated" : ""}"
+      class="board-bar ${barClass} ${assignment.himeReservation === "あり" ? "has-pin" : ""} ${assignment.id === state.selectedBoardAssignmentId ? "selected" : ""} ${assignment.id === state.updatedBoardAssignmentId ? "updated" : ""}"
       type="button"
       data-board-assignment-id="${assignment.id}"
       style="left:${left}%; width:${width}%;">
+      ${assignment.himeReservation === "あり" ? `<span class="board-bar-pin">姫</span>` : ""}
       <span class="board-bar-name">${assignment.name}</span>
       <span class="board-bar-meta">${assignment.assignedArea}${reservationLabel ? `｜${reservationLabel}` : ""}</span>
       <span class="board-bar-sub">${compactTime}</span>
@@ -623,6 +640,15 @@ function packAssignmentsIntoBoardLanes(assignments) {
 
 function renderGenerationAlerts(checkSummary) {
   const blocks = [];
+  if (checkSummary.priorityFixes.length) {
+    blocks.push(`
+      <article class="alert-box danger">
+        <strong>修正優先リスト</strong>
+        <div>${checkSummary.priorityFixes.map((item, index) => `<div>${index + 1}. ${item}</div>`).join("")}</div>
+      </article>
+    `);
+  }
+
   if (checkSummary.slots.length) {
     blocks.push(`
       <article class="alert-box slot-summary-box">
@@ -751,7 +777,8 @@ function renderBoardInspector(day) {
 
   const profile = samplePrototypeData.therapistProfiles[assignment.name] || { rank: "G", areas: [] };
   const availableAreas = samplePrototypeData.settings.areas;
-  const areaWarning = !supportsArea(assignment.name, assignment.assignedArea);
+  const status = analyzeAssignmentStatus(assignment, profile);
+  const statusTone = status.level === "danger" ? "danger" : status.level === "warning" ? "warning" : "ok";
 
   return `
     <article class="board-inspector-card">
@@ -762,12 +789,16 @@ function renderBoardInspector(day) {
         </div>
         <div class="status-row tight">
           <span class="mini-badge rank">${profile.rank || "G"}</span>
-          <span class="mini-badge ${assignment.himeReservation === "あり" ? "booked" : "gray"}">${assignment.himeReservation === "あり" ? "姫あり" : "姫なし"}</span>
-          ${areaWarning ? `<span class="mini-badge warning">要確認</span>` : ""}
+          <span class="mini-badge ${assignment.himeReservation === "あり" ? "booked hime-accent" : "gray"}">${assignment.himeReservation === "あり" ? "姫あり" : "姫なし"}</span>
+          <span class="mini-badge ${status.level === "danger" ? "danger" : status.level === "warning" ? "warning" : "gray"}">${status.label}</span>
         </div>
       </div>
 
       <div class="board-inspector-grid">
+        <div class="shift-summary-item">
+          <span class="field-label">状態</span>
+          <span class="field-value">${status.label}</span>
+        </div>
         <div class="shift-summary-item">
           <span class="field-label">現在エリア</span>
           <span class="field-value">${assignment.assignedArea}</span>
@@ -782,6 +813,11 @@ function renderBoardInspector(day) {
         </div>
       </div>
 
+      <div class="alert-box ${statusTone}">
+        <strong>判断理由</strong>
+        <div>${status.reasons.map((reason) => `<div>・${reason}</div>`).join("")}</div>
+      </div>
+
       <label class="field-block">
         <span class="field-label">エリア変更</span>
         <select class="select-input" data-board-field="assignedArea">
@@ -789,7 +825,7 @@ function renderBoardInspector(day) {
         </select>
       </label>
 
-      ${areaWarning ? `<div class="alert-box warning">この配置は対応可能エリア外です。配置は残しますが、要確認として扱います。</div>` : `<p class="field-help">非対応エリアを選んだ場合は警告付きで反映します。</p>`}
+      ${assignment.warningArea ? `<div class="alert-box warning">この配置は対応可能エリア外です。配置は残しますが、要確認として扱います。</div>` : `<p class="field-help">非対応エリアを選んだ場合は警告付きで反映します。</p>`}
     </article>
   `;
 }
@@ -1172,6 +1208,7 @@ function buildCheckSummary(rows, missingTherapists) {
   return {
     missing: missingTherapists,
     items: items.filter((item) => item.names.length),
+    priorityFixes: buildPriorityFixes(),
     slots: state.dateList.map((dateKey) => {
       const requirement = findRequirement(dateKey);
       const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
@@ -1197,6 +1234,96 @@ function getCutRowsForDate(dateKey) {
   return state.generationRows
     .filter((row) => row.dateKey === dateKey && row.status === "cut")
     .sort((left, right) => left.name.localeCompare(right.name, "ja"));
+}
+
+function renderDashboardRiskSummary() {
+  const summary = buildDashboardRiskSummary();
+  return summary.map((item) => `
+    <article class="risk-summary-item ${item.level}">
+      <strong>${item.title}</strong>
+      <span>${item.value}</span>
+    </article>
+  `).join("");
+}
+
+function buildDashboardRiskSummary() {
+  const allAssignments = Object.values(state.generatedSchedule)
+    .flatMap((day) => [...day.earlyAssignments, ...day.lateAssignments]);
+  const maxShortage = state.dateList.reduce((best, dateKey) => {
+    const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
+    const requirement = findRequirement(dateKey);
+    const earlyNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.earlyNeeded || 0);
+    const lateNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.lateNeeded || 0);
+    const earlyShortage = Math.max(earlyNeeded - day.earlyAssignments.length, 0);
+    const lateShortage = Math.max(lateNeeded - day.lateAssignments.length, 0);
+    if (earlyShortage > best.count) return { label: `${formatSlashDate(dateKey)} 早番 ${earlyShortage}枠`, count: earlyShortage };
+    if (lateShortage > best.count) return { label: `${formatSlashDate(dateKey)} 遅番 ${lateShortage}枠`, count: lateShortage };
+    return best;
+  }, { label: "不足なし", count: 0 });
+  const himeRiskCount = allAssignments.filter((assignment) => analyzeAssignmentStatus(assignment, samplePrototypeData.therapistProfiles[assignment.name] || {}).level === "danger" && assignment.himeReservation === "あり").length;
+  const warningCount = allAssignments.filter((assignment) => analyzeAssignmentStatus(assignment, samplePrototypeData.therapistProfiles[assignment.name] || {}).level === "warning").length;
+
+  return [
+    { title: "最大不足", value: maxShortage.count ? maxShortage.label : "不足なし", level: maxShortage.count ? "danger" : "ok" },
+    { title: "姫予約リスク", value: `${himeRiskCount}件`, level: himeRiskCount ? "danger" : "ok" },
+    { title: "要確認配置", value: `${warningCount}件`, level: warningCount ? "warning" : "ok" }
+  ];
+}
+
+function buildPriorityFixes() {
+  const fixes = [];
+  const unfilledHime = state.generationRows
+    .filter((row) => row.status === "accepted" && row.himeReservation === "あり")
+    .filter((row) => {
+      const day = state.generatedSchedule[row.dateKey];
+      const assignments = day ? [...day.earlyAssignments, ...day.lateAssignments] : [];
+      return !assignments.some((item) => item.id === row.id);
+    });
+  if (unfilledHime.length) {
+    fixes.push(`姫予約あり未配置 ${unfilledHime.length}件`);
+  }
+
+  const totalShortage = state.dateList.reduce((count, dateKey) => {
+    const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
+    const requirement = findRequirement(dateKey);
+    const earlyNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.earlyNeeded || 0);
+    const lateNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.lateNeeded || 0);
+    return count + Math.max(earlyNeeded - day.earlyAssignments.length, 0) + Math.max(lateNeeded - day.lateAssignments.length, 0);
+  }, 0);
+  if (totalShortage) {
+    fixes.push(`空き枠 ${totalShortage}枠`);
+  }
+
+  const warningAssignments = Object.values(state.generatedSchedule)
+    .flatMap((day) => [...day.earlyAssignments, ...day.lateAssignments])
+    .filter((assignment) => analyzeAssignmentStatus(assignment, samplePrototypeData.therapistProfiles[assignment.name] || {}).level === "warning");
+  if (warningAssignments.length) {
+    fixes.push(`非対応エリアなど要確認配置 ${warningAssignments.length}件`);
+  }
+
+  return fixes.length ? fixes : ["大きな修正優先項目はありません"];
+}
+
+function analyzeAssignmentStatus(assignment, profile) {
+  const reasons = [];
+  const attendance = selectAttendanceFlag(profile.flags || []);
+  const isWarningArea = Boolean(assignment.warningArea);
+  const isHime = assignment.himeReservation === "あり";
+  const riskyAttendance = attendance === "遅刻注意";
+
+  if (isHime) reasons.push("姫予約あり");
+  if (isWarningArea) reasons.push("非対応エリア");
+  if (riskyAttendance) reasons.push("勤怠不安");
+
+  if (isHime && (isWarningArea || riskyAttendance)) {
+    return { level: "danger", label: "危険", reasons: reasons.length ? reasons : ["姫予約あり"] };
+  }
+
+  if (isWarningArea) {
+    return { level: "warning", label: "要確認", reasons: reasons.length ? reasons : ["非対応エリア"] };
+  }
+
+  return { level: "normal", label: "正常", reasons: reasons.length ? reasons : ["通常配置"] };
 }
 
 function supportsShift(row, shiftType) {

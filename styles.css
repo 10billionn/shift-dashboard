@@ -283,6 +283,47 @@ pre {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.dashboard-risk-panel {
+  padding: 14px 16px;
+}
+
+.risk-summary-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.risk-summary-item {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--panel-soft);
+}
+
+.risk-summary-item strong {
+  font-size: 0.82rem;
+}
+
+.risk-summary-item span {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.risk-summary-item.danger {
+  background: linear-gradient(135deg, rgba(198, 84, 84, 0.14), rgba(226, 140, 163, 0.18));
+  border-color: rgba(198, 84, 84, 0.28);
+}
+
+.risk-summary-item.warning {
+  background: var(--yellow-soft);
+}
+
+.risk-summary-item.ok {
+  background: var(--green-soft);
+}
+
 .summary-card,
 .placeholder-card {
   padding: 14px;
@@ -405,9 +446,14 @@ pre {
 .shift-card.slot-card { background: var(--blue-soft); }
 .shift-card.slot-card.booked-slot { background: var(--green-soft); }
 .shift-card.slot-card.warning-slot { background: var(--yellow-soft); }
+.shift-card.slot-card.danger-slot {
+  background: linear-gradient(135deg, rgba(198, 84, 84, 0.14), rgba(226, 140, 163, 0.18));
+  border-left-color: var(--danger);
+}
 .shift-card.empty-slot {
-  border-left-color: #de8aa1;
-  background: var(--pink-soft);
+  border-left-color: #cc5476;
+  background: linear-gradient(135deg, #ffe0e7, #ffd1dc);
+  box-shadow: inset 0 0 0 1px rgba(204, 84, 118, 0.14);
 }
 
 .cut-card {
@@ -460,8 +506,14 @@ pre {
 }
 
 .mini-badge.pink {
-  background: var(--pink-soft);
+  background: #ffd7e1;
   color: #b84b67;
+}
+
+.mini-badge.danger,
+.priority-tag.danger {
+  background: rgba(198, 84, 84, 0.16);
+  color: var(--danger);
 }
 
 .mini-badge.warning,
@@ -577,7 +629,7 @@ pre {
 }
 
 .legend-chip.empty {
-  background: var(--pink-soft);
+  background: #ffd7e1;
   color: #b84b67;
 }
 
@@ -916,6 +968,10 @@ pre {
   filter: saturate(1.08) brightness(1.04);
 }
 
+.board-bar.danger {
+  background: linear-gradient(135deg, #d45757, #b63d50);
+}
+
 .board-bar.normal {
   background: linear-gradient(135deg, #2e6bcb, #315a96);
 }
@@ -965,9 +1021,10 @@ pre {
 }
 
 .board-gap-shortage {
-  border: 1px dashed #de8aa1;
-  background: var(--pink-soft);
+  border: 2px dashed #cc5476;
+  background: linear-gradient(135deg, #ffe0e7, #ffd1dc);
   color: #b84b67;
+  box-shadow: inset 0 0 0 1px rgba(204, 84, 118, 0.12);
 }
 
 .board-gap-empty {
@@ -1009,6 +1066,34 @@ pre {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.board-bar-pin {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--green);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.board-bar.has-pin .board-bar-name {
+  padding-left: 34px;
+}
+
+.hime-accent {
+  font-size: 0.82rem;
+  min-height: 30px;
+  padding-inline: 12px;
+  box-shadow: inset 0 0 0 1px rgba(31, 138, 82, 0.16);
 }
 
 .copy-status.warning {
@@ -1092,7 +1177,8 @@ pre {
   .import-grid,
   .distribution-grid,
   .settings-grid,
-  .weekly-analysis {
+  .weekly-analysis,
+  .risk-summary-list {
     grid-template-columns: 1fr;
   }
 
