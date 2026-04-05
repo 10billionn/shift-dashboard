@@ -103,6 +103,7 @@ const elements = {
   generationResultNote: document.querySelector("#generationResultNote"),
   distributionDateSelect: document.querySelector("#distributionDateSelect"),
   distributionPendingOnly: document.querySelector("#distributionPendingOnly"),
+  distributionStatusSummary: document.querySelector("#distributionStatusSummary"),
   distributionList: document.querySelector("#distributionList"),
   distributionPreview: document.querySelector("#distributionPreview"),
   distributionFormatSelect: document.querySelector("#distributionFormatSelect"),
@@ -148,6 +149,7 @@ function bindEvents() {
   });
 
   elements.reloadButton.addEventListener("click", () => {
+    if (!confirmUnsavedNavigation("サンプルを再読込する")) return;
     clearPersistedState();
     hydrateState(null);
     syncCsvTextsFromState();
@@ -162,6 +164,7 @@ function bindEvents() {
 
   elements.sidebarNav.querySelectorAll(".nav-item").forEach((button) => {
     button.addEventListener("click", () => {
+      if (!confirmUnsavedNavigation("画面を切り替える")) return;
       state.activeAppView = button.dataset.view;
       state.mobileMenuOpen = false;
       elements.sidebar.classList.remove("open");
@@ -258,6 +261,12 @@ function bindEvents() {
 
   elements.copyAllMessagesButton.addEventListener("click", copyAllDistributionMessages);
   elements.copyMessageButton.addEventListener("click", copyDistributionMessage);
+
+  window.addEventListener("beforeunload", (event) => {
+    if (!state.hasUnsavedChanges) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
 }
 
 function hydrateState(saved) {
@@ -364,14 +373,14 @@ function renderSettings() {
 }
 
 function renderDashboard() {
-  const day = state.generatedSchedule[state.selectedDate] || emptyDay(state.selectedDate);
+  const day = getScheduleDay(state.selectedDate);
   const requirement = findRequirement(state.selectedDate);
   const cutRows = getCutRowsForDate(state.selectedDate);
-  const earlySlotTotal = Math.max(getAppSettings().defaultEarlySlots, requirement.earlyNeeded || 0);
-  const lateSlotTotal = Math.max(getAppSettings().defaultLateSlots, requirement.lateNeeded || 0);
+  const earlySlotTotal = getShiftSlotTotal(state.selectedDate, "early");
+  const lateSlotTotal = getShiftSlotTotal(state.selectedDate, "late");
   const earlyFilled = countAssignments(day.earlyAssignments);
   const lateFilled = countAssignments(day.lateAssignments);
-  const displayNeeded = earlySlotTotal + lateSlotTotal;
+  const displayNeeded = (requirement.earlyNeeded || 0) + (requirement.lateNeeded || 0);
   const displayFilled = earlyFilled + lateFilled;
   const displayShortage = Math.max(displayNeeded - displayFilled, 0);
   const displayFillRate = displayNeeded ? Math.round((displayFilled / displayNeeded) * 100) : 100;
@@ -421,13 +430,20 @@ function renderDistribution() {
     .join("");
 
   const allItems = getAssignmentsForDate(state.selectedDistributionDate);
+  const copiedCount = allItems.filter((item) => state.copiedDistributionIds.includes(item.id)).length;
+  const pendingCount = Math.max(allItems.length - copiedCount, 0);
+  elements.distributionStatusSummary.innerHTML = `
+    <span class="legend-chip empty">未配布 ${pendingCount}件</span>
+    <span class="legend-chip booked">配布済み ${copiedCount}件</span>
+    <span class="legend-chip normal">${state.distributionFormat === "line" ? "LINE用" : "シンプル"}</span>
+  `;
   const items = state.distributionPendingOnly
     ? allItems.filter((item) => !state.copiedDistributionIds.includes(item.id))
     : allItems;
   syncSelectedDistributionAssignment();
 
   if (!items.length) {
-    elements.distributionList.innerHTML = `<div class="empty-state">この日の確定シフトはまだありません。</div>`;
+    elements.distributionList.innerHTML = `<div class="empty-state">${allItems.length && state.distributionPendingOnly ? "この日の未配布はありません。" : "この日の確定シフトはまだありません。"}</div>`;
     elements.distributionPreview.textContent = "シフトを生成するとここに個別文言が出ます。";
     elements.copyStatus.textContent = "";
     elements.copyAllMessagesButton.disabled = true;
@@ -647,9 +663,9 @@ function renderBoardTimeline(day) {
 
 function renderBoardGroup(group) {
   const assignedLanes = packAssignmentsIntoBoardLanes(group.assignments);
-  const targetLaneCount = Math.max(getAppSettings().roomNames.length, getAppSettings().defaultEarlySlots, getAppSettings().defaultLateSlots, group.needed || 0);
-  const shortageCount = Math.max(targetLaneCount - group.assignments.length, 0);
-  const visualLaneCount = Math.max(assignedLanes.length + shortageCount, targetLaneCount, 2);
+  const baseLaneCount = Math.max(getRoomCapacity(), assignedLanes.length);
+  const shortageCount = Math.max((group.needed || 0) - group.assignments.length, 0);
+  const visualLaneCount = Math.max(baseLaneCount, assignedLanes.length + shortageCount, 2);
   const lanes = Array.from({ length: visualLaneCount }, (_, index) => {
     if (index < assignedLanes.length) {
       return { type: "assigned", items: assignedLanes[index], label: `${group.label}${index + 1}` };
@@ -664,7 +680,7 @@ function renderBoardGroup(group) {
     <section class="board-group">
       <div class="board-group-head">
         <strong class="board-group-title">${group.label}</strong>
-        <span class="board-group-meta">${group.assignments.length}/${targetLaneCount}枠</span>
+        <span class="board-group-meta">${group.assignments.length}/${baseLaneCount}枠 ・ 必要 ${group.needed || 0}</span>
       </div>
       <div class="board-group-body">
         ${lanes.map((lane, index) => renderBoardLaneRow(group, lane, index)).join("")}
@@ -1163,7 +1179,9 @@ function handleRequirementChange(event) {
   if (!requirement) return;
   requirement[input.dataset.reqField] = Math.max(0, Number(input.value) || 0);
   markGenerationDirty();
+  recomputeAllScheduleState();
   persistState();
+  renderCurrentView();
 }
 
 function handleSettingsChange() {
@@ -1215,8 +1233,7 @@ function applyHistoryCsv() {
 function runGeneration(note) {
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
   state.generatedSchedule = buildGeneratedSchedule();
-  state.dateList.forEach((dateKey) => recomputeAssignmentWarningsForDate(dateKey));
-  state.generationSummary = summarizeGeneration();
+  recomputeAllScheduleState();
   state.copiedDistributionIds = [];
   state.hasUnsavedChanges = false;
   state.hasManualAdjustments = false;
@@ -1276,7 +1293,7 @@ function buildGeneratedSchedule() {
 
 function summarizeGeneration() {
   return state.dateList.reduce((summary, dateKey) => {
-    const day = state.generatedSchedule[dateKey];
+    const day = getScheduleDay(dateKey);
     summary.sales += day.metrics.salesForecast;
     summary.store += day.metrics.storeForecast;
     summary.shortage += day.metrics.shortage;
@@ -1344,9 +1361,7 @@ function updateAssignmentArea(assignmentId, nextArea, options = {}) {
   state.updatedBoardAssignmentId = assignmentId;
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
   markManualScheduleDirty();
-  if (row?.dateKey) {
-    recomputeAssignmentWarningsForDate(row.dateKey);
-  }
+  recomputeScheduleStateForDates([row?.dateKey].filter(Boolean));
   persistState();
   flashBoardUpdateStatus(
     supportsArea(row?.name || "", nextArea)
@@ -1400,13 +1415,11 @@ function moveAssignmentBetweenSlots(source, target) {
     day[target.shiftType === "early" ? "earlyAssignments" : "lateAssignments"] = targetSlots;
   }
 
-  refreshDayMetrics(state.selectedDate);
   state.selectedBoardAssignmentId = moving.id;
   state.updatedBoardAssignmentId = moving.id;
   markManualScheduleDirty();
+  recomputeScheduleStateForDates([state.selectedDate]);
   persistState();
-  const movedAssignment = findAssignmentById(moving.id);
-  recomputeAssignmentWarningsForDate(state.selectedDate);
   const warnings = collectMoveWarnings(findAssignmentById(moving.id));
   const actionText = swapped
     ? `${formatSlotLabel(source.shiftType, source.slotIndex)} ↔ ${formatSlotLabel(target.shiftType, target.slotIndex)} を入れ替えました`
@@ -1429,7 +1442,7 @@ function collectMoveWarnings(assignment) {
 }
 
 function createSlotArray(assignments, shiftType) {
-  const slotTotal = Math.max(getAppSettings()[shiftType === "early" ? "defaultEarlySlots" : "defaultLateSlots"], findRequirement(state.selectedDate)[shiftType === "early" ? "earlyNeeded" : "lateNeeded"] || 0);
+  const slotTotal = Math.max(getRoomCapacity(), countAssignments(assignments));
   return Array.from({ length: slotTotal }, (_, index) => {
     const item = assignments[index] || null;
     return item ? { ...item } : null;
@@ -1476,11 +1489,16 @@ function flashBoardUpdateStatus(message, tone) {
 function refreshDayMetrics(dateKey) {
   const day = state.generatedSchedule[dateKey];
   if (!day) return;
-  const requirement = day.requirement;
+  const requirement = findRequirement(dateKey);
+  const settings = getAppSettings();
+  const history = state.historyRows.find((row) => row.dateKey === dateKey);
+  day.requirement = requirement;
   const filled = countAssignments(day.earlyAssignments) + countAssignments(day.lateAssignments);
   const needed = requirement.earlyNeeded + requirement.lateNeeded;
   day.metrics.shortage = Math.max(needed - filled, 0);
   day.metrics.fillRate = needed ? Math.round((filled / needed) * 100) : 100;
+  day.metrics.salesForecast = history?.salesForecast || filled * settings.averageUnitPrice * 2;
+  day.metrics.storeForecast = history?.storeForecast || Math.round(day.metrics.salesForecast * (settings.storeRate / 100));
 }
 
 function recomputeAssignmentWarningsForDate(dateKey) {
@@ -1493,11 +1511,24 @@ function recomputeAssignmentWarningsForDate(dateKey) {
 }
 
 function buildAssignmentWarnings(assignment, assignmentsForDay) {
+  const settings = getAppSettings();
   const warnings = [];
-  const duplicateCount = assignmentsForDay.filter((item) => item.name === assignment.name).length;
+  const sameTherapistAssignments = assignmentsForDay.filter((item) => item.name === assignment.name);
+  const duplicateCount = sameTherapistAssignments.length;
+  const duration = toMinutes(assignment.endTime) - toMinutes(assignment.startTime);
+  const sameAreaCount = assignmentsForDay.filter((item) => item.assignedArea === assignment.assignedArea).length;
+  const concentrationThreshold = Math.max(3, Math.ceil(assignmentsForDay.length * 0.5));
+
   if (duplicateCount > 1) warnings.push("同日重複配置");
+  if (sameTherapistAssignments.some((item) => item.id !== assignment.id && isTimeOverlapping(item, assignment))) warnings.push("時間被り");
   if (!supportsShift(assignment, assignment.shiftType)) warnings.push("時間帯不自然");
   if (assignment.himeReservation === "あり" && isWeakHimePlacement(assignment)) warnings.push("姫予約の弱い配置");
+  if (duration && duration < 4 * 60) warnings.push("短時間すぎ");
+  if (duration > 12 * 60) warnings.push("長時間すぎ");
+  if (toMinutes(assignment.startTime) < settings.businessStartHour * 60 || toMinutes(assignment.endTime) > settings.businessEndHour * 60) {
+    warnings.push("営業時間外");
+  }
+  if (assignment.assignedArea && sameAreaCount >= concentrationThreshold) warnings.push("同一エリア偏り");
   return warnings;
 }
 
@@ -1535,7 +1566,7 @@ function parseMoveTarget(value) {
   const matched = earlyMatch || lateMatch;
   if (!matched) return null;
   const slotIndex = Number(matched[2]) - 1;
-  if (slotIndex < 0 || slotIndex >= Math.max(getAppSettings().roomNames.length, getAppSettings().defaultEarlySlots, getAppSettings().defaultLateSlots)) return null;
+  if (slotIndex < 0 || slotIndex >= getRoomCapacity()) return null;
   return {
     shiftType: earlyMatch ? "early" : "late",
     slotIndex
@@ -1661,9 +1692,9 @@ function buildCheckSummary(rows, missingTherapists) {
     priorityFixes: buildPriorityFixes(),
     slots: state.dateList.map((dateKey) => {
       const requirement = findRequirement(dateKey);
-      const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
-      const earlyNeeded = Math.max(getAppSettings().defaultEarlySlots, requirement.earlyNeeded || 0);
-      const lateNeeded = Math.max(getAppSettings().defaultLateSlots, requirement.lateNeeded || 0);
+      const day = getScheduleDay(dateKey);
+      const earlyNeeded = requirement.earlyNeeded || 0;
+      const lateNeeded = requirement.lateNeeded || 0;
       return `${formatSlashDate(dateKey)}(${formatWeekday(dateKey)}) 早番 必要 ${earlyNeeded} / 採用 ${countAssignments(day.earlyAssignments)} / 不足 ${Math.max(earlyNeeded - countAssignments(day.earlyAssignments), 0)} ｜ 遅番 必要 ${lateNeeded} / 採用 ${countAssignments(day.lateAssignments)} / 不足 ${Math.max(lateNeeded - countAssignments(day.lateAssignments), 0)}`;
     }),
     shortages: state.dateList
@@ -1701,10 +1732,10 @@ function buildDashboardRiskSummary() {
   const allAssignments = Object.values(state.generatedSchedule)
     .flatMap((day) => [...day.earlyAssignments, ...day.lateAssignments].filter(Boolean));
   const maxShortage = state.dateList.reduce((best, dateKey) => {
-    const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
+    const day = getScheduleDay(dateKey);
     const requirement = findRequirement(dateKey);
-    const earlyNeeded = Math.max(getAppSettings().defaultEarlySlots, requirement.earlyNeeded || 0);
-    const lateNeeded = Math.max(getAppSettings().defaultLateSlots, requirement.lateNeeded || 0);
+    const earlyNeeded = requirement.earlyNeeded || 0;
+    const lateNeeded = requirement.lateNeeded || 0;
     const earlyShortage = Math.max(earlyNeeded - countAssignments(day.earlyAssignments), 0);
     const lateShortage = Math.max(lateNeeded - countAssignments(day.lateAssignments), 0);
     if (earlyShortage > best.count) return { label: `${formatSlashDate(dateKey)} 早番 ${earlyShortage}枠`, count: earlyShortage };
@@ -1742,10 +1773,10 @@ function buildPriorityFixes() {
   }
 
   const totalShortage = state.dateList.reduce((count, dateKey) => {
-    const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
+    const day = getScheduleDay(dateKey);
     const requirement = findRequirement(dateKey);
-    const earlyNeeded = Math.max(getAppSettings().defaultEarlySlots, requirement.earlyNeeded || 0);
-    const lateNeeded = Math.max(getAppSettings().defaultLateSlots, requirement.lateNeeded || 0);
+    const earlyNeeded = requirement.earlyNeeded || 0;
+    const lateNeeded = requirement.lateNeeded || 0;
     return count + Math.max(earlyNeeded - countAssignments(day.earlyAssignments), 0) + Math.max(lateNeeded - countAssignments(day.lateAssignments), 0);
   }, 0);
   if (totalShortage) {
@@ -1766,8 +1797,8 @@ function buildPreGenerationSummary(rows) {
   const accepted = rows.filter((row) => row.status === "accepted");
   const hold = rows.filter((row) => row.status === "hold");
   const cut = rows.filter((row) => row.status === "cut");
-  const earlyCapacity = state.dateList.reduce((count, dateKey) => count + Math.max(getAppSettings().defaultEarlySlots, findRequirement(dateKey).earlyNeeded || 0), 0);
-  const lateCapacity = state.dateList.reduce((count, dateKey) => count + Math.max(getAppSettings().defaultLateSlots, findRequirement(dateKey).lateNeeded || 0), 0);
+  const earlyCapacity = state.dateList.reduce((count, dateKey) => count + (findRequirement(dateKey).earlyNeeded || 0), 0);
+  const lateCapacity = state.dateList.reduce((count, dateKey) => count + (findRequirement(dateKey).lateNeeded || 0), 0);
   const earlyCandidates = accepted.filter((row) => supportsShift(row, "early")).length;
   const lateCandidates = accepted.filter((row) => supportsShift(row, "late")).length;
 
@@ -1792,13 +1823,14 @@ function analyzeAssignmentStatus(assignment, profile) {
   const isHime = assignment.himeReservation === "あり";
   const riskyAttendance = attendance === "遅刻注意";
   const manualWarnings = assignment.manualWarnings || [];
+  const criticalWarnings = manualWarnings.filter((warning) => ["姫予約の弱い配置", "時間被り", "営業時間外"].includes(warning));
 
   if (isHime) reasons.push("姫予約あり");
   if (isWarningArea) reasons.push("非対応エリア");
   if (riskyAttendance) reasons.push("勤怠不安");
   reasons.push(...manualWarnings);
 
-  if (isHime && (isWarningArea || riskyAttendance || manualWarnings.length)) {
+  if (isHime && (isWarningArea || riskyAttendance || criticalWarnings.length)) {
     return { level: "danger", label: "危険", reasons: reasons.length ? reasons : ["姫予約あり"] };
   }
 
@@ -1889,11 +1921,47 @@ function restoreGenerationRows(rows) {
 }
 
 function getAssignmentsForDate(dateKey) {
-  const day = state.generatedSchedule[dateKey];
-  if (!day) return [];
+  const day = getScheduleDay(dateKey);
   return [...day.earlyAssignments, ...day.lateAssignments]
     .filter(Boolean)
     .sort((left, right) => left.name.localeCompare(right.name, "ja"));
+}
+
+function getScheduleDay(dateKey) {
+  return state.generatedSchedule[dateKey] || emptyDay(dateKey);
+}
+
+function getRoomCapacity() {
+  return Math.max(1, getAppSettings().roomNames.length || 0);
+}
+
+function getShiftSlotTotal(dateKey, shiftType) {
+  const day = getScheduleDay(dateKey);
+  const key = shiftType === "early" ? "earlyAssignments" : "lateAssignments";
+  return Math.max(getRoomCapacity(), countAssignments(day[key]));
+}
+
+function recomputeScheduleStateForDates(dateKeys) {
+  [...new Set(dateKeys.filter(Boolean))].forEach((dateKey) => {
+    recomputeAssignmentWarningsForDate(dateKey);
+    refreshDayMetrics(dateKey);
+  });
+  state.generationSummary = summarizeGeneration();
+  syncSelectedBoardAssignment();
+  syncSelectedDistributionAssignment();
+}
+
+function recomputeAllScheduleState() {
+  recomputeScheduleStateForDates(state.dateList);
+}
+
+function confirmUnsavedNavigation(actionLabel) {
+  if (!state.hasUnsavedChanges) return true;
+  return window.confirm(`未保存の変更があります。${actionLabel}と保存前の調整内容が残ったままになります。続行しますか？`);
+}
+
+function isTimeOverlapping(left, right) {
+  return toMinutes(left.startTime) < toMinutes(right.endTime) && toMinutes(right.startTime) < toMinutes(left.endTime);
 }
 
 function syncSelectedDistributionAssignment() {
