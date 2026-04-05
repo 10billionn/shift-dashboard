@@ -398,7 +398,7 @@ function renderWeeklyAnalysis() {
 
 function renderBoardTimeline(day) {
   const hourLabels = buildBoardHourLabels(10, 27);
-  const lanes = [
+  const groups = [
     {
       key: "early",
       label: "早番",
@@ -421,40 +421,61 @@ function renderBoardTimeline(day) {
           ${hourLabels.map((label) => `<div class="board-hour-cell">${label}</div>`).join("")}
         </div>
       </div>
-      ${lanes.map((lane) => renderBoardLane(lane)).join("")}
+      ${groups.map((group) => renderBoardGroup(group)).join("")}
     </div>
   `;
 }
 
-function renderBoardLane(lane) {
-  const shortageCount = Math.max(lane.needed - lane.assignments.length, 0);
+function renderBoardGroup(group) {
+  const assignedLanes = packAssignmentsIntoBoardLanes(group.assignments);
+  const shortageCount = Math.max(group.needed - group.assignments.length, 0);
+  const visualLaneCount = Math.max(assignedLanes.length + shortageCount, Math.min(group.needed || 0, 3), 2);
+  const lanes = Array.from({ length: visualLaneCount }, (_, index) => {
+    if (index < assignedLanes.length) {
+      return { type: "assigned", items: assignedLanes[index], label: `${group.label}${index + 1}` };
+    }
+    if (index < assignedLanes.length + shortageCount) {
+      return { type: "shortage", items: [], label: `${group.label}${index + 1}` };
+    }
+    return { type: "empty", items: [], label: `${group.label}${index + 1}` };
+  });
 
   return `
-    <section class="board-lane">
-      <div class="board-lane-head">
-        <strong class="board-lane-title">${lane.label}</strong>
-        <span class="board-lane-meta">${lane.assignments.length}/${lane.needed}名</span>
+    <section class="board-group">
+      <div class="board-group-head">
+        <strong class="board-group-title">${group.label}</strong>
+        <span class="board-group-meta">${group.assignments.length}/${group.needed}名</span>
       </div>
-      <div class="board-track-wrap">
-        <div class="board-track">
-          ${lane.assignments.map((assignment, index) => renderBoardBar(assignment, index)).join("")}
-        </div>
-        <div class="board-shortage">
-          ${shortageCount
-            ? Array.from({ length: shortageCount }, (_, index) => `
-                <div class="board-shortage-item">
-                  <strong>空き枠 ${index + 1}</strong>
-                  <span>${lane.label} 未充足</span>
-                </div>
-              `).join("")
-            : `<span class="field-help">不足枠なし</span>`}
-        </div>
+      <div class="board-group-body">
+        ${lanes.map((lane, index) => renderBoardLaneRow(group, lane, index)).join("")}
       </div>
     </section>
   `;
 }
 
-function renderBoardBar(assignment, index) {
+function renderBoardLaneRow(group, lane, index) {
+  const shortageMarkup = lane.type === "shortage"
+    ? `<div class="board-gap board-gap-shortage">空き｜未配置</div>`
+    : lane.type === "empty"
+      ? `<div class="board-gap board-gap-empty">${group.label}枠</div>`
+      : lane.items.map((assignment) => renderBoardBar(assignment)).join("");
+
+  return `
+    <div class="board-lane">
+      <div class="board-lane-head">
+        <strong class="board-lane-title">枠 ${index + 1}</strong>
+        <span class="board-lane-meta">${lane.type === "shortage" ? "不足" : lane.type === "assigned" ? "稼働中" : "待機"}</span>
+      </div>
+      <div class="board-track-wrap">
+        <div class="board-track">
+          ${shortageMarkup}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderBoardBar(assignment) {
   const start = toMinutes(assignment.startTime);
   const end = toMinutes(assignment.endTime);
   const timelineStart = 10 * 60;
@@ -465,17 +486,45 @@ function renderBoardBar(assignment, index) {
   const total = timelineEnd - timelineStart;
   const left = ((clampedStart - timelineStart) / total) * 100;
   const width = Math.max((duration / total) * 100, 8);
-  const verticalOffset = 10 + (index % 2) * 12;
-  const barClass = assignment.himeReservation === "あり" ? "booked" : "normal";
-  const compactTime = `${formatHourLabel(assignment.startTime)}-${formatHourLabel(assignment.endTime)}`;
+  const barClass = assignment.warningArea
+    ? "warning"
+    : assignment.himeReservation === "あり"
+      ? "booked"
+      : "normal";
+  const compactTime = `${assignment.startTime}-${assignment.endTime}`;
   const reservationLabel = assignment.himeReservation === "あり" ? "姫" : "";
 
   return `
-    <div class="board-bar ${barClass}" style="left:${left}%; width:${width}%; top:${verticalOffset}px;">
+    <div class="board-bar ${barClass}" style="left:${left}%; width:${width}%;">
       <span class="board-bar-name">${assignment.name}</span>
-      <span class="board-bar-meta">${assignment.assignedArea}｜${compactTime}${reservationLabel ? `｜${reservationLabel}` : ""}</span>
+      <span class="board-bar-meta">${assignment.assignedArea}${reservationLabel ? `｜${reservationLabel}` : ""}</span>
+      <span class="board-bar-sub">${compactTime}</span>
     </div>
   `;
+}
+
+function packAssignmentsIntoBoardLanes(assignments) {
+  const sortedAssignments = assignments
+    .slice()
+    .sort((left, right) => toMinutes(left.startTime) - toMinutes(right.startTime) || toMinutes(left.endTime) - toMinutes(right.endTime));
+  const lanes = [];
+
+  sortedAssignments.forEach((assignment) => {
+    const start = toMinutes(assignment.startTime);
+    const targetLane = lanes.find((lane) => {
+      const last = lane[lane.length - 1];
+      return toMinutes(last.endTime) <= start;
+    });
+
+    if (targetLane) {
+      targetLane.push(assignment);
+      return;
+    }
+
+    lanes.push([assignment]);
+  });
+
+  return lanes;
 }
 
 function renderGenerationAlerts(checkSummary) {
