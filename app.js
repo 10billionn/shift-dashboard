@@ -7,6 +7,7 @@
   generationRows: [],
   generationErrors: [],
   generationWarnings: [],
+  appSettings: null,
   requirements: [],
   historyRows: [],
   generatedSchedule: {},
@@ -108,7 +109,15 @@ const elements = {
   copyAllMessagesButton: document.querySelector("#copyAllMessagesButton"),
   copyMessageButton: document.querySelector("#copyMessageButton"),
   copyStatus: document.querySelector("#copyStatus"),
-  globalToast: document.querySelector("#globalToast")
+  globalToast: document.querySelector("#globalToast"),
+  settingsDefaultEarlySlots: document.querySelector("#settingsDefaultEarlySlots"),
+  settingsDefaultLateSlots: document.querySelector("#settingsDefaultLateSlots"),
+  settingsBusinessStartHour: document.querySelector("#settingsBusinessStartHour"),
+  settingsBusinessEndHour: document.querySelector("#settingsBusinessEndHour"),
+  settingsAverageUnitPrice: document.querySelector("#settingsAverageUnitPrice"),
+  settingsStoreRate: document.querySelector("#settingsStoreRate"),
+  settingsAreas: document.querySelector("#settingsAreas"),
+  settingsRoomNames: document.querySelector("#settingsRoomNames")
 };
 
 initialize();
@@ -184,6 +193,16 @@ function bindEvents() {
   elements.requestList.addEventListener("click", handleRequestListClick);
   elements.requestList.addEventListener("change", handleRequestListChange);
   elements.requirementsList.addEventListener("change", handleRequirementChange);
+  [
+    elements.settingsDefaultEarlySlots,
+    elements.settingsDefaultLateSlots,
+    elements.settingsBusinessStartHour,
+    elements.settingsBusinessEndHour,
+    elements.settingsAverageUnitPrice,
+    elements.settingsStoreRate,
+    elements.settingsAreas,
+    elements.settingsRoomNames
+  ].forEach((input) => input?.addEventListener("change", handleSettingsChange));
   [elements.earlyShiftList, elements.lateShiftList].forEach((list) => {
     list.addEventListener("dragstart", handleShiftDragStart);
     list.addEventListener("dragend", handleShiftDragEnd);
@@ -252,6 +271,7 @@ function hydrateState(saved) {
   state.activeAppView = saved.activeAppView || "dashboard";
   state.activeDashboardView = saved.activeDashboardView || "list";
   state.activeShiftTab = saved.activeShiftTab || "early";
+  state.appSettings = saved.appSettings ? restoreAppSettings(saved.appSettings) : cloneAppSettings(samplePrototypeData.settings);
   state.distributionFormat = ["line", "simple"].includes(saved.distributionFormat) ? saved.distributionFormat : "line";
   state.copiedDistributionIds = Array.isArray(saved.copiedDistributionIds) ? saved.copiedDistributionIds : [];
   state.distributionPendingOnly = Boolean(saved.distributionPendingOnly);
@@ -282,6 +302,7 @@ function loadSampleState() {
   state.activeAppView = "dashboard";
   state.activeDashboardView = "list";
   state.activeShiftTab = "early";
+  state.appSettings = cloneAppSettings(samplePrototypeData.settings);
   state.distributionFormat = "line";
   state.copiedDistributionIds = [];
   state.distributionPendingOnly = false;
@@ -322,6 +343,7 @@ function renderCurrentView() {
   renderDashboard();
   renderGeneration();
   renderDistribution();
+  renderSettings();
 }
 
 function renderSaveState() {
@@ -329,12 +351,24 @@ function renderSaveState() {
   elements.saveStateNotice.className = `save-state-notice ${state.hasUnsavedChanges ? "warning" : "saved"}`;
 }
 
+function renderSettings() {
+  const settings = getAppSettings();
+  elements.settingsDefaultEarlySlots.value = settings.defaultEarlySlots;
+  elements.settingsDefaultLateSlots.value = settings.defaultLateSlots;
+  elements.settingsBusinessStartHour.value = settings.businessStartHour;
+  elements.settingsBusinessEndHour.value = settings.businessEndHour;
+  elements.settingsAverageUnitPrice.value = settings.averageUnitPrice;
+  elements.settingsStoreRate.value = settings.storeRate;
+  elements.settingsAreas.value = settings.areas.join("\n");
+  elements.settingsRoomNames.value = settings.roomNames.join("\n");
+}
+
 function renderDashboard() {
   const day = state.generatedSchedule[state.selectedDate] || emptyDay(state.selectedDate);
   const requirement = findRequirement(state.selectedDate);
   const cutRows = getCutRowsForDate(state.selectedDate);
-  const earlySlotTotal = Math.max(DASHBOARD_SLOT_COUNT, requirement.earlyNeeded || 0);
-  const lateSlotTotal = Math.max(DASHBOARD_SLOT_COUNT, requirement.lateNeeded || 0);
+  const earlySlotTotal = Math.max(getAppSettings().defaultEarlySlots, requirement.earlyNeeded || 0);
+  const lateSlotTotal = Math.max(getAppSettings().defaultLateSlots, requirement.lateNeeded || 0);
   const earlyFilled = countAssignments(day.earlyAssignments);
   const lateFilled = countAssignments(day.lateAssignments);
   const displayNeeded = earlySlotTotal + lateSlotTotal;
@@ -428,6 +462,7 @@ function renderShiftTabState() {
 }
 function renderShiftSlots(assignments, shiftLabel, slotTotal) {
   return Array.from({ length: slotTotal }, (_, index) => {
+    const roomLabel = getRoomLabel(index);
     const assignment = assignments[index];
     if (!assignment) {
       return `
@@ -444,7 +479,7 @@ function renderShiftSlots(assignments, shiftLabel, slotTotal) {
           <div class="shift-summary-grid slot-summary-grid">
             <div class="shift-summary-item">
               <span class="field-label">枠名</span>
-              <span class="field-value">Room ${index + 1}</span>
+              <span class="field-value">${roomLabel}</span>
             </div>
             <div class="shift-summary-item">
               <span class="field-label">状態</span>
@@ -488,7 +523,7 @@ function renderShiftSlots(assignments, shiftLabel, slotTotal) {
         <div class="shift-card-top">
           <div>
             <strong class="therapist-name">${shiftLabel}${index + 1} / ${assignment.name}</strong>
-            <div class="field-help">Room ${index + 1} / ${shiftLabel}の配置</div>
+            <div class="field-help">${roomLabel} / ${shiftLabel}の配置</div>
           </div>
           <div class="status-row tight">
             <span class="mini-badge rank">${profile.rank}</span>
@@ -500,13 +535,13 @@ function renderShiftSlots(assignments, shiftLabel, slotTotal) {
         <div class="shift-summary-grid slot-summary-grid">
           <div class="shift-summary-item">
             <span class="field-label">枠名</span>
-            <span class="field-value">Room ${index + 1}</span>
+            <span class="field-value">${roomLabel}</span>
           </div>
           <div class="shift-summary-item area-field">
             <span class="field-label">エリア</span>
             ${state.editingAreaAssignmentId === assignment.id ? `
               <select class="select-input compact-select" data-list-field="assignedArea" data-assignment-id="${assignment.id}">
-                ${samplePrototypeData.settings.areas.map((area) => `<option value="${area}" ${area === assignment.assignedArea ? "selected" : ""}>${area}</option>`).join("")}
+                ${getAppSettings().areas.map((area) => `<option value="${area}" ${area === assignment.assignedArea ? "selected" : ""}>${area}</option>`).join("")}
               </select>
             ` : `
               <button class="field-value clickable-field" type="button" data-area-trigger="${assignment.id}">${assignment.assignedArea}</button>
@@ -580,7 +615,8 @@ function renderWeeklyAnalysis() {
 }
 
 function renderBoardTimeline(day) {
-  const hourLabels = buildBoardHourLabels(10, 27);
+  const settings = getAppSettings();
+  const hourLabels = buildBoardHourLabels(settings.businessStartHour, settings.businessEndHour);
   const groups = [
     {
       key: "early",
@@ -611,7 +647,7 @@ function renderBoardTimeline(day) {
 
 function renderBoardGroup(group) {
   const assignedLanes = packAssignmentsIntoBoardLanes(group.assignments);
-  const targetLaneCount = Math.max(DASHBOARD_SLOT_COUNT, group.needed || 0);
+  const targetLaneCount = Math.max(getAppSettings().roomNames.length, getAppSettings().defaultEarlySlots, getAppSettings().defaultLateSlots, group.needed || 0);
   const shortageCount = Math.max(targetLaneCount - group.assignments.length, 0);
   const visualLaneCount = Math.max(assignedLanes.length + shortageCount, targetLaneCount, 2);
   const lanes = Array.from({ length: visualLaneCount }, (_, index) => {
@@ -638,16 +674,17 @@ function renderBoardGroup(group) {
 }
 
 function renderBoardLaneRow(group, lane, index) {
+  const roomLabel = getRoomLabel(index);
   const shortageMarkup = lane.type === "shortage"
     ? `<div class="board-gap board-gap-shortage">空き｜未配置</div>`
     : lane.type === "empty"
-      ? `<div class="board-gap board-gap-empty">Room ${index + 1}</div>`
+      ? `<div class="board-gap board-gap-empty">${roomLabel}</div>`
       : lane.items.map((assignment) => renderBoardBar(assignment)).join("");
 
   return `
     <div class="board-lane">
       <div class="board-lane-head">
-        <strong class="board-lane-title">Room ${index + 1}</strong>
+        <strong class="board-lane-title">${roomLabel}</strong>
         <span class="board-lane-meta">${lane.type === "shortage" ? "不足" : lane.type === "assigned" ? "稼働中" : "待機"}</span>
       </div>
       <div class="board-track-wrap">
@@ -660,11 +697,12 @@ function renderBoardLaneRow(group, lane, index) {
 }
 
 function renderBoardBar(assignment) {
+  const settings = getAppSettings();
   const profile = samplePrototypeData.therapistProfiles[assignment.name] || { flags: [], rank: "G" };
   const start = toMinutes(assignment.startTime);
   const end = toMinutes(assignment.endTime);
-  const timelineStart = 10 * 60;
-  const timelineEnd = 27 * 60;
+  const timelineStart = settings.businessStartHour * 60;
+  const timelineEnd = settings.businessEndHour * 60;
   const clampedStart = Math.max(start, timelineStart);
   const clampedEnd = Math.min(end, timelineEnd);
   const duration = Math.max(clampedEnd - clampedStart, 60);
@@ -826,7 +864,7 @@ function renderRequestRows() {
             <span class="field-label">エリア調整</span>
             <select class="select-input" data-row-field="preferredArea">
               <option value="">未設定</option>
-              ${samplePrototypeData.settings.areas.map((area) => `<option value="${area}" ${area === row.preferredArea ? "selected" : ""}>${area}</option>`).join("")}
+              ${getAppSettings().areas.map((area) => `<option value="${area}" ${area === row.preferredArea ? "selected" : ""}>${area}</option>`).join("")}
             </select>
           </label>
           <label class="field-block">
@@ -867,7 +905,7 @@ function renderBoardInspector(day) {
   }
 
   const profile = samplePrototypeData.therapistProfiles[assignment.name] || { rank: "G", areas: [] };
-  const availableAreas = samplePrototypeData.settings.areas;
+  const availableAreas = getAppSettings().areas;
   const status = analyzeAssignmentStatus(assignment, profile);
   const statusTone = status.level === "danger" ? "danger" : status.level === "warning" ? "warning" : "ok";
 
@@ -908,6 +946,13 @@ function renderBoardInspector(day) {
         <strong>判断理由</strong>
         <div>${status.reasons.map((reason) => `<div>・${reason}</div>`).join("")}</div>
       </div>
+
+      ${assignment.generationReasons?.length ? `
+        <div class="alert-box ok">
+          <strong>生成理由</strong>
+          <div>${assignment.generationReasons.map((reason) => `<div>・${reason}</div>`).join("")}</div>
+        </div>
+      ` : ""}
 
       <label class="field-block">
         <span class="field-label">エリア変更</span>
@@ -1121,6 +1166,34 @@ function handleRequirementChange(event) {
   persistState();
 }
 
+function handleSettingsChange() {
+  const nextSettings = {
+    ...getAppSettings(),
+    defaultEarlySlots: Math.max(0, Number(elements.settingsDefaultEarlySlots.value) || 0),
+    defaultLateSlots: Math.max(0, Number(elements.settingsDefaultLateSlots.value) || 0),
+    businessStartHour: Math.max(0, Number(elements.settingsBusinessStartHour.value) || 0),
+    businessEndHour: Math.max(12, Number(elements.settingsBusinessEndHour.value) || 27),
+    averageUnitPrice: Math.max(0, Number(elements.settingsAverageUnitPrice.value) || 0),
+    storeRate: Math.max(0, Number(elements.settingsStoreRate.value) || 0),
+    areas: parseLineList(elements.settingsAreas.value),
+    roomNames: parseLineList(elements.settingsRoomNames.value)
+  };
+
+  state.appSettings = normalizeAppSettings(nextSettings);
+  state.requirements = state.requirements.map((item) => ({
+    ...item,
+    earlyNeeded: Math.max(item.earlyNeeded || 0, state.appSettings.defaultEarlySlots),
+    lateNeeded: Math.max(item.lateNeeded || 0, state.appSettings.defaultLateSlots)
+  }));
+  markGenerationDirty();
+  persistState();
+  if (Object.keys(state.generatedSchedule).length) {
+    runGeneration("設定変更を反映しました。");
+  } else {
+    renderCurrentView();
+  }
+}
+
 function applyRequestCsv() {
   const parsed = parseRequestCsv(elements.requestCsvText.value);
   state.generationRows = createGenerationRows(parsed.rows);
@@ -1161,6 +1234,7 @@ function markGenerationDirty() {
 
 function buildGeneratedSchedule() {
   const schedule = {};
+  const settings = getAppSettings();
 
   state.dateList.forEach((dateKey) => {
     const requirement = findRequirement(dateKey);
@@ -1173,15 +1247,15 @@ function buildGeneratedSchedule() {
     const earlyAssignedNames = new Set(pickedEarly.map((item) => item.name));
     const latePool = acceptedRows.filter((row) => supportsShift(row, "late") && !earlyAssignedNames.has(row.name));
 
-    const earlyAssignments = pickedEarly.map((row) => toAssignment(row, "early", dateKey));
-    const lateAssignments = latePool.slice(0, requirement.lateNeeded).map((row) => toAssignment(row, "late", dateKey));
+    const earlyAssignments = pickedEarly.map((row) => toAssignment(row, "early", dateKey, requirement, acceptedRows));
+    const lateAssignments = latePool.slice(0, requirement.lateNeeded).map((row) => toAssignment(row, "late", dateKey, requirement, acceptedRows));
 
     const filled = earlyAssignments.length + lateAssignments.length;
     const needed = requirement.earlyNeeded + requirement.lateNeeded;
     const shortage = Math.max(needed - filled, 0);
     const history = state.historyRows.find((row) => row.dateKey === dateKey);
-    const salesForecast = history?.salesForecast || filled * samplePrototypeData.settings.averageUnitPrice * 2;
-    const storeForecast = history?.storeForecast || Math.round(salesForecast * (samplePrototypeData.settings.storeRate / 100));
+    const salesForecast = history?.salesForecast || filled * settings.averageUnitPrice * 2;
+    const storeForecast = history?.storeForecast || Math.round(salesForecast * (settings.storeRate / 100));
 
     schedule[dateKey] = {
       dateKey,
@@ -1210,20 +1284,31 @@ function summarizeGeneration() {
   }, { sales: 0, store: 0, shortage: 0 });
 }
 
-function toAssignment(row, shiftType, dateKey) {
+function toAssignment(row, shiftType, dateKey, requirement, acceptedRows) {
+  const settings = getAppSettings();
+  const reasonTags = [];
+  if (row.himeReservation === "あり") reasonTags.push("姫優先");
+  if (supportsArea(row.name, row.preferredArea)) reasonTags.push("エリア適正");
+  if ((shiftType === "late" && toMinutes(row.endTime) >= 21 * 60) || (shiftType === "early" && toMinutes(row.startTime) <= 12 * 60)) {
+    reasonTags.push("時間帯優先");
+  }
+  const candidateCount = acceptedRows.filter((item) => supportsShift(item, shiftType)).length;
+  const neededCount = shiftType === "early" ? requirement.earlyNeeded : requirement.lateNeeded;
+  if (candidateCount <= neededCount + 1) reasonTags.push("不足補完");
   return {
     id: row.id,
     dateKey,
     name: row.name,
     shiftType,
-    shiftLabel: shiftType === "early" ? samplePrototypeData.settings.shiftLabels.early : samplePrototypeData.settings.shiftLabels.late,
+    shiftLabel: shiftType === "early" ? settings.shiftLabels.early : settings.shiftLabels.late,
     preferredArea: row.preferredArea,
     assignedArea: row.preferredArea,
     startTime: row.startTime,
     endTime: row.endTime,
     himeReservation: row.himeReservation,
     note: row.note,
-    warningArea: !supportsArea(row.name, row.preferredArea)
+    warningArea: !supportsArea(row.name, row.preferredArea),
+    generationReasons: [...new Set(reasonTags)].slice(0, 3)
   };
 }
 
@@ -1299,14 +1384,14 @@ function moveAssignmentBetweenSlots(source, target) {
   targetSlots[target.slotIndex] = {
     ...moving,
     shiftType: target.shiftType,
-    shiftLabel: target.shiftType === "early" ? samplePrototypeData.settings.shiftLabels.early : samplePrototypeData.settings.shiftLabels.late
+    shiftLabel: target.shiftType === "early" ? getAppSettings().shiftLabels.early : getAppSettings().shiftLabels.late
   };
 
   if (source.shiftType !== target.shiftType && swapped) {
     sourceSlots[source.slotIndex] = {
       ...swapped,
       shiftType: source.shiftType,
-      shiftLabel: source.shiftType === "early" ? samplePrototypeData.settings.shiftLabels.early : samplePrototypeData.settings.shiftLabels.late
+      shiftLabel: source.shiftType === "early" ? getAppSettings().shiftLabels.early : getAppSettings().shiftLabels.late
     };
   }
 
@@ -1344,7 +1429,7 @@ function collectMoveWarnings(assignment) {
 }
 
 function createSlotArray(assignments, shiftType) {
-  const slotTotal = Math.max(DASHBOARD_SLOT_COUNT, findRequirement(state.selectedDate)[shiftType === "early" ? "earlyNeeded" : "lateNeeded"] || 0);
+  const slotTotal = Math.max(getAppSettings()[shiftType === "early" ? "defaultEarlySlots" : "defaultLateSlots"], findRequirement(state.selectedDate)[shiftType === "early" ? "earlyNeeded" : "lateNeeded"] || 0);
   return Array.from({ length: slotTotal }, (_, index) => {
     const item = assignments[index] || null;
     return item ? { ...item } : null;
@@ -1450,7 +1535,7 @@ function parseMoveTarget(value) {
   const matched = earlyMatch || lateMatch;
   if (!matched) return null;
   const slotIndex = Number(matched[2]) - 1;
-  if (slotIndex < 0 || slotIndex >= DASHBOARD_SLOT_COUNT) return null;
+  if (slotIndex < 0 || slotIndex >= Math.max(getAppSettings().roomNames.length, getAppSettings().defaultEarlySlots, getAppSettings().defaultLateSlots)) return null;
   return {
     shiftType: earlyMatch ? "early" : "late",
     slotIndex
@@ -1554,7 +1639,7 @@ function collectRowIssues(row) {
   if (!row.startTime || !row.endTime) issues.push("時間未入力");
   if (!row.preferredArea) issues.push("希望エリア未入力");
   if (row.himeReservation !== "あり" && row.himeReservation !== "なし") issues.push("姫予約未設定");
-  if (row.preferredArea && !samplePrototypeData.settings.areas.includes(row.preferredArea)) issues.push("非対応エリア含む");
+  if (row.preferredArea && !getAppSettings().areas.includes(row.preferredArea)) issues.push("非対応エリア含む");
   return issues;
 }
 
@@ -1577,14 +1662,14 @@ function buildCheckSummary(rows, missingTherapists) {
     slots: state.dateList.map((dateKey) => {
       const requirement = findRequirement(dateKey);
       const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
-      const earlyNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.earlyNeeded || 0);
-      const lateNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.lateNeeded || 0);
+      const earlyNeeded = Math.max(getAppSettings().defaultEarlySlots, requirement.earlyNeeded || 0);
+      const lateNeeded = Math.max(getAppSettings().defaultLateSlots, requirement.lateNeeded || 0);
       return `${formatSlashDate(dateKey)}(${formatWeekday(dateKey)}) 早番 必要 ${earlyNeeded} / 採用 ${countAssignments(day.earlyAssignments)} / 不足 ${Math.max(earlyNeeded - countAssignments(day.earlyAssignments), 0)} ｜ 遅番 必要 ${lateNeeded} / 採用 ${countAssignments(day.lateAssignments)} / 不足 ${Math.max(lateNeeded - countAssignments(day.lateAssignments), 0)}`;
     }),
     shortages: state.dateList
       .map((dateKey) => {
-        const day = state.generatedSchedule[dateKey];
-        return day?.metrics.shortage ? `${formatSlashDate(dateKey)}(${formatWeekday(dateKey)}) 不足 ${day.metrics.shortage}名` : "";
+      const day = state.generatedSchedule[dateKey];
+      return day?.metrics.shortage ? `${formatSlashDate(dateKey)}(${formatWeekday(dateKey)}) 不足 ${day.metrics.shortage}枠` : "";
       })
       .filter(Boolean)
   };
@@ -1618,8 +1703,8 @@ function buildDashboardRiskSummary() {
   const maxShortage = state.dateList.reduce((best, dateKey) => {
     const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
     const requirement = findRequirement(dateKey);
-    const earlyNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.earlyNeeded || 0);
-    const lateNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.lateNeeded || 0);
+    const earlyNeeded = Math.max(getAppSettings().defaultEarlySlots, requirement.earlyNeeded || 0);
+    const lateNeeded = Math.max(getAppSettings().defaultLateSlots, requirement.lateNeeded || 0);
     const earlyShortage = Math.max(earlyNeeded - countAssignments(day.earlyAssignments), 0);
     const lateShortage = Math.max(lateNeeded - countAssignments(day.lateAssignments), 0);
     if (earlyShortage > best.count) return { label: `${formatSlashDate(dateKey)} 早番 ${earlyShortage}枠`, count: earlyShortage };
@@ -1659,8 +1744,8 @@ function buildPriorityFixes() {
   const totalShortage = state.dateList.reduce((count, dateKey) => {
     const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
     const requirement = findRequirement(dateKey);
-    const earlyNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.earlyNeeded || 0);
-    const lateNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.lateNeeded || 0);
+    const earlyNeeded = Math.max(getAppSettings().defaultEarlySlots, requirement.earlyNeeded || 0);
+    const lateNeeded = Math.max(getAppSettings().defaultLateSlots, requirement.lateNeeded || 0);
     return count + Math.max(earlyNeeded - countAssignments(day.earlyAssignments), 0) + Math.max(lateNeeded - countAssignments(day.lateAssignments), 0);
   }, 0);
   if (totalShortage) {
@@ -1681,8 +1766,8 @@ function buildPreGenerationSummary(rows) {
   const accepted = rows.filter((row) => row.status === "accepted");
   const hold = rows.filter((row) => row.status === "hold");
   const cut = rows.filter((row) => row.status === "cut");
-  const earlyCapacity = state.dateList.reduce((count, dateKey) => count + Math.max(DASHBOARD_SLOT_COUNT, findRequirement(dateKey).earlyNeeded || 0), 0);
-  const lateCapacity = state.dateList.reduce((count, dateKey) => count + Math.max(DASHBOARD_SLOT_COUNT, findRequirement(dateKey).lateNeeded || 0), 0);
+  const earlyCapacity = state.dateList.reduce((count, dateKey) => count + Math.max(getAppSettings().defaultEarlySlots, findRequirement(dateKey).earlyNeeded || 0), 0);
+  const lateCapacity = state.dateList.reduce((count, dateKey) => count + Math.max(getAppSettings().defaultLateSlots, findRequirement(dateKey).lateNeeded || 0), 0);
   const earlyCandidates = accepted.filter((row) => supportsShift(row, "early")).length;
   const lateCandidates = accepted.filter((row) => supportsShift(row, "late")).length;
 
@@ -1761,6 +1846,7 @@ function buildPriorityTags(item) {
   if (note.includes("ヘルプ")) tags.push("ヘルプ可");
   if (item.himeReservation === "あり") tags.push("姫予約あり");
   (item.manualWarnings || []).forEach((warning) => tags.push(warning));
+  (item.generationReasons || []).forEach((reason) => tags.push(reason));
   return [...new Set(tags)].slice(0, 3);
 }
 
@@ -1773,7 +1859,11 @@ function selectAttendanceFlag(flags) {
 }
 
 function findRequirement(dateKey) {
-  return state.requirements.find((item) => item.dateKey === dateKey) || { dateKey, earlyNeeded: 0, lateNeeded: 0 };
+  return state.requirements.find((item) => item.dateKey === dateKey) || {
+    dateKey,
+    earlyNeeded: getAppSettings().defaultEarlySlots,
+    lateNeeded: getAppSettings().defaultLateSlots
+  };
 }
 
 function cloneRequirements(rows) {
@@ -1822,10 +1912,11 @@ function syncSelectedDistributionAssignment() {
 }
 
 function buildDistributionMessage(item) {
+  const reservationLabel = item.himeReservation === "あり" ? "あり" : "なし";
   if (state.distributionFormat === "simple") {
-    return `${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})\n${item.assignedArea}\n${item.startTime}-${normalizeDistributionEnd(item.endTime)}\n${item.himeReservation === "あり" ? "姫予約あり" : "通常"}\nよろしくお願いします`;
+    return `${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})\nエリア：${item.assignedArea}\n時間：${item.startTime}-${normalizeDistributionEnd(item.endTime)}\n姫予約：${reservationLabel}\nよろしくお願いします。`;
   }
-  return `【${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})】\n${item.assignedArea}\n${item.startTime}-${normalizeDistributionEnd(item.endTime)}\n${item.himeReservation === "あり" ? "姫予約あり" : "姫予約なし"}\nよろしくお願いします`;
+  return `【${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)}) 本日のシフト】\nエリア：${item.assignedArea}\n時間：${item.startTime}-${normalizeDistributionEnd(item.endTime)}\n姫予約：${reservationLabel}\n\nよろしくお願いします。`;
 }
 
 async function copyAllDistributionMessages() {
@@ -2011,6 +2102,48 @@ function formatCompactYen(value) {
   return `${Math.round((Number(value || 0) / 1000))}千円`;
 }
 
+function getAppSettings() {
+  return state.appSettings || cloneAppSettings(samplePrototypeData.settings);
+}
+
+function cloneAppSettings(settings) {
+  return normalizeAppSettings({
+    ...settings,
+    shiftLabels: settings.shiftLabels || samplePrototypeData.settings.shiftLabels
+  });
+}
+
+function restoreAppSettings(settings) {
+  return normalizeAppSettings(settings);
+}
+
+function normalizeAppSettings(settings) {
+  return {
+    startDate: settings.startDate || samplePrototypeData.settings.startDate,
+    days: Number(settings.days) || samplePrototypeData.settings.days,
+    defaultEarlySlots: Number(settings.defaultEarlySlots) || samplePrototypeData.settings.defaultEarlySlots || DASHBOARD_SLOT_COUNT,
+    defaultLateSlots: Number(settings.defaultLateSlots) || samplePrototypeData.settings.defaultLateSlots || DASHBOARD_SLOT_COUNT,
+    businessStartHour: Number(settings.businessStartHour) || samplePrototypeData.settings.businessStartHour || 11,
+    businessEndHour: Number(settings.businessEndHour) || samplePrototypeData.settings.businessEndHour || 27,
+    areas: Array.isArray(settings.areas) && settings.areas.length ? settings.areas : [...samplePrototypeData.settings.areas],
+    roomNames: Array.isArray(settings.roomNames) && settings.roomNames.length ? settings.roomNames : Array.from({ length: Math.max(samplePrototypeData.settings.defaultEarlySlots || DASHBOARD_SLOT_COUNT, 7) }, (_, index) => `Room ${index + 1}`),
+    shiftLabels: settings.shiftLabels || samplePrototypeData.settings.shiftLabels,
+    averageUnitPrice: Number(settings.averageUnitPrice) || samplePrototypeData.settings.averageUnitPrice,
+    storeRate: Number(settings.storeRate) || samplePrototypeData.settings.storeRate
+  };
+}
+
+function parseLineList(value) {
+  return String(value || "")
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function getRoomLabel(index) {
+  return getAppSettings().roomNames[index] || `Room ${index + 1}`;
+}
+
 function escapeHtml(text) {
   return String(text || "")
     .replaceAll("&", "&amp;")
@@ -2108,6 +2241,7 @@ function persistState() {
       })),
       requirements: state.requirements,
       historyRows: state.historyRows,
+      appSettings: state.appSettings,
       generatedSchedule: state.generatedSchedule
     }));
   } catch (error) {

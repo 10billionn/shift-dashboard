@@ -2,7 +2,12 @@
   settings: {
     startDate: "2026-04-06",
     days: 7,
+    defaultEarlySlots: 7,
+    defaultLateSlots: 7,
+    businessStartHour: 11,
+    businessEndHour: 27,
     areas: ["葛西", "浦安", "船橋", "浅草橋", "八千代"],
+    roomNames: ["葛西1", "葛西2", "船橋1", "浦安1", "浅草橋1", "八千代1", "予備1"],
     shiftLabels: {
       early: "早番",
       late: "遅番"

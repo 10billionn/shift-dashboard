@@ -808,6 +808,39 @@ pre {
   gap: 12px;
 }
 
+.csv-example {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.csv-example code {
+  font-family: Consolas, monospace;
+  font-size: 0.8rem;
+  color: var(--navy);
+  word-break: break-all;
+}
+
+.operational-settings-grid {
+  align-items: start;
+}
+
+.settings-card {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-card-wide {
+  grid-column: 1 / -1;
+}
+
+.compact-textarea {
+  min-height: 120px;
+}
+
 .request-edit-grid {
   padding-top: 10px;
   border-top: 1px solid var(--line);
