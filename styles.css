@@ -429,7 +429,13 @@ pre {
 }
 
 .dashboard-view-panel.active {
-  display: block;
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-legend-panel {
+  padding: 12px 14px;
+  background: rgba(247, 249, 252, 0.92);
 }
 
 .shift-columns {
@@ -539,6 +545,8 @@ pre {
 
 .dashboard-secondary-block {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.94));
+  border-color: rgba(188, 200, 218, 0.78);
+  box-shadow: 0 10px 22px rgba(17, 36, 63, 0.05);
 }
 
 .drop-slot {
