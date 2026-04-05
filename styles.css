@@ -321,6 +321,12 @@ pre {
   font-weight: 800;
 }
 
+.risk-summary-item small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
 .risk-summary-item.danger {
   background: linear-gradient(135deg, rgba(198, 84, 84, 0.14), rgba(226, 140, 163, 0.18));
   border-color: rgba(198, 84, 84, 0.28);
@@ -1159,9 +1165,18 @@ pre {
   cursor: pointer;
 }
 
+.distribution-item.pending {
+  border-color: rgba(226, 140, 163, 0.38);
+}
+
+.distribution-item.copied {
+  opacity: 0.68;
+}
+
 .distribution-item.active {
   border-color: var(--navy);
   background: #eef4ff;
+  opacity: 1;
 }
 
 .distribution-item-top strong {
@@ -1216,6 +1231,19 @@ pre {
 
 .accent-panel {
   background: linear-gradient(135deg, rgba(17, 36, 63, 0.04), rgba(46, 107, 203, 0.06));
+}
+
+.filter-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+.filter-check input {
+  width: 18px;
+  height: 18px;
 }
 
 @media (min-width: 769px) {
@@ -1308,6 +1336,14 @@ pre {
 
   .compact-select {
     max-width: none;
+  }
+
+  .drag-handle,
+  .clickable-field,
+  .legend-chip,
+  .mini-badge,
+  .priority-tag {
+    min-height: 34px;
   }
 
   .card-edit-grid,

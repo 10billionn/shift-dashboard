@@ -15,10 +15,12 @@
   selectedDistributionAssignmentId: "",
   distributionFormat: "line",
   copiedDistributionIds: [],
+  distributionPendingOnly: false,
   selectedBoardAssignmentId: "",
   updatedBoardAssignmentId: "",
   editingAreaAssignmentId: "",
   hasUnsavedChanges: false,
+  hasManualAdjustments: false,
   mobileMenuOpen: false
 };
 
@@ -99,6 +101,7 @@ const elements = {
   generateScheduleButton: document.querySelector("#generateScheduleButton"),
   generationResultNote: document.querySelector("#generationResultNote"),
   distributionDateSelect: document.querySelector("#distributionDateSelect"),
+  distributionPendingOnly: document.querySelector("#distributionPendingOnly"),
   distributionList: document.querySelector("#distributionList"),
   distributionPreview: document.querySelector("#distributionPreview"),
   distributionFormatSelect: document.querySelector("#distributionFormatSelect"),
@@ -214,6 +217,12 @@ function bindEvents() {
     persistState();
     renderDistribution();
   });
+  elements.distributionPendingOnly.addEventListener("change", () => {
+    state.distributionPendingOnly = elements.distributionPendingOnly.checked;
+    syncSelectedDistributionAssignment();
+    persistState();
+    renderDistribution();
+  });
   elements.distributionFormatSelect.addEventListener("change", () => {
     state.distributionFormat = elements.distributionFormatSelect.value;
     persistState();
@@ -245,10 +254,12 @@ function hydrateState(saved) {
   state.activeShiftTab = saved.activeShiftTab || "early";
   state.distributionFormat = ["line", "simple"].includes(saved.distributionFormat) ? saved.distributionFormat : "line";
   state.copiedDistributionIds = Array.isArray(saved.copiedDistributionIds) ? saved.copiedDistributionIds : [];
+  state.distributionPendingOnly = Boolean(saved.distributionPendingOnly);
   state.selectedBoardAssignmentId = saved.selectedBoardAssignmentId || "";
   state.updatedBoardAssignmentId = "";
   state.editingAreaAssignmentId = "";
   state.hasUnsavedChanges = Boolean(saved.hasUnsavedChanges);
+  state.hasManualAdjustments = Boolean(saved.hasManualAdjustments);
   state.requirements = Array.isArray(saved.requirements) && saved.requirements.length
     ? cloneRequirements(saved.requirements)
     : cloneRequirements(samplePrototypeData.requirements);
@@ -273,10 +284,12 @@ function loadSampleState() {
   state.activeShiftTab = "early";
   state.distributionFormat = "line";
   state.copiedDistributionIds = [];
+  state.distributionPendingOnly = false;
   state.selectedBoardAssignmentId = "";
   state.updatedBoardAssignmentId = "";
   state.editingAreaAssignmentId = "";
   state.hasUnsavedChanges = false;
+  state.hasManualAdjustments = false;
   state.requirements = cloneRequirements(samplePrototypeData.requirements);
   state.generationRows = createGenerationRows(samplePrototypeData.shiftRequests);
   state.historyRows = [...samplePrototypeData.weeklyPerformance];
@@ -368,11 +381,15 @@ function renderGeneration() {
 
 function renderDistribution() {
   elements.distributionFormatSelect.value = state.distributionFormat;
+  elements.distributionPendingOnly.checked = state.distributionPendingOnly;
   elements.distributionDateSelect.innerHTML = state.dateList
     .map((dateKey) => `<option value="${dateKey}" ${dateKey === state.selectedDistributionDate ? "selected" : ""}>${formatDisplayDate(dateKey)} (${formatWeekday(dateKey)})</option>`)
     .join("");
 
-  const items = getAssignmentsForDate(state.selectedDistributionDate);
+  const allItems = getAssignmentsForDate(state.selectedDistributionDate);
+  const items = state.distributionPendingOnly
+    ? allItems.filter((item) => !state.copiedDistributionIds.includes(item.id))
+    : allItems;
   syncSelectedDistributionAssignment();
 
   if (!items.length) {
@@ -705,6 +722,15 @@ function packAssignmentsIntoBoardLanes(assignments) {
 
 function renderGenerationAlerts(checkSummary) {
   const blocks = [];
+  if (checkSummary.generationSummary.length) {
+    blocks.push(`
+      <article class="alert-box ok">
+        <strong>生成前サマリー</strong>
+        <div>${checkSummary.generationSummary.map((item) => `<div>${item}</div>`).join("")}</div>
+      </article>
+    `);
+  }
+
   if (checkSummary.priorityFixes.length) {
     blocks.push(`
       <article class="alert-box danger">
@@ -918,8 +944,9 @@ function renderRequirements() {
 }
 
 function renderDistributionItem(item) {
+  const copied = state.copiedDistributionIds.includes(item.id);
   return `
-    <article class="distribution-item ${item.id === state.selectedDistributionAssignmentId ? "active" : ""}" data-distribution-id="${item.id}">
+    <article class="distribution-item ${item.id === state.selectedDistributionAssignmentId ? "active" : ""} ${copied ? "copied" : "pending"}" data-distribution-id="${item.id}">
       <div class="distribution-item-top">
         <div>
           <strong>${item.name}</strong>
@@ -928,7 +955,7 @@ function renderDistributionItem(item) {
         <div class="status-row tight">
           <span class="shift-chip ${item.shiftType}">${item.shiftLabel}</span>
           <span class="mini-badge rank">${state.distributionFormat === "line" ? "LINE" : "簡易"}</span>
-          ${state.copiedDistributionIds.includes(item.id) ? `<span class="mini-badge booked">コピー済み</span>` : ""}
+          ${copied ? `<span class="mini-badge booked">配布済み</span>` : `<span class="mini-badge pink">未配布</span>`}
         </div>
       </div>
       <div class="distribution-summary-grid">
@@ -1054,8 +1081,12 @@ function handleShiftDrop(event) {
 }
 
 function handleGenerateScheduleClick() {
-  if (state.hasUnsavedChanges) {
-    const confirmed = window.confirm("未保存の手動変更があります。再生成すると現在の調整内容が上書きされます。");
+  if (state.hasUnsavedChanges || state.hasManualAdjustments) {
+    const confirmed = window.confirm(
+      state.hasUnsavedChanges
+        ? "未保存の手動変更があります。再生成すると現在の調整内容が上書きされ、配布済み状態もリセットされます。"
+        : "保存済みの手動調整があります。再生成すると現在の調整内容が上書きされ、配布済み状態もリセットされます。"
+    );
     if (!confirmed) return;
   }
   runGeneration("生成結果を反映しました。");
@@ -1115,6 +1146,7 @@ function runGeneration(note) {
   state.generationSummary = summarizeGeneration();
   state.copiedDistributionIds = [];
   state.hasUnsavedChanges = false;
+  state.hasManualAdjustments = false;
   state.editingAreaAssignmentId = "";
   syncSelectedBoardAssignment();
   elements.generationResultNote.textContent = note;
@@ -1321,6 +1353,7 @@ function createSlotArray(assignments, shiftType) {
 
 function markManualScheduleDirty() {
   state.hasUnsavedChanges = true;
+  state.hasManualAdjustments = true;
   renderSaveState();
 }
 
@@ -1539,6 +1572,7 @@ function buildCheckSummary(rows, missingTherapists) {
   return {
     missing: missingTherapists,
     items: items.filter((item) => item.names.length),
+    generationSummary: buildPreGenerationSummary(rows),
     priorityFixes: buildPriorityFixes(),
     slots: state.dateList.map((dateKey) => {
       const requirement = findRequirement(dateKey);
@@ -1573,6 +1607,7 @@ function renderDashboardRiskSummary() {
     <article class="risk-summary-item ${item.level}">
       <strong>${item.title}</strong>
       <span>${item.value}</span>
+      <small>${item.detail || ""}</small>
     </article>
   `).join("");
 }
@@ -1594,10 +1629,17 @@ function buildDashboardRiskSummary() {
   const himeRiskCount = allAssignments.filter((assignment) => analyzeAssignmentStatus(assignment, samplePrototypeData.therapistProfiles[assignment.name] || {}).level === "danger" && assignment.himeReservation === "あり").length;
   const warningCount = allAssignments.filter((assignment) => analyzeAssignmentStatus(assignment, samplePrototypeData.therapistProfiles[assignment.name] || {}).level === "warning").length;
 
+  const himeRiskNames = allAssignments
+    .filter((assignment) => analyzeAssignmentStatus(assignment, samplePrototypeData.therapistProfiles[assignment.name] || {}).level === "danger" && assignment.himeReservation === "あり")
+    .map((assignment) => assignment.name);
+  const warningNames = allAssignments
+    .filter((assignment) => analyzeAssignmentStatus(assignment, samplePrototypeData.therapistProfiles[assignment.name] || {}).level === "warning")
+    .map((assignment) => assignment.name);
+
   return [
-    { title: "最大不足", value: maxShortage.count ? maxShortage.label : "不足なし", level: maxShortage.count ? "danger" : "ok" },
-    { title: "姫予約リスク", value: `${himeRiskCount}件`, level: himeRiskCount ? "danger" : "ok" },
-    { title: "要確認配置", value: `${warningCount}件`, level: warningCount ? "warning" : "ok" }
+    { title: "最大不足", value: maxShortage.count ? maxShortage.label : "不足なし", detail: maxShortage.count ? "要補充" : "問題なし", level: maxShortage.count ? "danger" : "ok" },
+    { title: "姫予約リスク", value: `${himeRiskCount}件`, detail: formatNamePreview(himeRiskNames), level: himeRiskCount ? "danger" : "ok" },
+    { title: "要確認配置", value: `${warningCount}件`, detail: formatNamePreview(warningNames), level: warningCount ? "warning" : "ok" }
   ];
 }
 
@@ -1633,6 +1675,29 @@ function buildPriorityFixes() {
   }
 
   return fixes.length ? fixes : ["大きな修正優先項目はありません"];
+}
+
+function buildPreGenerationSummary(rows) {
+  const accepted = rows.filter((row) => row.status === "accepted");
+  const hold = rows.filter((row) => row.status === "hold");
+  const cut = rows.filter((row) => row.status === "cut");
+  const earlyCapacity = state.dateList.reduce((count, dateKey) => count + Math.max(DASHBOARD_SLOT_COUNT, findRequirement(dateKey).earlyNeeded || 0), 0);
+  const lateCapacity = state.dateList.reduce((count, dateKey) => count + Math.max(DASHBOARD_SLOT_COUNT, findRequirement(dateKey).lateNeeded || 0), 0);
+  const earlyCandidates = accepted.filter((row) => supportsShift(row, "early")).length;
+  const lateCandidates = accepted.filter((row) => supportsShift(row, "late")).length;
+
+  return [
+    `採用 ${accepted.length}名 / 保留 ${hold.length}名 / カット ${cut.length}名`,
+    `早番 必要 ${earlyCapacity}枠 / 足りている人数 ${Math.min(earlyCandidates, earlyCapacity)} / 不足 ${Math.max(earlyCapacity - earlyCandidates, 0)}枠`,
+    `遅番 必要 ${lateCapacity}枠 / 足りている人数 ${Math.min(lateCandidates, lateCapacity)} / 不足 ${Math.max(lateCapacity - lateCandidates, 0)}枠`
+  ];
+}
+
+function formatNamePreview(names) {
+  const unique = [...new Set(names)];
+  if (!unique.length) return "問題なし";
+  if (unique.length <= 2) return unique.join(" / ");
+  return `${unique.slice(0, 2).join(" / ")} 他${unique.length - 2}件`;
 }
 
 function analyzeAssignmentStatus(assignment, profile) {
@@ -1742,7 +1807,10 @@ function getAssignmentsForDate(dateKey) {
 }
 
 function syncSelectedDistributionAssignment() {
-  const items = getAssignmentsForDate(state.selectedDistributionDate);
+  const baseItems = getAssignmentsForDate(state.selectedDistributionDate);
+  const items = state.distributionPendingOnly
+    ? baseItems.filter((item) => !state.copiedDistributionIds.includes(item.id))
+    : baseItems;
   if (!items.length) {
     state.selectedDistributionAssignmentId = "";
     return;
@@ -2023,8 +2091,10 @@ function persistState() {
       activeShiftTab: state.activeShiftTab,
       distributionFormat: state.distributionFormat,
       copiedDistributionIds: state.copiedDistributionIds,
+      distributionPendingOnly: state.distributionPendingOnly,
       selectedBoardAssignmentId: state.selectedBoardAssignmentId,
       hasUnsavedChanges: state.hasUnsavedChanges,
+      hasManualAdjustments: state.hasManualAdjustments,
       generationRows: state.generationRows.map((row) => ({
         id: row.id,
         name: row.name,
