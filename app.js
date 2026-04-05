@@ -52,6 +52,7 @@ const elements = {
   dashboardViewTabs: document.querySelector("#dashboardViewTabs"),
   dashboardListView: document.querySelector("#dashboardListView"),
   dashboardBoardView: document.querySelector("#dashboardBoardView"),
+  dashboardBoardCanvas: document.querySelector("#dashboardBoardCanvas"),
   shiftTabs: document.querySelector("#shiftTabs"),
   shiftPanels: Array.from(document.querySelectorAll("[data-shift-panel]")),
   earlyShiftList: document.querySelector("#earlyShiftList"),
@@ -263,6 +264,7 @@ function renderDashboard() {
   elements.fillSummary.textContent = `${day.metrics.fillRate}%`;
   elements.earlyShiftList.innerHTML = renderShiftCards(day.earlyAssignments, "早番");
   elements.lateShiftList.innerHTML = renderShiftCards(day.lateAssignments, "遅番");
+  elements.dashboardBoardCanvas.innerHTML = renderBoardTimeline(day);
   elements.weeklyAnalysis.innerHTML = renderWeeklyAnalysis();
 
   updateDayButtons();
@@ -392,6 +394,88 @@ function renderWeeklyAnalysis() {
       </article>
     `;
   }).join("");
+}
+
+function renderBoardTimeline(day) {
+  const hourLabels = buildBoardHourLabels(10, 27);
+  const lanes = [
+    {
+      key: "early",
+      label: "早番",
+      assignments: day.earlyAssignments,
+      needed: day.requirement?.earlyNeeded || 0
+    },
+    {
+      key: "late",
+      label: "遅番",
+      assignments: day.lateAssignments,
+      needed: day.requirement?.lateNeeded || 0
+    }
+  ];
+
+  return `
+    <div class="board-timeline">
+      <div class="board-hours">
+        <div class="board-hours-label">時間</div>
+        <div class="board-hours-track">
+          ${hourLabels.map((label) => `<div class="board-hour-cell">${label}</div>`).join("")}
+        </div>
+      </div>
+      ${lanes.map((lane) => renderBoardLane(lane)).join("")}
+    </div>
+  `;
+}
+
+function renderBoardLane(lane) {
+  const shortageCount = Math.max(lane.needed - lane.assignments.length, 0);
+
+  return `
+    <section class="board-lane">
+      <div class="board-lane-head">
+        <strong class="board-lane-title">${lane.label}</strong>
+        <span class="board-lane-meta">${lane.assignments.length}/${lane.needed}名</span>
+      </div>
+      <div class="board-track-wrap">
+        <div class="board-track">
+          ${lane.assignments.map((assignment, index) => renderBoardBar(assignment, index)).join("")}
+        </div>
+        <div class="board-shortage">
+          ${shortageCount
+            ? Array.from({ length: shortageCount }, (_, index) => `
+                <div class="board-shortage-item">
+                  <strong>空き枠 ${index + 1}</strong>
+                  <span>${lane.label} 未充足</span>
+                </div>
+              `).join("")
+            : `<span class="field-help">不足枠なし</span>`}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderBoardBar(assignment, index) {
+  const start = toMinutes(assignment.startTime);
+  const end = toMinutes(assignment.endTime);
+  const timelineStart = 10 * 60;
+  const timelineEnd = 27 * 60;
+  const clampedStart = Math.max(start, timelineStart);
+  const clampedEnd = Math.min(end, timelineEnd);
+  const duration = Math.max(clampedEnd - clampedStart, 60);
+  const total = timelineEnd - timelineStart;
+  const left = ((clampedStart - timelineStart) / total) * 100;
+  const width = Math.max((duration / total) * 100, 8);
+  const verticalOffset = 10 + (index % 2) * 12;
+  const barClass = assignment.himeReservation === "あり" ? "booked" : "normal";
+  const compactTime = `${formatHourLabel(assignment.startTime)}-${formatHourLabel(assignment.endTime)}`;
+  const reservationLabel = assignment.himeReservation === "あり" ? "姫" : "";
+
+  return `
+    <div class="board-bar ${barClass}" style="left:${left}%; width:${width}%; top:${verticalOffset}px;">
+      <span class="board-bar-name">${assignment.name}</span>
+      <span class="board-bar-meta">${assignment.assignedArea}｜${compactTime}${reservationLabel ? `｜${reservationLabel}` : ""}</span>
+    </div>
+  `;
 }
 
 function renderGenerationAlerts(checkSummary) {
@@ -1067,6 +1151,21 @@ function formatShortDate(dateKey) {
 function formatSlashDate(dateKey) {
   const [, month, day] = dateKey.split("-").map(Number);
   return `${month}/${day}`;
+}
+
+function buildBoardHourLabels(startHour, endHour) {
+  return Array.from({ length: endHour - startHour + 1 }, (_, index) => {
+    const hour = startHour + index;
+    return `${hour}:00`;
+  });
+}
+
+function formatHourLabel(timeText) {
+  const [hours, minutes] = String(timeText || "00:00").split(":").map(Number);
+  if ((minutes || 0) === 0) {
+    return `${hours}`;
+  }
+  return `${hours}:${String(minutes).padStart(2, "0")}`;
 }
 
 function formatYen(value) {
