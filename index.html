@@ -63,7 +63,17 @@
             </div>
           </section>
 
-          <section class="summary-grid">
+          <section class="content-panel dashboard-risk-panel">
+            <div class="panel-head">
+              <div>
+                <h3>危険度サマリー</h3>
+                <p class="section-note">今日どこを優先して触るべきかを先に出します</p>
+              </div>
+            </div>
+            <div id="dashboardRiskSummary" class="risk-summary-list"></div>
+          </section>
+
+          <section class="summary-grid dashboard-summary-grid">
             <article class="summary-card emphasis">
               <p>売上予測</p>
               <strong id="salesSummary"></strong>
@@ -82,16 +92,6 @@
             </article>
           </section>
 
-          <section class="content-panel dashboard-risk-panel">
-            <div class="panel-head">
-              <div>
-                <h3>危険度サマリー</h3>
-                <p class="section-note">今日どこを優先して触るべきかを先に出します</p>
-              </div>
-            </div>
-            <div id="dashboardRiskSummary" class="risk-summary-list"></div>
-          </section>
-
           <div id="dashboardListView" class="dashboard-view-panel active">
             <section class="content-panel dashboard-legend-panel">
               <div class="status-row">
@@ -107,7 +107,7 @@
               <button class="shift-tab" type="button" data-shift="late">遅番 <span id="lateCountMobile"></span></button>
             </div>
 
-            <section class="shift-columns">
+            <section class="shift-columns dashboard-shift-columns">
               <section class="content-panel shift-panel active" data-shift-panel="early">
                 <div class="panel-head">
                   <h3>早番</h3>
@@ -125,16 +125,16 @@
               </section>
             </section>
 
-            <section class="content-panel">
-              <div class="panel-head">
+            <details class="content-panel dashboard-collapsible dashboard-secondary-block">
+              <summary class="dashboard-collapsible-summary">
                 <div>
                   <h3>今回は見送り</h3>
                   <p class="section-note">希望はあったが今回は枠に入れていない人</p>
                 </div>
                 <span id="cutCount" class="panel-count"></span>
-              </div>
-              <div id="cutShiftList" class="cut-list"></div>
-            </section>
+              </summary>
+              <div id="cutShiftList" class="cut-list dashboard-collapsible-body"></div>
+            </details>
           </div>
 
           <section id="dashboardBoardView" class="content-panel dashboard-view-panel board-placeholder-panel">
@@ -157,15 +157,16 @@
             </section>
           </section>
 
-          <section class="content-panel">
-            <div class="panel-head">
+          <details class="content-panel dashboard-collapsible dashboard-secondary-block">
+            <summary class="dashboard-collapsible-summary">
               <div>
                 <h2>週間分析</h2>
                 <p class="section-note">補助情報として充足と予測を確認します</p>
               </div>
-            </div>
-            <div id="weeklyAnalysis" class="weekly-analysis"></div>
-          </section>
+              <span class="panel-count">補助</span>
+            </summary>
+            <div id="weeklyAnalysis" class="weekly-analysis dashboard-collapsible-body"></div>
+          </details>
         </section>
 
         <section class="view" data-view-panel="generation">
