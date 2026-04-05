@@ -360,6 +360,7 @@ pre {
 .shift-panel {
   display: grid;
   gap: 10px;
+  min-height: 0;
 }
 
 .shift-list,
@@ -373,10 +374,16 @@ pre {
   gap: 10px;
 }
 
+.shift-list {
+  max-height: 62vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
 .shift-card {
   display: grid;
-  gap: 12px;
-  padding: 14px;
+  gap: 8px;
+  padding: 10px 12px;
   border-radius: 16px;
   border: 1px solid var(--line);
   border-left: 5px solid var(--line-strong);
@@ -400,7 +407,7 @@ pre {
 }
 
 .therapist-name {
-  font-size: 1.05rem;
+  font-size: 1rem;
 }
 
 .status-row,
@@ -510,7 +517,7 @@ pre {
 .field-help {
   margin: 0;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
 }
 
 .topbar-actions,
@@ -761,6 +768,11 @@ pre {
 
   .shift-panel.active {
     display: grid;
+  }
+
+  .shift-list {
+    max-height: none;
+    overflow: visible;
   }
 
   .day-switcher,

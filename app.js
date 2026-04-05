@@ -234,11 +234,12 @@ function renderDashboard() {
 function renderGeneration() {
   const reviewRows = state.generationRows.filter((row) => row.issues.length > 0);
   const missingTherapists = getMissingTherapists();
+  const checkSummary = buildCheckSummary(state.generationRows, missingTherapists);
   elements.importedCount.textContent = `${state.generationRows.length}件`;
   elements.errorCount.textContent = `${state.generationErrors.length}件`;
   elements.missingCount.textContent = `${missingTherapists.length}名`;
   elements.reviewCount.textContent = `${new Set(reviewRows.map((row) => row.name)).size}名`;
-  elements.generationAlerts.innerHTML = renderGenerationAlerts(missingTherapists);
+  elements.generationAlerts.innerHTML = renderGenerationAlerts(checkSummary);
   elements.requestList.innerHTML = renderRequestRows();
   elements.requirementsList.innerHTML = renderRequirements();
 }
@@ -324,7 +325,7 @@ function renderShiftCards(assignments, shiftLabel) {
         </div>
 
         <div class="status-row">
-          <span class="shift-chip ${assignment.shiftType}">${assignment.shiftLabel}</span>
+          <span class="shift-chip ${assignment.shiftType}">${shiftLabel}</span>
           ${assignment.warningArea ? `<span class="priority-tag warning">要確認</span>` : ""}
         </div>
 
@@ -352,7 +353,7 @@ function renderWeeklyAnalysis() {
   }).join("");
 }
 
-function renderGenerationAlerts(missingTherapists) {
+function renderGenerationAlerts(checkSummary) {
   const blocks = [];
   if (state.generationErrors.length) {
     blocks.push(`
@@ -363,20 +364,20 @@ function renderGenerationAlerts(missingTherapists) {
     `);
   }
 
-  if (missingTherapists.length) {
+  if (checkSummary.missing.length) {
     blocks.push(`
       <article class="alert-box warning">
         <strong>未提出</strong>
-        <div>${missingTherapists.join(" / ")}</div>
+        <div>${checkSummary.missing.join(" / ")}</div>
       </article>
     `);
   }
 
-  if (state.generationWarnings.length) {
+  if (checkSummary.items.length) {
     blocks.push(`
       <article class="alert-box warning">
         <strong>要確認</strong>
-        <div>${state.generationWarnings.slice(0, 8).map((warning) => `<div>${warning}</div>`).join("")}</div>
+        <div>${checkSummary.items.map((item) => `<div>${item.label}: ${item.names.length ? item.names.join(" / ") : "なし"}</div>`).join("")}</div>
       </article>
     `);
   }
@@ -723,6 +724,19 @@ function collectGenerationWarnings(rows) {
   return rows.flatMap((row) => row.issues.map((issue) => `${formatDisplayDate(row.dateKey)} ${row.name}: ${issue}`));
 }
 
+function buildCheckSummary(rows, missingTherapists) {
+  const issueLabels = ["時間未入力", "希望エリア未入力", "姫予約未設定", "非対応エリア含む"];
+  const items = issueLabels.map((label) => ({
+    label,
+    names: [...new Set(rows.filter((row) => row.issues.includes(label)).map((row) => `${row.name} ${formatSlashDate(row.dateKey)}`))]
+  }));
+
+  return {
+    missing: missingTherapists,
+    items: items.filter((item) => item.names.length)
+  };
+}
+
 function getMissingTherapists() {
   const submittedNames = new Set(state.generationRows.map((row) => row.name));
   return Object.keys(samplePrototypeData.therapistProfiles).filter((name) => !submittedNames.has(name));
@@ -802,7 +816,7 @@ function syncSelectedDistributionAssignment() {
 }
 
 function buildDistributionMessage(item) {
-  return `${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})\n${item.assignedArea}\n${item.startTime}-${normalizeDistributionEnd(item.endTime)}\n${item.himeReservation === "あり" ? "姫予約あり" : "通常出勤"}\nよろしくお願いします`;
+  return `【${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})】\n${item.assignedArea}\n${item.startTime}-${normalizeDistributionEnd(item.endTime)}\n${item.himeReservation === "あり" ? "姫予約あり" : "姫予約なし"}\nよろしくお願いします`;
 }
 
 async function copyDistributionMessage() {
