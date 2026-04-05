@@ -3,15 +3,21 @@
   const dateList = createDateList(model.settings.startDate, model.settings.days);
   const areaLoad = new Map();
   const therapistStats = new Map();
+  const profileMap = model.therapistProfiles || {};
+  const knownTherapists = new Set([
+    ...Object.keys(profileMap),
+    ...(model.therapists || []).map((therapist) => therapist.name),
+    ...model.shiftRequests.map((request) => request.name)
+  ]);
 
-  model.therapists.forEach((therapist) => {
-    therapistStats.set(therapist.name, { assigned: 0, early: 0, late: 0 });
+  [...knownTherapists].forEach((name) => {
+    therapistStats.set(name, { assigned: 0, early: 0, late: 0, weeklyScore: 0 });
   });
 
   const dailyPlans = dateList.map((dateKey, index) => {
-    const requirement = model.requirements[index] || defaultRequirement(dateKey);
+    const requirement = findRequirement(model.requirements, dateKey, index) || defaultRequirement(dateKey);
     const availableRequests = model.shiftRequests.filter((request) => request.dateKey === dateKey);
-    const assignedToday = [];
+    const assignedToday = new Set();
 
     const earlyAssignments = assignByShift({
       shiftType: "early",
@@ -20,7 +26,9 @@
       assignedToday,
       therapistStats,
       areaLoad,
-      dateKey
+      profileMap,
+      dateKey,
+      warnings
     });
 
     const lateAssignments = assignByShift({
@@ -30,17 +38,19 @@
       assignedToday,
       therapistStats,
       areaLoad,
-      dateKey
+      profileMap,
+      dateKey,
+      warnings
     });
 
     const offMembers = [...new Set(availableRequests.map((request) => request.name))]
-      .filter((name) => !assignedToday.includes(name));
+      .filter((name) => !assignedToday.has(name));
 
     if (earlyAssignments.length < requirement.earlyNeeded) {
-      warnings.push(`${dateKey} の早番が ${requirement.earlyNeeded - earlyAssignments.length} 人不足しています。`);
+      warnings.push(`${formatMonthDay(dateKey)} 早番 ${requirement.earlyNeeded - earlyAssignments.length}人不足`);
     }
     if (lateAssignments.length < requirement.lateNeeded) {
-      warnings.push(`${dateKey} の遅番が ${requirement.lateNeeded - lateAssignments.length} 人不足しています。`);
+      warnings.push(`${formatMonthDay(dateKey)} 遅番 ${requirement.lateNeeded - lateAssignments.length}人不足`);
     }
 
     return {
@@ -56,7 +66,7 @@
 
   return {
     summary: {
-      totalTherapists: model.therapists.length,
+      totalTherapists: knownTherapists.size,
       totalAssignments: dailyPlans.reduce(
         (sum, day) => sum + day.earlyAssignments.length + day.lateAssignments.length,
         0
@@ -77,36 +87,55 @@ function assignByShift(context) {
     assignedToday,
     therapistStats,
     areaLoad,
-    dateKey
+    profileMap,
+    dateKey,
+    warnings
   } = context;
   const assignments = [];
 
-  for (let count = 0; count < needed; count += 1) {
-    const candidate = availableRequests
-      .filter((request) => !assignedToday.includes(request.name) && supportsShift(request, shiftType))
-      .sort((left, right) => rankTherapist(left, right, shiftType, therapistStats, areaLoad, dateKey))[0];
+  const eligibleRequests = availableRequests.filter(
+    (request) => !assignedToday.has(request.name) && supportsShift(request, shiftType)
+  );
 
-    if (!candidate) {
+  const himeRequests = eligibleRequests
+    .filter((request) => request.himeReservation === "あり")
+    .sort((left, right) => compareRequests(left, right, shiftType, therapistStats, areaLoad, dateKey, profileMap));
+
+  const regularRequests = eligibleRequests
+    .filter((request) => request.himeReservation !== "あり")
+    .sort((left, right) => compareRequests(left, right, shiftType, therapistStats, areaLoad, dateKey, profileMap));
+
+  for (const request of [...himeRequests, ...regularRequests]) {
+    if (assignments.length >= needed) {
+      break;
+    }
+    if (assignedToday.has(request.name)) {
       continue;
     }
 
-    const area = pickArea(candidate, areaLoad, dateKey);
+    const areaDecision = chooseAreaForRequest(request, areaLoad, dateKey, profileMap);
     assignments.push({
-      name: candidate.name,
-      area,
-      preferredArea: candidate.preferredArea,
-      preferredTime: describeShiftPreference(candidate),
-      startTime: candidate.startTime,
-      endTime: candidate.endTime,
-      himeReservation: candidate.himeReservation,
-      note: candidate.note
+      name: request.name,
+      area: areaDecision.area,
+      preferredArea: request.preferredArea,
+      preferredTime: describeShiftPreference(request),
+      startTime: request.startTime,
+      endTime: request.endTime,
+      himeReservation: request.himeReservation,
+      note: request.note,
+      areaWarning: areaDecision.warning
     });
 
-    assignedToday.push(candidate.name);
-    const stats = therapistStats.get(candidate.name);
+    if (areaDecision.warning) {
+      warnings.push(`${formatMonthDay(dateKey)} ${shiftLabel(shiftType)} ${request.name}: ${areaDecision.warning}`);
+    }
+
+    assignedToday.add(request.name);
+    const stats = therapistStats.get(request.name);
     stats.assigned += 1;
     stats[shiftType] += 1;
-    markAreaLoad(areaLoad, dateKey, area);
+    stats.weeklyScore += calculateWeeklyLoad(shiftType, request, profileMap[request.name]);
+    markAreaLoad(areaLoad, dateKey, areaDecision.area);
   }
 
   return assignments;
@@ -139,48 +168,122 @@ function describeShiftPreference(request) {
   return "時間外";
 }
 
-function rankTherapist(left, right, shiftType, therapistStats, areaLoad, dateKey) {
-  const leftScore = scoreTherapist(left, shiftType, therapistStats, areaLoad, dateKey);
-  const rightScore = scoreTherapist(right, shiftType, therapistStats, areaLoad, dateKey);
+function compareRequests(left, right, shiftType, therapistStats, areaLoad, dateKey, profileMap) {
+  const leftScore = scoreTherapist(left, shiftType, therapistStats, areaLoad, dateKey, profileMap);
+  const rightScore = scoreTherapist(right, shiftType, therapistStats, areaLoad, dateKey, profileMap);
   return rightScore - leftScore || left.name.localeCompare(right.name, "ja");
 }
 
-function scoreTherapist(request, shiftType, therapistStats, areaLoad, dateKey) {
-  const stats = therapistStats.get(request.name);
-  let score = 100 - stats.assigned * 5;
+function scoreTherapist(request, shiftType, therapistStats, areaLoad, dateKey, profileMap) {
+  const stats = therapistStats.get(request.name) || { assigned: 0, weeklyScore: 0, early: 0, late: 0 };
+  const profile = profileMap[request.name] || {};
+  const areaDecision = chooseAreaForRequest(request, areaLoad, dateKey, profileMap);
+  let score = 100;
 
-  if (describeShiftPreference(request) === "どちらでも") {
-    score += 8;
+  if (request.himeReservation === "あり") {
+    score += 1000;
   }
-  if (
-    (shiftType === "early" && describeShiftPreference(request) === "早番") ||
-    (shiftType === "late" && describeShiftPreference(request) === "遅番")
-  ) {
+
+  score += areaDecision.compatible ? 120 : 20;
+  score += rankScore(profile.rank, shiftType, request);
+  score += timeBandScore(request, shiftType);
+  score += shiftPreferenceScore(request, shiftType);
+  score += areaBalanceScore(areaDecision.area, areaLoad, dateKey);
+
+  score -= stats.assigned * 10;
+  score -= (stats.weeklyScore || 0) * 4;
+  score -= (stats[shiftType] || 0) * 4;
+
+  return score;
+}
+
+function chooseAreaForRequest(request, areaLoad, dateKey, profileMap) {
+  const profile = profileMap[request.name] || {};
+  const supportedAreas = Array.isArray(profile.areas) ? profile.areas.filter(Boolean) : [];
+  const preferredArea = request.preferredArea;
+
+  if (preferredArea && supportedAreas.includes(preferredArea)) {
+    return { area: preferredArea, compatible: true, warning: "" };
+  }
+
+  if (supportedAreas.length) {
+    const fallbackArea = bestAreaByLoad(supportedAreas, areaLoad, dateKey);
+    return {
+      area: fallbackArea,
+      compatible: true,
+      warning: preferredArea && !supportedAreas.includes(preferredArea)
+        ? `希望エリア ${preferredArea} 非対応のため ${fallbackArea} に配置`
+        : ""
+    };
+  }
+
+  return {
+    area: preferredArea || "要確認",
+    compatible: false,
+    warning: preferredArea ? `非対応エリア ${preferredArea} を警告付き配置` : "対応エリア未設定のため警告付き配置"
+  };
+}
+
+function rankScore(rank, shiftType, request) {
+  const premiumTime = timeBandScore(request, shiftType);
+  if (rank === "S") {
+    return 40 + premiumTime * 0.7;
+  }
+  if (rank === "G") {
+    return 18 + premiumTime * 0.3;
+  }
+  if (rank === "P") {
+    return 4 - premiumTime * 0.15;
+  }
+  return 12;
+}
+
+function timeBandScore(request, shiftType) {
+  const start = toMinutes(request.startTime);
+  const end = toMinutes(request.endTime);
+  let score = 0;
+
+  if (overlaps(start, end, 20 * 60, 24 * 60)) {
+    score += 50;
+  }
+  if (overlaps(start, end, 15 * 60, 18 * 60)) {
     score += 20;
   }
-  if (request.himeReservation === "あり") {
-    score += 12;
+  if (shiftType === "late" && end >= 24 * 60) {
+    score += 8;
   }
 
-  score += areaBalanceScore(request.preferredArea, areaLoad, dateKey);
   return score;
+}
+
+function shiftPreferenceScore(request, shiftType) {
+  const preference = describeShiftPreference(request);
+  if (preference === "どちらでも") {
+    return 6;
+  }
+  if ((shiftType === "early" && preference === "早番") || (shiftType === "late" && preference === "遅番")) {
+    return 16;
+  }
+  return 0;
 }
 
 function areaBalanceScore(area, areaLoad, dateKey) {
   const dateMap = areaLoad.get(dateKey) || new Map();
   const current = dateMap.get(area) || 0;
-  return 10 - current * 3;
+  return 8 - current * 3;
 }
 
-function pickArea(request, areaLoad, dateKey) {
-  const preferredLoad = areaBalanceScore(request.preferredArea, areaLoad, dateKey);
-  if (preferredLoad > 3) {
-    return request.preferredArea;
-  }
+function calculateWeeklyLoad(shiftType, request, profile) {
+  return 1 + (request.himeReservation === "あり" ? 1 : 0) + (rankScore(profile?.rank, shiftType, request) > 40 ? 1 : 0);
+}
 
-  const dateMap = areaLoad.get(dateKey) || new Map();
-  return [...samplePrototypeData.settings.areas]
-    .sort((left, right) => (dateMap.get(left) || 0) - (dateMap.get(right) || 0))[0];
+function bestAreaByLoad(areas, areaLoad, dateKey) {
+  return [...areas]
+    .sort((left, right) => areaBalanceScore(right, areaLoad, dateKey) - areaBalanceScore(left, areaLoad, dateKey))[0];
+}
+
+function overlaps(start, end, rangeStart, rangeEnd) {
+  return Math.max(start, rangeStart) < Math.min(end, rangeEnd);
 }
 
 function markAreaLoad(areaLoad, dateKey, area) {
@@ -189,6 +292,14 @@ function markAreaLoad(areaLoad, dateKey, area) {
   }
   const dateMap = areaLoad.get(dateKey);
   dateMap.set(area, (dateMap.get(area) || 0) + 1);
+}
+
+function findRequirement(requirements, dateKey, index) {
+  return requirements.find((item) => item.dateKey === dateKey) || requirements[index];
+}
+
+function shiftLabel(shiftType) {
+  return shiftType === "early" ? "早番" : "遅番";
 }
 
 function createDateList(startDate, days) {
@@ -205,6 +316,11 @@ function formatDate(date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function formatMonthDay(dateKey) {
+  const [, month, day] = dateKey.split("-").map(Number);
+  return `${month}/${day}`;
 }
 
 function formatWeekday(dateKey) {
