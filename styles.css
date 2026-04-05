@@ -239,6 +239,7 @@ pre {
   background: linear-gradient(135deg, rgba(17, 36, 63, 0.98), rgba(39, 71, 119, 0.98));
   color: #fff;
   padding: 8px 12px;
+  margin-top: -2px;
 }
 
 .hero-panel .selected-date-label,
@@ -315,7 +316,22 @@ pre {
 }
 
 .dashboard-risk-panel {
-  padding: 14px 16px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(250, 252, 255, 0.92), rgba(245, 248, 252, 0.88));
+}
+
+.dashboard-risk-panel .panel-head {
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.dashboard-risk-panel .panel-head h3 {
+  font-size: 0.92rem;
+}
+
+.dashboard-risk-panel .section-note {
+  font-size: 0.72rem;
+  color: rgba(102, 117, 138, 0.68);
 }
 
 .dashboard-summary-grid .summary-card {
@@ -349,46 +365,48 @@ pre {
 .risk-summary-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 6px;
 }
 
 .risk-summary-item {
   display: grid;
-  gap: 5px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: var(--panel-soft);
-  box-shadow: 0 8px 18px rgba(17, 36, 63, 0.05);
+  gap: 2px;
+  min-height: 74px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(188, 200, 218, 0.72);
+  background: rgba(247, 249, 252, 0.88);
+  box-shadow: none;
 }
 
 .risk-summary-item strong {
-  font-size: 0.86rem;
+  font-size: 0.74rem;
+  color: rgba(23, 34, 48, 0.76);
 }
 
 .risk-summary-item span {
-  font-size: 1.08rem;
-  font-weight: 900;
+  font-size: 0.98rem;
+  font-weight: 850;
+  color: rgba(23, 34, 48, 0.92);
 }
 
 .risk-summary-item small {
-  color: var(--muted);
-  font-size: 0.75rem;
-  line-height: 1.4;
+  color: rgba(102, 117, 138, 0.62);
+  font-size: 0.67rem;
+  line-height: 1.25;
 }
 
 .risk-summary-item.danger {
-  background: linear-gradient(135deg, rgba(198, 84, 84, 0.22), rgba(226, 140, 163, 0.26));
-  border-color: rgba(198, 84, 84, 0.38);
-  box-shadow: 0 12px 24px rgba(198, 84, 84, 0.14);
+  background: linear-gradient(135deg, rgba(198, 84, 84, 0.14), rgba(226, 140, 163, 0.16));
+  border-color: rgba(198, 84, 84, 0.28);
 }
 
 .risk-summary-item.warning {
-  background: var(--yellow-soft);
+  background: rgba(255, 247, 223, 0.9);
 }
 
 .risk-summary-item.ok {
-  background: var(--green-soft);
+  background: rgba(234, 248, 239, 0.88);
 }
 
 .summary-card,
@@ -476,6 +494,9 @@ pre {
   display: block;
   min-height: 56vh;
   order: 3;
+  margin-top: -4px;
+  border-color: rgba(46, 107, 203, 0.22);
+  box-shadow: 0 16px 34px rgba(17, 36, 63, 0.09);
 }
 
 #dashboardListView {
@@ -1222,6 +1243,8 @@ pre {
       transparent calc(100% / 17)
     ),
     linear-gradient(180deg, #fcfdff 0%, #eef3fa 100%);
+  border-color: rgba(46, 107, 203, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(46, 107, 203, 0.04);
 }
 
 .board-bar {
@@ -1238,6 +1261,10 @@ pre {
   overflow: hidden;
   text-align: left;
   transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, filter 0.22s ease;
+}
+
+#dashboardBoardView .board-bar {
+  box-shadow: 0 10px 20px rgba(17, 36, 63, 0.18);
 }
 
 .board-bar:hover {
