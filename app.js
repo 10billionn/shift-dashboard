@@ -13,10 +13,13 @@
   generationSummary: null,
   selectedDistributionDate: "",
   selectedDistributionAssignmentId: "",
+  selectedBoardAssignmentId: "",
+  updatedBoardAssignmentId: "",
   mobileMenuOpen: false
 };
 
 const STORAGE_KEY = "shift-dashboard-state-v1";
+let boardFeedbackTimer = null;
 
 const viewMeta = {
   dashboard: {
@@ -53,6 +56,8 @@ const elements = {
   dashboardListView: document.querySelector("#dashboardListView"),
   dashboardBoardView: document.querySelector("#dashboardBoardView"),
   dashboardBoardCanvas: document.querySelector("#dashboardBoardCanvas"),
+  boardInspectorContent: document.querySelector("#boardInspectorContent"),
+  boardUpdateStatus: document.querySelector("#boardUpdateStatus"),
   shiftTabs: document.querySelector("#shiftTabs"),
   shiftPanels: Array.from(document.querySelectorAll("[data-shift-panel]")),
   earlyShiftList: document.querySelector("#earlyShiftList"),
@@ -134,9 +139,15 @@ function bindEvents() {
   elements.dashboardViewTabs.querySelectorAll(".view-tab").forEach((button) => {
     button.addEventListener("click", () => {
       state.activeDashboardView = button.dataset.dashboardView;
+      if (state.activeDashboardView === "board") {
+        syncSelectedBoardAssignment();
+      }
       renderDashboardViewState();
     });
   });
+
+  elements.dashboardBoardCanvas.addEventListener("click", handleBoardCanvasClick);
+  elements.boardInspectorContent.addEventListener("change", handleBoardInspectorChange);
 
   elements.shiftTabs.querySelectorAll(".shift-tab").forEach((button) => {
     button.addEventListener("click", () => {
@@ -196,6 +207,8 @@ function hydrateState(saved) {
   state.activeAppView = saved.activeAppView || "dashboard";
   state.activeDashboardView = saved.activeDashboardView || "list";
   state.activeShiftTab = saved.activeShiftTab || "early";
+  state.selectedBoardAssignmentId = saved.selectedBoardAssignmentId || "";
+  state.updatedBoardAssignmentId = "";
   state.requirements = Array.isArray(saved.requirements) && saved.requirements.length
     ? cloneRequirements(saved.requirements)
     : cloneRequirements(samplePrototypeData.requirements);
@@ -217,6 +230,8 @@ function loadSampleState() {
   state.activeAppView = "dashboard";
   state.activeDashboardView = "list";
   state.activeShiftTab = "early";
+  state.selectedBoardAssignmentId = "";
+  state.updatedBoardAssignmentId = "";
   state.requirements = cloneRequirements(samplePrototypeData.requirements);
   state.generationRows = createGenerationRows(samplePrototypeData.shiftRequests);
   state.historyRows = [...samplePrototypeData.weeklyPerformance];
@@ -264,7 +279,9 @@ function renderDashboard() {
   elements.fillSummary.textContent = `${day.metrics.fillRate}%`;
   elements.earlyShiftList.innerHTML = renderShiftCards(day.earlyAssignments, "早番");
   elements.lateShiftList.innerHTML = renderShiftCards(day.lateAssignments, "遅番");
+  syncSelectedBoardAssignment();
   elements.dashboardBoardCanvas.innerHTML = renderBoardTimeline(day);
+  elements.boardInspectorContent.innerHTML = renderBoardInspector(day);
   elements.weeklyAnalysis.innerHTML = renderWeeklyAnalysis();
 
   updateDayButtons();
@@ -495,11 +512,15 @@ function renderBoardBar(assignment) {
   const reservationLabel = assignment.himeReservation === "あり" ? "姫" : "";
 
   return `
-    <div class="board-bar ${barClass}" style="left:${left}%; width:${width}%;">
+    <button
+      class="board-bar ${barClass} ${assignment.id === state.selectedBoardAssignmentId ? "selected" : ""} ${assignment.id === state.updatedBoardAssignmentId ? "updated" : ""}"
+      type="button"
+      data-board-assignment-id="${assignment.id}"
+      style="left:${left}%; width:${width}%;">
       <span class="board-bar-name">${assignment.name}</span>
       <span class="board-bar-meta">${assignment.assignedArea}${reservationLabel ? `｜${reservationLabel}` : ""}</span>
       <span class="board-bar-sub">${compactTime}</span>
-    </div>
+    </button>
   `;
 }
 
@@ -640,6 +661,57 @@ function renderRequestRows() {
     `).join("");
 }
 
+function renderBoardInspector(day) {
+  const assignment = findAssignmentById(state.selectedBoardAssignmentId);
+  if (!assignment || assignment.dateKey !== day.dateKey) {
+    return `<div class="empty-state">盤面のバーを選ぶと、ここで詳細確認とエリア調整ができます。</div>`;
+  }
+
+  const profile = samplePrototypeData.therapistProfiles[assignment.name] || { rank: "G", areas: [] };
+  const availableAreas = samplePrototypeData.settings.areas;
+  const areaWarning = !supportsArea(assignment.name, assignment.assignedArea);
+
+  return `
+    <article class="board-inspector-card">
+      <div class="board-inspector-head">
+        <div>
+          <strong class="therapist-name">${assignment.name}</strong>
+          <p class="field-help">${assignment.shiftLabel} / ${formatDisplayDate(assignment.dateKey)} (${formatWeekday(assignment.dateKey)})</p>
+        </div>
+        <div class="status-row tight">
+          <span class="mini-badge rank">${profile.rank || "G"}</span>
+          <span class="mini-badge ${assignment.himeReservation === "あり" ? "booked" : "gray"}">${assignment.himeReservation === "あり" ? "姫あり" : "姫なし"}</span>
+          ${areaWarning ? `<span class="mini-badge warning">要確認</span>` : ""}
+        </div>
+      </div>
+
+      <div class="board-inspector-grid">
+        <div class="shift-summary-item">
+          <span class="field-label">現在エリア</span>
+          <span class="field-value">${assignment.assignedArea}</span>
+        </div>
+        <div class="shift-summary-item">
+          <span class="field-label">時間</span>
+          <span class="field-value">${assignment.startTime}-${assignment.endTime}</span>
+        </div>
+        <div class="shift-summary-item">
+          <span class="field-label">対応可能</span>
+          <span class="field-value">${profile.areas?.length ? profile.areas.join(" / ") : "未設定"}</span>
+        </div>
+      </div>
+
+      <label class="field-block">
+        <span class="field-label">エリア変更</span>
+        <select class="select-input" data-board-field="assignedArea">
+          ${availableAreas.map((area) => `<option value="${area}" ${area === assignment.assignedArea ? "selected" : ""}>${area}</option>`).join("")}
+        </select>
+      </label>
+
+      ${areaWarning ? `<div class="alert-box warning">この配置は対応可能エリア外です。配置は残しますが、要確認として扱います。</div>` : `<p class="field-help">非対応エリアを選んだ場合は警告付きで反映します。</p>`}
+    </article>
+  `;
+}
+
 function renderRequirements() {
   return state.requirements.map((requirement) => `
     <article class="requirement-card">
@@ -719,6 +791,25 @@ function handleRequestListChange(event) {
   renderGeneration();
 }
 
+function handleBoardCanvasClick(event) {
+  const bar = event.target.closest("[data-board-assignment-id]");
+  if (!bar) return;
+
+  state.selectedBoardAssignmentId = bar.dataset.boardAssignmentId;
+  persistState();
+  renderDashboard();
+}
+
+function handleBoardInspectorChange(event) {
+  const input = event.target.closest("[data-board-field]");
+  if (!input || input.dataset.boardField !== "assignedArea") return;
+
+  const assignment = findAssignmentById(state.selectedBoardAssignmentId);
+  if (!assignment) return;
+
+  updateAssignmentArea(assignment.id, input.value);
+}
+
 function handleRequirementChange(event) {
   const input = event.target.closest("[data-date-key][data-req-field]");
   if (!input) return;
@@ -751,6 +842,7 @@ function runGeneration(note) {
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
   state.generatedSchedule = buildGeneratedSchedule();
   state.generationSummary = summarizeGeneration();
+  syncSelectedBoardAssignment();
   elements.generationResultNote.textContent = note;
   syncSelectedDistributionAssignment();
   persistState();
@@ -827,6 +919,60 @@ function toAssignment(row, shiftType, dateKey) {
     note: row.note,
     warningArea: !supportsArea(row.name, row.preferredArea)
   };
+}
+
+function syncSelectedBoardAssignment() {
+  const items = getAssignmentsForDate(state.selectedDate);
+  if (!items.length) {
+    state.selectedBoardAssignmentId = "";
+    return;
+  }
+
+  if (!items.some((item) => item.id === state.selectedBoardAssignmentId)) {
+    state.selectedBoardAssignmentId = items[0].id;
+  }
+}
+
+function updateAssignmentArea(assignmentId, nextArea) {
+  const row = state.generationRows.find((item) => item.id === assignmentId);
+  if (row) {
+    row.preferredArea = nextArea;
+    row.issues = collectRowIssues(row);
+  }
+
+  Object.values(state.generatedSchedule).forEach((day) => {
+    [...day.earlyAssignments, ...day.lateAssignments].forEach((assignment) => {
+      if (assignment.id !== assignmentId) return;
+      assignment.preferredArea = nextArea;
+      assignment.assignedArea = nextArea;
+      assignment.warningArea = !supportsArea(assignment.name, nextArea);
+    });
+  });
+
+  state.updatedBoardAssignmentId = assignmentId;
+  state.generationWarnings = collectGenerationWarnings(state.generationRows);
+  persistState();
+  flashBoardUpdateStatus(
+    supportsArea(row?.name || "", nextArea)
+      ? `エリアを ${nextArea} に更新しました。`
+      : `エリアを ${nextArea} に更新しました。対応外のため要確認です。`,
+    supportsArea(row?.name || "", nextArea) ? "success" : "warning"
+  );
+  renderDashboard();
+  renderGeneration();
+  renderDistribution();
+}
+
+function flashBoardUpdateStatus(message, tone) {
+  clearTimeout(boardFeedbackTimer);
+  elements.boardUpdateStatus.textContent = message;
+  elements.boardUpdateStatus.className = `copy-status ${tone}`;
+  boardFeedbackTimer = setTimeout(() => {
+    state.updatedBoardAssignmentId = "";
+    elements.boardUpdateStatus.textContent = "";
+    elements.boardUpdateStatus.className = "copy-status";
+    renderDashboard();
+  }, 2400);
 }
 
 function refreshDayMetrics(dateKey) {
@@ -1281,6 +1427,7 @@ function persistState() {
       activeAppView: state.activeAppView,
       activeDashboardView: state.activeDashboardView,
       activeShiftTab: state.activeShiftTab,
+      selectedBoardAssignmentId: state.selectedBoardAssignmentId,
       generationRows: state.generationRows.map((row) => ({
         id: row.id,
         name: row.name,
