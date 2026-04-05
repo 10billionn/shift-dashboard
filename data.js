@@ -5,27 +5,27 @@
     areas: ["葛西", "浦安", "船橋", "浅草橋", "八千代"],
     shiftLabels: {
       early: "早番",
-      late: "遅番",
-      off: "休み"
+      late: "遅番"
     },
-    assignmentRule:
-      "CSVで集めた出勤希望を優先し、希望エリアと時間帯をなるべく反映しながら必要人数に合わせて割り当てます。"
+    averageUnitPrice: 16000,
+    storeRate: 45
   },
   therapistProfiles: {
-    "れいか": { rank: "S", flags: ["勤怠安定", "写真強"] },
-    "ななみ": { rank: "G", flags: ["勤怠安定"] },
-    "かれん": { rank: "P", flags: ["遅刻注意"] },
-    "つき": { rank: "S", flags: ["姫強"] },
-    "あいり": { rank: "G", flags: ["出稼ぎ"] },
-    "もも": { rank: "P", flags: ["店泊可"] },
-    "りおな": { rank: "G", flags: ["勤怠安定"] },
-    "あすな": { rank: "S", flags: ["写真強"] },
-    "いおり": { rank: "G", flags: ["葛西強"] },
-    "かなえ": { rank: "P", flags: ["ヘルプ可"] },
-    "なほ": { rank: "G", flags: ["終電調整"] },
-    "さき": { rank: "P", flags: ["遅番寄り"] },
-    "あい": { rank: "S", flags: ["姫強"] },
-    "みゆき": { rank: "G", flags: ["店泊可"] }
+    "れいか": { rank: "S", flags: ["勤怠安定", "写真強"], areas: ["葛西", "浦安"] },
+    "ななみ": { rank: "G", flags: ["勤怠安定"], areas: ["浦安", "船橋"] },
+    "かれん": { rank: "P", flags: ["遅刻注意"], areas: ["船橋"] },
+    "つき": { rank: "S", flags: ["勤怠安定", "姫強"], areas: ["浅草橋"] },
+    "あいり": { rank: "G", flags: ["出稼ぎ"], areas: ["八千代"] },
+    "もも": { rank: "P", flags: ["店泊可"], areas: ["葛西", "船橋"] },
+    "りおな": { rank: "G", flags: ["勤怠安定"], areas: ["浦安"] },
+    "あすな": { rank: "S", flags: ["写真強"], areas: ["船橋", "葛西"] },
+    "いおり": { rank: "G", flags: ["葛西強"], areas: ["葛西"] },
+    "かなえ": { rank: "P", flags: ["ヘルプ可"], areas: ["浅草橋", "葛西"] },
+    "なほ": { rank: "G", flags: ["終電調整"], areas: ["八千代", "浦安"] },
+    "さき": { rank: "P", flags: ["遅番寄り"], areas: ["浦安", "船橋"] },
+    "あい": { rank: "S", flags: ["姫強"], areas: ["葛西"] },
+    "みゆき": { rank: "G", flags: ["店泊可"], areas: ["船橋", "八千代"] },
+    "ゆい": { rank: "G", flags: ["勤怠安定"], areas: ["葛西", "浅草橋"] }
   },
   requirements: [
     { dateKey: "2026-04-06", earlyNeeded: 7, lateNeeded: 7 },
@@ -35,6 +35,15 @@
     { dateKey: "2026-04-10", earlyNeeded: 5, lateNeeded: 5 },
     { dateKey: "2026-04-11", earlyNeeded: 6, lateNeeded: 6 },
     { dateKey: "2026-04-12", earlyNeeded: 6, lateNeeded: 6 }
+  ],
+  weeklyPerformance: [
+    { dateKey: "2026-04-06", salesForecast: 340000, storeForecast: 153000 },
+    { dateKey: "2026-04-07", salesForecast: 256000, storeForecast: 115200 },
+    { dateKey: "2026-04-08", salesForecast: 248000, storeForecast: 111600 },
+    { dateKey: "2026-04-09", salesForecast: 296000, storeForecast: 133200 },
+    { dateKey: "2026-04-10", salesForecast: 312000, storeForecast: 140400 },
+    { dateKey: "2026-04-11", salesForecast: 352000, storeForecast: 158400 },
+    { dateKey: "2026-04-12", salesForecast: 328000, storeForecast: 147600 }
   ],
   shiftRequests: [
     { name: "れいか", dateKey: "2026-04-06", startTime: "10:00", endTime: "18:00", preferredArea: "葛西", himeReservation: "あり", note: "葛西希望" },
@@ -51,7 +60,6 @@
     { name: "さき", dateKey: "2026-04-06", startTime: "15:00", endTime: "23:00", preferredArea: "浦安", himeReservation: "なし", note: "終電上がり希望" },
     { name: "あい", dateKey: "2026-04-06", startTime: "11:00", endTime: "19:00", preferredArea: "葛西", himeReservation: "あり", note: "姫予約あり" },
     { name: "みゆき", dateKey: "2026-04-06", startTime: "13:00", endTime: "22:00", preferredArea: "船橋", himeReservation: "なし", note: "店泊可" },
-
     { name: "れいか", dateKey: "2026-04-07", startTime: "10:00", endTime: "18:00", preferredArea: "葛西", himeReservation: "なし", note: "葛西希望" },
     { name: "ななみ", dateKey: "2026-04-07", startTime: "13:00", endTime: "22:00", preferredArea: "浦安", himeReservation: "なし", note: "終電上がり希望" },
     { name: "かれん", dateKey: "2026-04-07", startTime: "15:00", endTime: "23:00", preferredArea: "船橋", himeReservation: "あり", note: "姫予約あり" },
@@ -62,7 +70,6 @@
     { name: "あすな", dateKey: "2026-04-07", startTime: "15:00", endTime: "24:00", preferredArea: "船橋", himeReservation: "なし", note: "船橋希望" },
     { name: "いおり", dateKey: "2026-04-07", startTime: "12:00", endTime: "20:00", preferredArea: "葛西", himeReservation: "あり", note: "姫予約あり" },
     { name: "かなえ", dateKey: "2026-04-07", startTime: "13:00", endTime: "21:00", preferredArea: "浅草橋", himeReservation: "なし", note: "21:00以降可" },
-
     { name: "れいか", dateKey: "2026-04-08", startTime: "10:00", endTime: "17:00", preferredArea: "葛西", himeReservation: "なし", note: "早番固定希望" },
     { name: "ななみ", dateKey: "2026-04-08", startTime: "12:00", endTime: "21:00", preferredArea: "浦安", himeReservation: "あり", note: "姫予約あり" },
     { name: "かれん", dateKey: "2026-04-08", startTime: "14:00", endTime: "22:00", preferredArea: "船橋", himeReservation: "なし", note: "終電上がり希望" },
@@ -73,7 +80,6 @@
     { name: "いおり", dateKey: "2026-04-08", startTime: "12:00", endTime: "20:00", preferredArea: "葛西", himeReservation: "なし", note: "葛西希望" },
     { name: "かなえ", dateKey: "2026-04-08", startTime: "14:00", endTime: "22:00", preferredArea: "浅草橋", himeReservation: "なし", note: "ヘルプ可" },
     { name: "なほ", dateKey: "2026-04-08", startTime: "12:00", endTime: "20:00", preferredArea: "八千代", himeReservation: "なし", note: "終電上がり希望" },
-
     { name: "れいか", dateKey: "2026-04-09", startTime: "10:00", endTime: "18:00", preferredArea: "葛西", himeReservation: "なし", note: "葛西希望" },
     { name: "ななみ", dateKey: "2026-04-09", startTime: "13:00", endTime: "22:00", preferredArea: "浦安", himeReservation: "なし", note: "21:00以降可" },
     { name: "かれん", dateKey: "2026-04-09", startTime: "15:00", endTime: "23:00", preferredArea: "船橋", himeReservation: "なし", note: "船橋希望" },
@@ -86,7 +92,6 @@
     { name: "なほ", dateKey: "2026-04-09", startTime: "13:00", endTime: "21:00", preferredArea: "八千代", himeReservation: "なし", note: "21:00以降可" },
     { name: "さき", dateKey: "2026-04-09", startTime: "15:00", endTime: "23:00", preferredArea: "浦安", himeReservation: "なし", note: "終電上がり希望" },
     { name: "あい", dateKey: "2026-04-09", startTime: "11:00", endTime: "19:00", preferredArea: "葛西", himeReservation: "なし", note: "葛西希望" },
-
     { name: "れいか", dateKey: "2026-04-10", startTime: "11:00", endTime: "19:00", preferredArea: "葛西", himeReservation: "あり", note: "姫予約あり" },
     { name: "ななみ", dateKey: "2026-04-10", startTime: "14:00", endTime: "23:00", preferredArea: "浦安", himeReservation: "なし", note: "21:00以降可" },
     { name: "かれん", dateKey: "2026-04-10", startTime: "15:00", endTime: "23:30", preferredArea: "船橋", himeReservation: "なし", note: "終電上がり希望" },
@@ -97,7 +102,6 @@
     { name: "かなえ", dateKey: "2026-04-10", startTime: "13:00", endTime: "21:00", preferredArea: "浅草橋", himeReservation: "なし", note: "ヘルプ可" },
     { name: "なほ", dateKey: "2026-04-10", startTime: "14:00", endTime: "22:00", preferredArea: "八千代", himeReservation: "なし", note: "終電上がり希望" },
     { name: "みゆき", dateKey: "2026-04-10", startTime: "13:00", endTime: "22:00", preferredArea: "船橋", himeReservation: "なし", note: "船橋希望" },
-
     { name: "れいか", dateKey: "2026-04-11", startTime: "10:00", endTime: "18:00", preferredArea: "葛西", himeReservation: "なし", note: "葛西希望" },
     { name: "ななみ", dateKey: "2026-04-11", startTime: "12:00", endTime: "21:00", preferredArea: "浦安", himeReservation: "あり", note: "姫予約あり" },
     { name: "つき", dateKey: "2026-04-11", startTime: "13:00", endTime: "22:00", preferredArea: "浅草橋", himeReservation: "なし", note: "浅草橋希望" },
@@ -109,7 +113,6 @@
     { name: "さき", dateKey: "2026-04-11", startTime: "15:00", endTime: "23:00", preferredArea: "浦安", himeReservation: "なし", note: "終電上がり希望" },
     { name: "あい", dateKey: "2026-04-11", startTime: "11:00", endTime: "19:00", preferredArea: "葛西", himeReservation: "なし", note: "葛西希望" },
     { name: "みゆき", dateKey: "2026-04-11", startTime: "13:00", endTime: "22:00", preferredArea: "船橋", himeReservation: "なし", note: "店泊可" },
-
     { name: "れいか", dateKey: "2026-04-12", startTime: "10:00", endTime: "18:00", preferredArea: "葛西", himeReservation: "なし", note: "葛西希望" },
     { name: "ななみ", dateKey: "2026-04-12", startTime: "12:00", endTime: "21:00", preferredArea: "浦安", himeReservation: "なし", note: "21:00以降可" },
     { name: "かれん", dateKey: "2026-04-12", startTime: "14:00", endTime: "23:00", preferredArea: "船橋", himeReservation: "あり", note: "姫予約あり" },
