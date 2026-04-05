@@ -73,40 +73,6 @@
             </div>
           </section>
 
-          <div id="dashboardListView" class="dashboard-view-panel active">
-            <section class="content-panel dashboard-legend-panel">
-              <div class="status-row">
-                <span class="legend-chip normal">通常出勤</span>
-                <span class="legend-chip booked">姫予約あり</span>
-                <span class="legend-chip empty">空き枠</span>
-                <span class="legend-chip warning">要確認</span>
-                <span class="legend-chip cut">カット</span>
-              </div>
-            </section>
-            <div class="shift-tabs" id="shiftTabs">
-              <button class="shift-tab active" type="button" data-shift="early">早番 <span id="earlyCountMobile"></span></button>
-              <button class="shift-tab" type="button" data-shift="late">遅番 <span id="lateCountMobile"></span></button>
-            </div>
-
-            <section class="shift-columns dashboard-shift-columns">
-              <section class="content-panel shift-panel active" data-shift-panel="early">
-                <div class="panel-head">
-                  <h3>早番</h3>
-                  <span id="earlyCount" class="panel-count"></span>
-                </div>
-                <div id="earlyShiftList" class="shift-list"></div>
-              </section>
-
-              <section class="content-panel shift-panel" data-shift-panel="late">
-                <div class="panel-head">
-                  <h3>遅番</h3>
-                  <span id="lateCount" class="panel-count"></span>
-                </div>
-                <div id="lateShiftList" class="shift-list"></div>
-              </section>
-            </section>
-          </div>
-
           <section id="dashboardBoardView" class="content-panel dashboard-view-panel board-placeholder-panel">
             <div class="panel-head">
               <div>
@@ -126,6 +92,51 @@
               <div id="boardInspectorContent" class="board-inspector-content"></div>
             </section>
           </section>
+
+          <div id="dashboardListView" class="dashboard-view-panel active">
+            <details class="content-panel dashboard-collapsible dashboard-list-collapsible dashboard-secondary-block">
+              <summary class="dashboard-collapsible-summary">
+                <div>
+                  <h3>詳細リスト</h3>
+                  <p class="section-note">個別確認が必要なときだけ開く一覧です</p>
+                </div>
+                <span class="panel-count">早番 / 遅番</span>
+              </summary>
+              <div class="dashboard-collapsible-body">
+                <section class="content-panel dashboard-legend-panel">
+                  <div class="status-row">
+                    <span class="legend-chip normal">通常出勤</span>
+                    <span class="legend-chip booked">姫予約あり</span>
+                    <span class="legend-chip empty">空き枠</span>
+                    <span class="legend-chip warning">要確認</span>
+                    <span class="legend-chip cut">カット</span>
+                  </div>
+                </section>
+                <div class="shift-tabs" id="shiftTabs">
+                  <button class="shift-tab active" type="button" data-shift="early">早番 <span id="earlyCountMobile"></span></button>
+                  <button class="shift-tab" type="button" data-shift="late">遅番 <span id="lateCountMobile"></span></button>
+                </div>
+
+                <section class="shift-columns dashboard-shift-columns">
+                  <section class="content-panel shift-panel active" data-shift-panel="early">
+                    <div class="panel-head">
+                      <h3>早番</h3>
+                      <span id="earlyCount" class="panel-count"></span>
+                    </div>
+                    <div id="earlyShiftList" class="shift-list"></div>
+                  </section>
+
+                  <section class="content-panel shift-panel" data-shift-panel="late">
+                    <div class="panel-head">
+                      <h3>遅番</h3>
+                      <span id="lateCount" class="panel-count"></span>
+                    </div>
+                    <div id="lateShiftList" class="shift-list"></div>
+                  </section>
+                </section>
+              </div>
+            </details>
+          </div>
 
           <section class="summary-grid dashboard-summary-grid">
             <article class="summary-card emphasis">
