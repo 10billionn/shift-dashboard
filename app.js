@@ -146,9 +146,8 @@ function bindEvents() {
   });
 
   elements.requestList.addEventListener("click", handleRequestListClick);
+  elements.requestList.addEventListener("change", handleRequestListChange);
   elements.requirementsList.addEventListener("change", handleRequirementChange);
-  elements.earlyShiftList.addEventListener("change", handleAssignmentFieldChange);
-  elements.lateShiftList.addEventListener("change", handleAssignmentFieldChange);
 
   elements.applyRequestCsvButton.addEventListener("click", applyRequestCsv);
   elements.loadRequestSampleButton.addEventListener("click", () => {
@@ -300,7 +299,7 @@ function renderShiftCards(assignments, shiftLabel) {
         <div class="shift-card-top">
           <div>
             <strong class="therapist-name">${assignment.name}</strong>
-            <div class="field-help">${shiftLabel} / 希望 ${assignment.preferredArea || "-"}</div>
+            <div class="field-help">${shiftLabel} / 本日の配置を確認</div>
           </div>
           <div class="status-row tight">
             <span class="mini-badge rank">${profile.rank}</span>
@@ -331,26 +330,6 @@ function renderShiftCards(assignments, shiftLabel) {
 
         <div class="priority-row">
           ${tags.length ? tags.filter((tag) => tag !== "要確認").map((tag) => `<span class="priority-tag ${tag === "姫予約あり" ? "hime" : ""}">${tag}</span>`).join("") : `<span class="field-label">優先条件なし</span>`}
-        </div>
-
-        <div class="shift-edit-block">
-          <div class="field-help">調整が必要なときだけ下の項目を変更します</div>
-          <div class="shift-edit-grid" data-assignment-id="${assignment.id}">
-            <label class="field-block">
-              <span class="field-label">エリア変更</span>
-              <select class="select-input" data-field="assignedArea">
-                ${samplePrototypeData.settings.areas.map((area) => `<option value="${area}" ${area === assignment.assignedArea ? "selected" : ""}>${area}</option>`).join("")}
-              </select>
-            </label>
-            <label class="field-block">
-              <span class="field-label">開始変更</span>
-              <input class="time-input" type="time" value="${assignment.startTime}" data-field="startTime">
-            </label>
-            <label class="field-block">
-              <span class="field-label">終了変更</span>
-              <input class="time-input" type="time" value="${assignment.endTime}" data-field="endTime">
-            </label>
-          </div>
         </div>
       </article>
     `;
@@ -438,6 +417,23 @@ function renderRequestRows() {
           ${row.issues.map((issue) => `<span class="alert-tag warning">${issue}</span>`).join("")}
         </div>
 
+        <div class="request-edit-grid" data-row-id="${row.id}">
+          <label class="field-block">
+            <span class="field-label">エリア調整</span>
+            <select class="select-input" data-row-field="preferredArea">
+              ${samplePrototypeData.settings.areas.map((area) => `<option value="${area}" ${area === row.preferredArea ? "selected" : ""}>${area}</option>`).join("")}
+            </select>
+          </label>
+          <label class="field-block">
+            <span class="field-label">開始時間</span>
+            <input class="time-input" type="time" value="${row.startTime}" data-row-field="startTime">
+          </label>
+          <label class="field-block">
+            <span class="field-label">終了時間</span>
+            <input class="time-input" type="time" value="${row.endTime}" data-row-field="endTime">
+          </label>
+        </div>
+
         <div class="status-toggle-group">
           <button class="status-toggle ${row.status === "accepted" ? "active" : ""}" type="button" data-row-id="${row.id}" data-status="accepted">採用</button>
           <button class="status-toggle ${row.status === "hold" ? "active" : ""}" type="button" data-row-id="${row.id}" data-status="hold">保留</button>
@@ -508,28 +504,26 @@ function handleRequestListClick(event) {
   renderGeneration();
 }
 
+function handleRequestListChange(event) {
+  const input = event.target.closest("[data-row-field]");
+  if (!input) return;
+
+  const container = input.closest("[data-row-id]");
+  const row = state.generationRows.find((item) => item.id === container?.dataset.rowId);
+  if (!row) return;
+
+  row[input.dataset.rowField] = input.value;
+  row.issues = collectRowIssues(row);
+  state.generationWarnings = collectGenerationWarnings(state.generationRows);
+  renderGeneration();
+}
+
 function handleRequirementChange(event) {
   const input = event.target.closest("[data-date-key][data-req-field]");
   if (!input) return;
   const requirement = state.requirements.find((item) => item.dateKey === input.dataset.dateKey);
   if (!requirement) return;
   requirement[input.dataset.reqField] = Math.max(0, Number(input.value) || 0);
-}
-
-function handleAssignmentFieldChange(event) {
-  const input = event.target.closest("[data-field]");
-  if (!input) return;
-  const container = input.closest("[data-assignment-id]");
-  const assignment = findAssignmentById(container?.dataset.assignmentId);
-  if (!assignment) return;
-
-  assignment[input.dataset.field] = input.value;
-  assignment.warningArea = !supportsArea(assignment.name, assignment.assignedArea);
-  refreshDayMetrics(assignment.dateKey);
-  if (assignment.dateKey === state.selectedDistributionDate) {
-    renderDistribution();
-  }
-  renderDashboard();
 }
 
 function applyRequestCsv() {

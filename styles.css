@@ -457,7 +457,7 @@ pre {
 }
 
 .shift-summary-grid,
-.shift-edit-grid,
+.request-edit-grid,
 .distribution-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -507,11 +507,6 @@ pre {
   min-height: 26px;
 }
 
-.shift-edit-block {
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-}
-
 .field-help {
   margin: 0;
   color: var(--muted);
@@ -526,7 +521,7 @@ pre {
 
 .card-edit-grid,
 .time-grid,
-.shift-edit-grid {
+.request-edit-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -587,6 +582,10 @@ pre {
   gap: 12px;
 }
 
+.generation-layout .stack-block {
+  padding: 18px;
+}
+
 .data-textarea {
   min-height: 180px;
   resize: vertical;
@@ -602,6 +601,15 @@ pre {
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--panel-soft);
+}
+
+.request-card {
+  gap: 12px;
+}
+
+.request-edit-grid {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
 }
 
 .status-pill.accepted { background: var(--green-soft); color: var(--green); }
@@ -776,7 +784,7 @@ pre {
   .time-grid,
   .requirement-inputs,
   .shift-summary-grid,
-  .shift-edit-grid,
+  .request-edit-grid,
   .distribution-summary-grid {
     grid-template-columns: 1fr;
   }

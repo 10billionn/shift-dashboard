@@ -141,34 +141,37 @@
             <div class="generation-layout">
               <section class="stack-block">
                 <div class="subsection-head">
-                  <h3>読み込み</h3>
+                  <h3>1. シフト希望CSV</h3>
                 </div>
-                <div class="import-grid">
-                  <article class="import-card">
-                    <label class="field-label" for="requestCsvInput">シフト希望CSV</label>
-                    <input id="requestCsvInput" type="file" accept=".csv">
-                    <textarea id="requestCsvText" class="data-textarea" spellcheck="false"></textarea>
-                    <div class="action-row">
-                      <button id="applyRequestCsvButton" class="primary-button" type="button">CSV反映</button>
-                      <button id="loadRequestSampleButton" class="ghost-button" type="button">サンプル読込</button>
-                    </div>
-                  </article>
-
-                  <article class="import-card">
-                    <label class="field-label" for="historyCsvInput">過去実績CSV</label>
-                    <input id="historyCsvInput" type="file" accept=".csv">
-                    <textarea id="historyCsvText" class="data-textarea" spellcheck="false"></textarea>
-                    <div class="action-row">
-                      <button id="applyHistoryCsvButton" class="ghost-button" type="button">実績反映</button>
-                      <button id="loadHistorySampleButton" class="ghost-button" type="button">サンプル読込</button>
-                    </div>
-                  </article>
-                </div>
+                <article class="import-card">
+                  <label class="field-label" for="requestCsvInput">シフト希望CSV</label>
+                  <input id="requestCsvInput" type="file" accept=".csv">
+                  <textarea id="requestCsvText" class="data-textarea" spellcheck="false"></textarea>
+                  <div class="action-row">
+                    <button id="applyRequestCsvButton" class="primary-button" type="button">CSV反映</button>
+                    <button id="loadRequestSampleButton" class="ghost-button" type="button">サンプル読込</button>
+                  </div>
+                </article>
               </section>
 
               <section class="stack-block">
                 <div class="subsection-head">
-                  <h3>抜け漏れチェック</h3>
+                  <h3>2. 過去実績CSV</h3>
+                </div>
+                <article class="import-card">
+                  <label class="field-label" for="historyCsvInput">過去実績CSV</label>
+                  <input id="historyCsvInput" type="file" accept=".csv">
+                  <textarea id="historyCsvText" class="data-textarea" spellcheck="false"></textarea>
+                  <div class="action-row">
+                    <button id="applyHistoryCsvButton" class="ghost-button" type="button">実績反映</button>
+                    <button id="loadHistorySampleButton" class="ghost-button" type="button">サンプル読込</button>
+                  </div>
+                </article>
+              </section>
+
+              <section class="stack-block">
+                <div class="subsection-head">
+                  <h3>3. 抜け漏れチェック</h3>
                 </div>
                 <div class="summary-grid compact">
                   <article class="summary-card">
@@ -193,14 +196,14 @@
 
               <section class="stack-block">
                 <div class="subsection-head">
-                  <h3>採用 / カット / 保留</h3>
+                  <h3>4. 採用 / カット / 保留</h3>
                 </div>
                 <div id="requestList" class="request-list"></div>
               </section>
 
               <section class="stack-block">
                 <div class="subsection-head">
-                  <h3>人数設定</h3>
+                  <h3>5. 必要人数設定</h3>
                 </div>
                 <div id="requirementsList" class="requirements-list"></div>
               </section>
@@ -208,7 +211,7 @@
               <section class="content-panel accent-panel">
                 <div class="panel-head">
                   <div>
-                    <h3>生成</h3>
+                    <h3>6. 生成</h3>
                     <p class="section-note">生成結果はダッシュボードと配布画面へ反映されます</p>
                   </div>
                 </div>
