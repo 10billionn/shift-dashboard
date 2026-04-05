@@ -374,7 +374,8 @@ pre {
 .weekly-analysis,
 .alert-stack,
 .distribution-list,
-.settings-grid {
+.settings-grid,
+.cut-list {
   display: grid;
   gap: 10px;
 }
@@ -401,6 +402,23 @@ pre {
 .shift-card.area-asakusabashi { border-left-color: #9f59d1; }
 .shift-card.area-yachiyo { border-left-color: #d4516b; }
 .shift-card.has-hime { background: #f6fbf8; }
+.shift-card.slot-card { background: var(--blue-soft); }
+.shift-card.slot-card.booked-slot { background: var(--green-soft); }
+.shift-card.slot-card.warning-slot { background: var(--yellow-soft); }
+.shift-card.empty-slot {
+  border-left-color: #de8aa1;
+  background: var(--pink-soft);
+}
+
+.cut-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--gray);
+  border-radius: 14px;
+  background: var(--gray-soft);
+}
 
 .shift-card-top,
 .request-card-top,
@@ -439,6 +457,11 @@ pre {
 .priority-tag.hime {
   background: var(--green-soft);
   color: var(--green);
+}
+
+.mini-badge.pink {
+  background: var(--pink-soft);
+  color: #b84b67;
 }
 
 .mini-badge.warning,
@@ -480,6 +503,10 @@ pre {
   grid-template-columns: 1.1fr 0.9fr 1fr;
 }
 
+.slot-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .shift-summary-item,
 .distribution-summary-item {
   display: grid;
@@ -508,6 +535,10 @@ pre {
   color: var(--text);
 }
 
+.pink-text {
+  color: #b84b67;
+}
+
 .priority-tag,
 .alert-tag {
   background: var(--gray-soft);
@@ -517,6 +548,47 @@ pre {
 .priority-row {
   align-items: center;
   min-height: 26px;
+}
+
+.dashboard-legend-panel {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.legend-chip.normal {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.legend-chip.booked {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.legend-chip.empty {
+  background: var(--pink-soft);
+  color: #b84b67;
+}
+
+.legend-chip.warning {
+  background: var(--yellow-soft);
+  color: var(--yellow);
+}
+
+.legend-chip.cut {
+  background: var(--gray-soft);
+  color: var(--gray);
 }
 
 .field-help {
@@ -565,6 +637,10 @@ pre {
 
 .alert-box.ok {
   background: var(--green-soft);
+}
+
+.slot-summary-box {
+  background: linear-gradient(135deg, rgba(226, 140, 163, 0.08), rgba(46, 107, 203, 0.04));
 }
 
 .import-grid,

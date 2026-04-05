@@ -81,6 +81,15 @@
           </section>
 
           <div id="dashboardListView" class="dashboard-view-panel active">
+            <section class="content-panel dashboard-legend-panel">
+              <div class="status-row">
+                <span class="legend-chip normal">通常出勤</span>
+                <span class="legend-chip booked">姫予約あり</span>
+                <span class="legend-chip empty">空き枠</span>
+                <span class="legend-chip warning">要確認</span>
+                <span class="legend-chip cut">カット</span>
+              </div>
+            </section>
             <div class="shift-tabs" id="shiftTabs">
               <button class="shift-tab active" type="button" data-shift="early">早番 <span id="earlyCountMobile"></span></button>
               <button class="shift-tab" type="button" data-shift="late">遅番 <span id="lateCountMobile"></span></button>
@@ -102,6 +111,17 @@
                 </div>
                 <div id="lateShiftList" class="shift-list"></div>
               </section>
+            </section>
+
+            <section class="content-panel">
+              <div class="panel-head">
+                <div>
+                  <h3>今回は見送り</h3>
+                  <p class="section-note">希望はあったが今回は枠に入れていない人</p>
+                </div>
+                <span id="cutCount" class="panel-count"></span>
+              </div>
+              <div id="cutShiftList" class="cut-list"></div>
             </section>
           </div>
 

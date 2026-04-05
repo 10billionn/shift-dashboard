@@ -19,6 +19,7 @@
 };
 
 const STORAGE_KEY = "shift-dashboard-state-v1";
+const DASHBOARD_SLOT_COUNT = 7;
 let boardFeedbackTimer = null;
 
 const viewMeta = {
@@ -62,8 +63,10 @@ const elements = {
   shiftPanels: Array.from(document.querySelectorAll("[data-shift-panel]")),
   earlyShiftList: document.querySelector("#earlyShiftList"),
   lateShiftList: document.querySelector("#lateShiftList"),
+  cutShiftList: document.querySelector("#cutShiftList"),
   earlyCount: document.querySelector("#earlyCount"),
   lateCount: document.querySelector("#lateCount"),
+  cutCount: document.querySelector("#cutCount"),
   earlyCountMobile: document.querySelector("#earlyCountMobile"),
   lateCountMobile: document.querySelector("#lateCountMobile"),
   salesSummary: document.querySelector("#salesSummary"),
@@ -267,18 +270,27 @@ function renderCurrentView() {
 function renderDashboard() {
   const day = state.generatedSchedule[state.selectedDate] || emptyDay(state.selectedDate);
   const requirement = findRequirement(state.selectedDate);
+  const cutRows = getCutRowsForDate(state.selectedDate);
+  const earlySlotTotal = Math.max(DASHBOARD_SLOT_COUNT, requirement.earlyNeeded || 0);
+  const lateSlotTotal = Math.max(DASHBOARD_SLOT_COUNT, requirement.lateNeeded || 0);
+  const displayNeeded = earlySlotTotal + lateSlotTotal;
+  const displayFilled = day.earlyAssignments.length + day.lateAssignments.length;
+  const displayShortage = Math.max(displayNeeded - displayFilled, 0);
+  const displayFillRate = displayNeeded ? Math.round((displayFilled / displayNeeded) * 100) : 100;
 
   elements.selectedDateLabel.textContent = `${formatDisplayDate(state.selectedDate)} (${formatWeekday(state.selectedDate)})`;
-  elements.earlyCount.textContent = `${day.earlyAssignments.length}/${requirement.earlyNeeded}`;
-  elements.lateCount.textContent = `${day.lateAssignments.length}/${requirement.lateNeeded}`;
+  elements.earlyCount.textContent = `${day.earlyAssignments.length}/${earlySlotTotal}枠`;
+  elements.lateCount.textContent = `${day.lateAssignments.length}/${lateSlotTotal}枠`;
+  elements.cutCount.textContent = `${cutRows.length}名`;
   elements.earlyCountMobile.textContent = elements.earlyCount.textContent;
   elements.lateCountMobile.textContent = elements.lateCount.textContent;
   elements.salesSummary.textContent = formatYen(day.metrics.salesForecast);
   elements.storeSummary.textContent = formatYen(day.metrics.storeForecast);
-  elements.shortageSummary.textContent = `${day.metrics.shortage}名`;
-  elements.fillSummary.textContent = `${day.metrics.fillRate}%`;
-  elements.earlyShiftList.innerHTML = renderShiftCards(day.earlyAssignments, "早番");
-  elements.lateShiftList.innerHTML = renderShiftCards(day.lateAssignments, "遅番");
+  elements.shortageSummary.textContent = `${displayShortage}枠`;
+  elements.fillSummary.textContent = `${displayFillRate}%`;
+  elements.earlyShiftList.innerHTML = renderShiftSlots(day.earlyAssignments, "早番", earlySlotTotal);
+  elements.lateShiftList.innerHTML = renderShiftSlots(day.lateAssignments, "遅番", lateSlotTotal);
+  elements.cutShiftList.innerHTML = renderCutRows(cutRows);
   syncSelectedBoardAssignment();
   elements.dashboardBoardCanvas.innerHTML = renderBoardTimeline(day);
   elements.boardInspectorContent.innerHTML = renderBoardInspector(day);
@@ -344,43 +356,75 @@ function renderShiftTabState() {
     panel.classList.toggle("active", panel.dataset.shiftPanel === state.activeShiftTab);
   });
 }
-function renderShiftCards(assignments, shiftLabel) {
-  if (!assignments.length) {
-    return `<div class="empty-state">${shiftLabel}の確定データはありません。</div>`;
-  }
+function renderShiftSlots(assignments, shiftLabel, slotTotal) {
+  return Array.from({ length: slotTotal }, (_, index) => {
+    const assignment = assignments[index];
+    if (!assignment) {
+      return `
+        <article class="shift-card empty-slot">
+          <div class="shift-card-top">
+            <div>
+              <strong class="therapist-name">${shiftLabel}${index + 1}</strong>
+              <div class="field-help">未充足の枠です</div>
+            </div>
+            <div class="status-row tight">
+              <span class="mini-badge pink">空き</span>
+            </div>
+          </div>
+          <div class="shift-summary-grid slot-summary-grid">
+            <div class="shift-summary-item">
+              <span class="field-label">枠名</span>
+              <span class="field-value">Room ${index + 1}</span>
+            </div>
+            <div class="shift-summary-item">
+              <span class="field-label">状態</span>
+              <span class="field-value pink-text">未配置</span>
+            </div>
+            <div class="shift-summary-item">
+              <span class="field-label">時間</span>
+              <span class="field-value">募集中</span>
+            </div>
+          </div>
+        </article>
+      `;
+    }
 
-  return assignments.map((assignment) => {
     const profile = samplePrototypeData.therapistProfiles[assignment.name] || { rank: "G", flags: [] };
     const attendance = selectAttendanceFlag(profile.flags || []);
     const tags = buildPriorityTags(assignment);
     if (assignment.warningArea) tags.unshift("要確認");
+    const cardClass = assignment.warningArea
+      ? "warning-slot"
+      : assignment.himeReservation === "あり"
+        ? "booked-slot"
+        : "";
 
     return `
-      <article class="shift-card area-${areaClassName(assignment.assignedArea)} ${assignment.himeReservation === "あり" ? "has-hime" : ""}">
+      <article class="shift-card slot-card area-${areaClassName(assignment.assignedArea)} ${cardClass}">
         <div class="shift-card-top">
           <div>
-            <strong class="therapist-name">${assignment.name}</strong>
-            <div class="field-help">${shiftLabel} / 本日の配置を確認</div>
+            <strong class="therapist-name">${shiftLabel}${index + 1} / ${assignment.name}</strong>
+            <div class="field-help">Room ${index + 1} / ${shiftLabel}の配置</div>
           </div>
           <div class="status-row tight">
             <span class="mini-badge rank">${profile.rank}</span>
             <span class="mini-badge">${attendance}</span>
-            <span class="mini-badge ${assignment.himeReservation === "あり" ? "booked" : "gray"}">${assignment.himeReservation === "あり" ? "姫あり" : "姫なし"}</span>
+            <span class="mini-badge ${assignment.warningArea ? "warning" : assignment.himeReservation === "あり" ? "booked" : "gray"}">${assignment.warningArea ? "要確認" : assignment.himeReservation === "あり" ? "姫あり" : "通常"}</span>
           </div>
         </div>
 
-        <div class="shift-summary-grid">
+        <div class="shift-summary-grid slot-summary-grid">
+          <div class="shift-summary-item">
+            <span class="field-label">枠名</span>
+            <span class="field-value">Room ${index + 1}</span>
+          </div>
           <div class="shift-summary-item">
             <span class="field-label">エリア</span>
             <span class="field-value">${assignment.assignedArea}</span>
           </div>
           <div class="shift-summary-item">
-            <span class="field-label">開始</span>
-            <span class="field-value">${assignment.startTime}</span>
-          </div>
-          <div class="shift-summary-item">
-            <span class="field-label">終了</span>
-            <span class="field-value">${assignment.endTime}</span>
+            <span class="field-label">時間</span>
+            <span class="field-value">${assignment.startTime}-${assignment.endTime}</span>
           </div>
         </div>
 
@@ -391,6 +435,34 @@ function renderShiftCards(assignments, shiftLabel) {
 
         <div class="priority-row">
           ${tags.length ? tags.filter((tag) => tag !== "要確認").map((tag) => `<span class="priority-tag ${tag === "姫予約あり" ? "hime" : ""}">${tag}</span>`).join("") : `<span class="field-label">優先条件なし</span>`}
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderCutRows(rows) {
+  if (!rows.length) {
+    return `<div class="empty-state">今回は見送りの希望はありません。</div>`;
+  }
+
+  return rows.map((row) => {
+    const profile = samplePrototypeData.therapistProfiles[row.name] || { rank: "G" };
+    return `
+      <article class="cut-card">
+        <div class="shift-card-top">
+          <div>
+            <strong class="therapist-name">${row.name}</strong>
+            <div class="field-help">${formatDisplayDate(row.dateKey)} (${formatWeekday(row.dateKey)}) / ${row.startTime}-${row.endTime}</div>
+          </div>
+          <div class="status-row tight">
+            <span class="mini-badge rank">${profile.rank}</span>
+            <span class="mini-badge gray">カット</span>
+          </div>
+        </div>
+        <div class="status-row">
+          <span class="field-value">希望エリア ${row.preferredArea || "未入力"}</span>
+          <span class="field-value">姫予約 ${row.himeReservation || "未設定"}</span>
         </div>
       </article>
     `;
@@ -445,8 +517,9 @@ function renderBoardTimeline(day) {
 
 function renderBoardGroup(group) {
   const assignedLanes = packAssignmentsIntoBoardLanes(group.assignments);
-  const shortageCount = Math.max(group.needed - group.assignments.length, 0);
-  const visualLaneCount = Math.max(assignedLanes.length + shortageCount, Math.min(group.needed || 0, 3), 2);
+  const targetLaneCount = Math.max(DASHBOARD_SLOT_COUNT, group.needed || 0);
+  const shortageCount = Math.max(targetLaneCount - group.assignments.length, 0);
+  const visualLaneCount = Math.max(assignedLanes.length + shortageCount, targetLaneCount, 2);
   const lanes = Array.from({ length: visualLaneCount }, (_, index) => {
     if (index < assignedLanes.length) {
       return { type: "assigned", items: assignedLanes[index], label: `${group.label}${index + 1}` };
@@ -461,7 +534,7 @@ function renderBoardGroup(group) {
     <section class="board-group">
       <div class="board-group-head">
         <strong class="board-group-title">${group.label}</strong>
-        <span class="board-group-meta">${group.assignments.length}/${group.needed}名</span>
+        <span class="board-group-meta">${group.assignments.length}/${targetLaneCount}枠</span>
       </div>
       <div class="board-group-body">
         ${lanes.map((lane, index) => renderBoardLaneRow(group, lane, index)).join("")}
@@ -474,13 +547,13 @@ function renderBoardLaneRow(group, lane, index) {
   const shortageMarkup = lane.type === "shortage"
     ? `<div class="board-gap board-gap-shortage">空き｜未配置</div>`
     : lane.type === "empty"
-      ? `<div class="board-gap board-gap-empty">${group.label}枠</div>`
+      ? `<div class="board-gap board-gap-empty">Room ${index + 1}</div>`
       : lane.items.map((assignment) => renderBoardBar(assignment)).join("");
 
   return `
     <div class="board-lane">
       <div class="board-lane-head">
-        <strong class="board-lane-title">枠 ${index + 1}</strong>
+        <strong class="board-lane-title">Room ${index + 1}</strong>
         <span class="board-lane-meta">${lane.type === "shortage" ? "不足" : lane.type === "assigned" ? "稼働中" : "待機"}</span>
       </div>
       <div class="board-track-wrap">
@@ -550,6 +623,15 @@ function packAssignmentsIntoBoardLanes(assignments) {
 
 function renderGenerationAlerts(checkSummary) {
   const blocks = [];
+  if (checkSummary.slots.length) {
+    blocks.push(`
+      <article class="alert-box slot-summary-box">
+        <strong>枠サマリー</strong>
+        <div>${checkSummary.slots.map((item) => `<div>${item}</div>`).join("")}</div>
+      </article>
+    `);
+  }
+
   if (state.generationErrors.length) {
     blocks.push(`
       <article class="alert-box danger">
@@ -1090,6 +1172,13 @@ function buildCheckSummary(rows, missingTherapists) {
   return {
     missing: missingTherapists,
     items: items.filter((item) => item.names.length),
+    slots: state.dateList.map((dateKey) => {
+      const requirement = findRequirement(dateKey);
+      const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
+      const earlyNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.earlyNeeded || 0);
+      const lateNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.lateNeeded || 0);
+      return `${formatSlashDate(dateKey)}(${formatWeekday(dateKey)}) 早番 必要 ${earlyNeeded} / 採用 ${day.earlyAssignments.length} / 不足 ${Math.max(earlyNeeded - day.earlyAssignments.length, 0)} ｜ 遅番 必要 ${lateNeeded} / 採用 ${day.lateAssignments.length} / 不足 ${Math.max(lateNeeded - day.lateAssignments.length, 0)}`;
+    }),
     shortages: state.dateList
       .map((dateKey) => {
         const day = state.generatedSchedule[dateKey];
@@ -1102,6 +1191,12 @@ function buildCheckSummary(rows, missingTherapists) {
 function getMissingTherapists() {
   const submittedNames = new Set(state.generationRows.map((row) => row.name));
   return Object.keys(samplePrototypeData.therapistProfiles).filter((name) => !submittedNames.has(name));
+}
+
+function getCutRowsForDate(dateKey) {
+  return state.generationRows
+    .filter((row) => row.dateKey === dateKey && row.status === "cut")
+    .sort((left, right) => left.name.localeCompare(right.name, "ja"));
 }
 
 function supportsShift(row, shiftType) {
