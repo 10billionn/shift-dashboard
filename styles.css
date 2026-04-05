@@ -144,8 +144,8 @@ pre {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 14px;
-  padding: 18px 22px;
+  gap: 10px;
+  padding: 11px 16px;
   background: rgba(247, 249, 252, 0.92);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid rgba(188, 200, 218, 0.7);
@@ -154,7 +154,12 @@ pre {
 .topbar-main {
   display: flex;
   align-items: start;
-  gap: 14px;
+  gap: 10px;
+}
+
+.topbar h1 {
+  font-size: 1.48rem;
+  line-height: 1.1;
 }
 
 .topbar h1,
@@ -180,7 +185,7 @@ pre {
 .save-state-notice {
   margin: 4px 0 0;
   color: rgba(102, 117, 138, 0.82);
-  font-size: 0.83rem;
+  font-size: 0.78rem;
 }
 
 .save-state-notice.warning {
@@ -233,7 +238,7 @@ pre {
 .hero-panel {
   background: linear-gradient(135deg, rgba(17, 36, 63, 0.98), rgba(39, 71, 119, 0.98));
   color: #fff;
-  padding: 14px 16px;
+  padding: 10px 14px;
 }
 
 .hero-panel .selected-date-label,
@@ -289,14 +294,15 @@ pre {
 }
 
 .selected-date-label {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   font-weight: 700;
+  font-size: 0.92rem;
 }
 
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 
 .dashboard-summary-grid {
@@ -308,25 +314,24 @@ pre {
 }
 
 .dashboard-risk-panel {
-  padding: 18px 18px;
-  order: 2;
+  padding: 16px 18px;
 }
 
 .dashboard-summary-grid .summary-card {
-  padding: 11px 12px;
+  padding: 8px 10px;
   border-radius: 14px;
   background: rgba(247, 249, 252, 0.78);
   border-color: rgba(188, 200, 218, 0.72);
 }
 
 .dashboard-summary-grid .summary-card p {
-  margin-bottom: 6px;
-  font-size: 0.72rem;
+  margin-bottom: 4px;
+  font-size: 0.68rem;
   color: rgba(102, 117, 138, 0.76);
 }
 
 .dashboard-summary-grid .summary-card strong {
-  font-size: 0.98rem;
+  font-size: 0.9rem;
   font-weight: 800;
   color: rgba(23, 34, 48, 0.9);
 }
@@ -450,17 +455,24 @@ pre {
   flex-wrap: wrap;
 }
 
+.hero-panel .ghost-button,
+.hero-panel .secondary-button,
+.hero-panel .view-tab {
+  padding: 8px 12px;
+  font-size: 0.82rem;
+}
+
 .dashboard-view-panel {
   display: none;
 }
 
 .dashboard-view-panel.active {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .dashboard-legend-panel {
-  padding: 12px 14px;
+  padding: 8px 12px;
   background: rgba(247, 249, 252, 0.92);
 }
 
@@ -471,7 +483,8 @@ pre {
 }
 
 .dashboard-shift-columns {
-  gap: 12px;
+  gap: 10px;
+  margin-top: -2px;
 }
 
 .shift-panel {
@@ -523,7 +536,7 @@ pre {
 }
 
 .shift-list {
-  max-height: 68vh;
+  max-height: 72vh;
   overflow: auto;
   padding-right: 4px;
   gap: 12px;

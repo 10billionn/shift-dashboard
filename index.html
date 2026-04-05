@@ -40,6 +40,16 @@
 
       <main class="content-area">
         <section class="view active" data-view-panel="dashboard">
+          <section class="content-panel dashboard-risk-panel">
+            <div class="panel-head">
+              <div>
+                <h3>危険度サマリー</h3>
+                <p class="section-note">今日どこを優先して触るべきかを先に出します</p>
+              </div>
+            </div>
+            <div id="dashboardRiskSummary" class="risk-summary-list"></div>
+          </section>
+
           <section class="content-panel hero-panel">
             <div class="panel-head">
               <div>
@@ -61,35 +71,6 @@
                 <button class="view-tab" type="button" data-dashboard-view="board">盤面表示</button>
               </div>
             </div>
-          </section>
-
-          <section class="content-panel dashboard-risk-panel">
-            <div class="panel-head">
-              <div>
-                <h3>危険度サマリー</h3>
-                <p class="section-note">今日どこを優先して触るべきかを先に出します</p>
-              </div>
-            </div>
-            <div id="dashboardRiskSummary" class="risk-summary-list"></div>
-          </section>
-
-          <section class="summary-grid dashboard-summary-grid">
-            <article class="summary-card emphasis">
-              <p>売上予測</p>
-              <strong id="salesSummary"></strong>
-            </article>
-            <article class="summary-card">
-              <p>店落ち予測</p>
-              <strong id="storeSummary"></strong>
-            </article>
-            <article class="summary-card warning">
-              <p>不足数</p>
-              <strong id="shortageSummary"></strong>
-            </article>
-            <article class="summary-card ok">
-              <p>当日充足率</p>
-              <strong id="fillSummary"></strong>
-            </article>
           </section>
 
           <div id="dashboardListView" class="dashboard-view-panel active">
@@ -124,17 +105,6 @@
                 <div id="lateShiftList" class="shift-list"></div>
               </section>
             </section>
-
-            <details class="content-panel dashboard-collapsible dashboard-secondary-block">
-              <summary class="dashboard-collapsible-summary">
-                <div>
-                  <h3>今回は見送り</h3>
-                  <p class="section-note">希望はあったが今回は枠に入れていない人</p>
-                </div>
-                <span id="cutCount" class="panel-count"></span>
-              </summary>
-              <div id="cutShiftList" class="cut-list dashboard-collapsible-body"></div>
-            </details>
           </div>
 
           <section id="dashboardBoardView" class="content-panel dashboard-view-panel board-placeholder-panel">
@@ -156,6 +126,36 @@
               <div id="boardInspectorContent" class="board-inspector-content"></div>
             </section>
           </section>
+
+          <section class="summary-grid dashboard-summary-grid">
+            <article class="summary-card emphasis">
+              <p>売上予測</p>
+              <strong id="salesSummary"></strong>
+            </article>
+            <article class="summary-card">
+              <p>店落ち予測</p>
+              <strong id="storeSummary"></strong>
+            </article>
+            <article class="summary-card warning">
+              <p>不足数</p>
+              <strong id="shortageSummary"></strong>
+            </article>
+            <article class="summary-card ok">
+              <p>当日充足率</p>
+              <strong id="fillSummary"></strong>
+            </article>
+          </section>
+
+          <details class="content-panel dashboard-collapsible dashboard-secondary-block">
+            <summary class="dashboard-collapsible-summary">
+              <div>
+                <h3>今回は見送り</h3>
+                <p class="section-note">希望はあったが今回は枠に入れていない人</p>
+              </div>
+              <span id="cutCount" class="panel-count"></span>
+            </summary>
+            <div id="cutShiftList" class="cut-list dashboard-collapsible-body"></div>
+          </details>
 
           <details class="content-panel dashboard-collapsible dashboard-secondary-block">
             <summary class="dashboard-collapsible-summary">
