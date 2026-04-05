@@ -13,8 +13,12 @@
   generationSummary: null,
   selectedDistributionDate: "",
   selectedDistributionAssignmentId: "",
+  distributionFormat: "line",
+  copiedDistributionIds: [],
   selectedBoardAssignmentId: "",
   updatedBoardAssignmentId: "",
+  editingAreaAssignmentId: "",
+  hasUnsavedChanges: false,
   mobileMenuOpen: false
 };
 
@@ -48,6 +52,8 @@ const elements = {
   appViews: Array.from(document.querySelectorAll("[data-view-panel]")),
   viewTitle: document.querySelector("#viewTitle"),
   viewSubtitle: document.querySelector("#viewSubtitle"),
+  saveStateNotice: document.querySelector("#saveStateNotice"),
+  saveScheduleButton: document.querySelector("#saveScheduleButton"),
   reloadButton: document.querySelector("#reloadButton"),
   selectedDateLabel: document.querySelector("#selectedDateLabel"),
   prevDayButton: document.querySelector("#prevDayButton"),
@@ -95,19 +101,30 @@ const elements = {
   distributionDateSelect: document.querySelector("#distributionDateSelect"),
   distributionList: document.querySelector("#distributionList"),
   distributionPreview: document.querySelector("#distributionPreview"),
+  distributionFormatSelect: document.querySelector("#distributionFormatSelect"),
   copyAllMessagesButton: document.querySelector("#copyAllMessagesButton"),
   copyMessageButton: document.querySelector("#copyMessageButton"),
-  copyStatus: document.querySelector("#copyStatus")
+  copyStatus: document.querySelector("#copyStatus"),
+  globalToast: document.querySelector("#globalToast")
 };
 
 initialize();
 
 function initialize() {
   state.dateList = buildDateList();
-  hydrateState(loadPersistedState());
+  const savedState = loadPersistedState();
+  hydrateState(savedState);
 
   bindEvents();
   syncCsvTextsFromState();
+  if (savedState?.generatedSchedule) {
+    state.generationSummary = summarizeGeneration();
+    syncSelectedBoardAssignment();
+    syncSelectedDistributionAssignment();
+    elements.generationResultNote.textContent = state.hasUnsavedChanges ? "保存前の変更を復元しました。" : "保存済みシフトを復元しました。";
+    renderAppView();
+    return;
+  }
   runGeneration(hasPersistedState() ? "保存済みデータを復元しました。" : "初期サンプルを反映しました。");
   renderAppView();
 }
@@ -125,6 +142,7 @@ function bindEvents() {
     runGeneration("サンプルデータを再読込しました。");
     renderCurrentView();
   });
+  elements.saveScheduleButton.addEventListener("click", saveManualScheduleChanges);
 
   elements.prevDayButton.addEventListener("click", () => moveDate(-1));
   elements.todayButton.addEventListener("click", jumpToStartDate);
@@ -163,6 +181,15 @@ function bindEvents() {
   elements.requestList.addEventListener("click", handleRequestListClick);
   elements.requestList.addEventListener("change", handleRequestListChange);
   elements.requirementsList.addEventListener("change", handleRequirementChange);
+  [elements.earlyShiftList, elements.lateShiftList].forEach((list) => {
+    list.addEventListener("dragstart", handleShiftDragStart);
+    list.addEventListener("dragend", handleShiftDragEnd);
+    list.addEventListener("dragover", handleShiftDragOver);
+    list.addEventListener("dragleave", handleShiftDragLeave);
+    list.addEventListener("drop", handleShiftDrop);
+    list.addEventListener("click", handleShiftListClick);
+    list.addEventListener("change", handleShiftListChange);
+  });
 
   elements.applyRequestCsvButton.addEventListener("click", applyRequestCsv);
   elements.loadRequestSampleButton.addEventListener("click", () => {
@@ -184,6 +211,11 @@ function bindEvents() {
   elements.distributionDateSelect.addEventListener("change", () => {
     state.selectedDistributionDate = elements.distributionDateSelect.value;
     syncSelectedDistributionAssignment();
+    persistState();
+    renderDistribution();
+  });
+  elements.distributionFormatSelect.addEventListener("change", () => {
+    state.distributionFormat = elements.distributionFormatSelect.value;
     persistState();
     renderDistribution();
   });
@@ -211,8 +243,12 @@ function hydrateState(saved) {
   state.activeAppView = saved.activeAppView || "dashboard";
   state.activeDashboardView = saved.activeDashboardView || "list";
   state.activeShiftTab = saved.activeShiftTab || "early";
+  state.distributionFormat = ["line", "simple"].includes(saved.distributionFormat) ? saved.distributionFormat : "line";
+  state.copiedDistributionIds = Array.isArray(saved.copiedDistributionIds) ? saved.copiedDistributionIds : [];
   state.selectedBoardAssignmentId = saved.selectedBoardAssignmentId || "";
   state.updatedBoardAssignmentId = "";
+  state.editingAreaAssignmentId = "";
+  state.hasUnsavedChanges = Boolean(saved.hasUnsavedChanges);
   state.requirements = Array.isArray(saved.requirements) && saved.requirements.length
     ? cloneRequirements(saved.requirements)
     : cloneRequirements(samplePrototypeData.requirements);
@@ -226,6 +262,7 @@ function hydrateState(saved) {
       storeForecast: Number(row.storeForecast) || 0
     }))
     : [...samplePrototypeData.weeklyPerformance];
+  state.generatedSchedule = saved.generatedSchedule ? restoreGeneratedSchedule(saved.generatedSchedule) : {};
 }
 
 function loadSampleState() {
@@ -234,11 +271,16 @@ function loadSampleState() {
   state.activeAppView = "dashboard";
   state.activeDashboardView = "list";
   state.activeShiftTab = "early";
+  state.distributionFormat = "line";
+  state.copiedDistributionIds = [];
   state.selectedBoardAssignmentId = "";
   state.updatedBoardAssignmentId = "";
+  state.editingAreaAssignmentId = "";
+  state.hasUnsavedChanges = false;
   state.requirements = cloneRequirements(samplePrototypeData.requirements);
   state.generationRows = createGenerationRows(samplePrototypeData.shiftRequests);
   state.historyRows = [...samplePrototypeData.weeklyPerformance];
+  state.generatedSchedule = {};
 }
 
 function syncCsvTextsFromState() {
@@ -263,9 +305,15 @@ function renderAppView() {
 }
 
 function renderCurrentView() {
+  renderSaveState();
   renderDashboard();
   renderGeneration();
   renderDistribution();
+}
+
+function renderSaveState() {
+  elements.saveStateNotice.textContent = state.hasUnsavedChanges ? "未保存の変更があります" : "保存済み";
+  elements.saveStateNotice.className = `save-state-notice ${state.hasUnsavedChanges ? "warning" : "saved"}`;
 }
 
 function renderDashboard() {
@@ -274,14 +322,16 @@ function renderDashboard() {
   const cutRows = getCutRowsForDate(state.selectedDate);
   const earlySlotTotal = Math.max(DASHBOARD_SLOT_COUNT, requirement.earlyNeeded || 0);
   const lateSlotTotal = Math.max(DASHBOARD_SLOT_COUNT, requirement.lateNeeded || 0);
+  const earlyFilled = countAssignments(day.earlyAssignments);
+  const lateFilled = countAssignments(day.lateAssignments);
   const displayNeeded = earlySlotTotal + lateSlotTotal;
-  const displayFilled = day.earlyAssignments.length + day.lateAssignments.length;
+  const displayFilled = earlyFilled + lateFilled;
   const displayShortage = Math.max(displayNeeded - displayFilled, 0);
   const displayFillRate = displayNeeded ? Math.round((displayFilled / displayNeeded) * 100) : 100;
 
   elements.selectedDateLabel.textContent = `${formatDisplayDate(state.selectedDate)} (${formatWeekday(state.selectedDate)})`;
-  elements.earlyCount.textContent = `${day.earlyAssignments.length}/${earlySlotTotal}枠`;
-  elements.lateCount.textContent = `${day.lateAssignments.length}/${lateSlotTotal}枠`;
+  elements.earlyCount.textContent = `${earlyFilled}/${earlySlotTotal}枠`;
+  elements.lateCount.textContent = `${lateFilled}/${lateSlotTotal}枠`;
   elements.cutCount.textContent = `${cutRows.length}名`;
   elements.earlyCountMobile.textContent = elements.earlyCount.textContent;
   elements.lateCountMobile.textContent = elements.lateCount.textContent;
@@ -317,6 +367,7 @@ function renderGeneration() {
 }
 
 function renderDistribution() {
+  elements.distributionFormatSelect.value = state.distributionFormat;
   elements.distributionDateSelect.innerHTML = state.dateList
     .map((dateKey) => `<option value="${dateKey}" ${dateKey === state.selectedDistributionDate ? "selected" : ""}>${formatDisplayDate(dateKey)} (${formatWeekday(dateKey)})</option>`)
     .join("");
@@ -336,7 +387,7 @@ function renderDistribution() {
   elements.distributionList.innerHTML = items.map((item) => renderDistributionItem(item)).join("");
   const selected = items.find((item) => item.id === state.selectedDistributionAssignmentId) || items[0];
   elements.distributionPreview.textContent = buildDistributionMessage(selected);
-  elements.copyStatus.textContent = `${selected.name} の文面を表示中`;
+  elements.copyStatus.textContent = `${selected.name} の${state.distributionFormat === "line" ? "LINE用" : "シンプル"}文面を表示中`;
   elements.copyStatus.className = "copy-status";
 }
 
@@ -363,7 +414,7 @@ function renderShiftSlots(assignments, shiftLabel, slotTotal) {
     const assignment = assignments[index];
     if (!assignment) {
       return `
-        <article class="shift-card empty-slot">
+        <article class="shift-card empty-slot drop-slot" data-slot-index="${index}" data-shift-type="${shiftLabel === "早番" ? "early" : "late"}">
           <div class="shift-card-top">
             <div>
               <strong class="therapist-name">${shiftLabel}${index + 1}</strong>
@@ -412,7 +463,11 @@ function renderShiftSlots(assignments, shiftLabel, slotTotal) {
           : "gray";
 
     return `
-      <article class="shift-card slot-card area-${areaClassName(assignment.assignedArea)} ${cardClass}">
+      <article
+        class="shift-card slot-card drop-slot area-${areaClassName(assignment.assignedArea)} ${cardClass}"
+        data-slot-index="${index}"
+        data-shift-type="${assignment.shiftType}"
+        data-assignment-id="${assignment.id}">
         <div class="shift-card-top">
           <div>
             <strong class="therapist-name">${shiftLabel}${index + 1} / ${assignment.name}</strong>
@@ -430,9 +485,15 @@ function renderShiftSlots(assignments, shiftLabel, slotTotal) {
             <span class="field-label">枠名</span>
             <span class="field-value">Room ${index + 1}</span>
           </div>
-          <div class="shift-summary-item">
+          <div class="shift-summary-item area-field">
             <span class="field-label">エリア</span>
-            <span class="field-value">${assignment.assignedArea}</span>
+            ${state.editingAreaAssignmentId === assignment.id ? `
+              <select class="select-input compact-select" data-list-field="assignedArea" data-assignment-id="${assignment.id}">
+                ${samplePrototypeData.settings.areas.map((area) => `<option value="${area}" ${area === assignment.assignedArea ? "selected" : ""}>${area}</option>`).join("")}
+              </select>
+            ` : `
+              <button class="field-value clickable-field" type="button" data-area-trigger="${assignment.id}">${assignment.assignedArea}</button>
+            `}
           </div>
           <div class="shift-summary-item">
             <span class="field-label">時間</span>
@@ -448,6 +509,10 @@ function renderShiftSlots(assignments, shiftLabel, slotTotal) {
         <div class="priority-row">
           ${tags.length ? tags.filter((tag) => tag !== "要確認").map((tag) => `<span class="priority-tag ${tag === "姫予約あり" ? "hime" : ""}">${tag}</span>`).join("") : `<span class="field-label">優先条件なし</span>`}
         </div>
+
+        <button class="drag-handle" type="button" draggable="true" data-drag-assignment-id="${assignment.id}" data-shift-type="${assignment.shiftType}" data-slot-index="${index}">
+          ドラッグして枠移動
+        </button>
       </article>
     `;
   }).join("");
@@ -503,13 +568,13 @@ function renderBoardTimeline(day) {
     {
       key: "early",
       label: "早番",
-      assignments: day.earlyAssignments,
+      assignments: day.earlyAssignments.filter(Boolean),
       needed: day.requirement?.earlyNeeded || 0
     },
     {
       key: "late",
       label: "遅番",
-      assignments: day.lateAssignments,
+      assignments: day.lateAssignments.filter(Boolean),
       needed: day.requirement?.lateNeeded || 0
     }
   ];
@@ -860,7 +925,10 @@ function renderDistributionItem(item) {
           <strong>${item.name}</strong>
           <div class="field-help">${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})</div>
         </div>
-        <span class="shift-chip ${item.shiftType}">${item.shiftLabel}</span>
+        <div class="status-row tight">
+          <span class="shift-chip ${item.shiftType}">${item.shiftLabel}</span>
+          ${state.copiedDistributionIds.includes(item.id) ? `<span class="mini-badge booked">コピー済み</span>` : ""}
+        </div>
       </div>
       <div class="distribution-summary-grid">
         <div class="distribution-summary-item">
@@ -907,6 +975,74 @@ function handleRequestListChange(event) {
   markGenerationDirty();
   persistState();
   renderGeneration();
+}
+
+function handleShiftListClick(event) {
+  const trigger = event.target.closest("[data-area-trigger]");
+  if (!trigger) return;
+
+  state.editingAreaAssignmentId = trigger.dataset.areaTrigger;
+  renderDashboard();
+}
+
+function handleShiftListChange(event) {
+  const input = event.target.closest("[data-list-field]");
+  if (!input || input.dataset.listField !== "assignedArea") return;
+  state.editingAreaAssignmentId = "";
+  updateAssignmentArea(input.dataset.assignmentId, input.value, { source: "list" });
+}
+
+function handleShiftDragStart(event) {
+  const handle = event.target.closest("[data-drag-assignment-id]");
+  if (!handle) return;
+
+  const payload = {
+    assignmentId: handle.dataset.dragAssignmentId,
+    shiftType: handle.dataset.shiftType,
+    slotIndex: Number(handle.dataset.slotIndex)
+  };
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", JSON.stringify(payload));
+  const slot = handle.closest(".drop-slot");
+  slot?.classList.add("dragging");
+}
+
+function handleShiftDragEnd(event) {
+  event.target.closest(".drop-slot")?.classList.remove("dragging");
+  document.querySelectorAll(".drop-slot.drag-over").forEach((item) => item.classList.remove("drag-over"));
+}
+
+function handleShiftDragOver(event) {
+  const target = event.target.closest(".drop-slot");
+  if (!target) return;
+  event.preventDefault();
+  document.querySelectorAll(".drop-slot.drag-over").forEach((item) => {
+    if (item !== target) item.classList.remove("drag-over");
+  });
+  target.classList.add("drag-over");
+}
+
+function handleShiftDragLeave(event) {
+  const target = event.target.closest(".drop-slot");
+  if (!target || target.contains(event.relatedTarget)) return;
+  target.classList.remove("drag-over");
+}
+
+function handleShiftDrop(event) {
+  const target = event.target.closest(".drop-slot");
+  if (!target) return;
+  event.preventDefault();
+  target.classList.remove("drag-over");
+
+  try {
+    const payload = JSON.parse(event.dataTransfer.getData("text/plain"));
+    moveAssignmentBetweenSlots(payload, {
+      shiftType: target.dataset.shiftType,
+      slotIndex: Number(target.dataset.slotIndex)
+    });
+  } catch (error) {
+    showToast("移動情報の読み込みに失敗しました。", "error");
+  }
 }
 
 function handleBoardCanvasClick(event) {
@@ -960,6 +1096,8 @@ function runGeneration(note) {
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
   state.generatedSchedule = buildGeneratedSchedule();
   state.generationSummary = summarizeGeneration();
+  state.hasUnsavedChanges = false;
+  state.editingAreaAssignmentId = "";
   syncSelectedBoardAssignment();
   elements.generationResultNote.textContent = note;
   syncSelectedDistributionAssignment();
@@ -1051,7 +1189,7 @@ function syncSelectedBoardAssignment() {
   }
 }
 
-function updateAssignmentArea(assignmentId, nextArea) {
+function updateAssignmentArea(assignmentId, nextArea, options = {}) {
   const row = state.generationRows.find((item) => item.id === assignmentId);
   if (row) {
     row.preferredArea = nextArea;
@@ -1060,6 +1198,7 @@ function updateAssignmentArea(assignmentId, nextArea) {
 
   Object.values(state.generatedSchedule).forEach((day) => {
     [...day.earlyAssignments, ...day.lateAssignments].forEach((assignment) => {
+      if (!assignment) return;
       if (assignment.id !== assignmentId) return;
       assignment.preferredArea = nextArea;
       assignment.assignedArea = nextArea;
@@ -1069,6 +1208,7 @@ function updateAssignmentArea(assignmentId, nextArea) {
 
   state.updatedBoardAssignmentId = assignmentId;
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
+  markManualScheduleDirty();
   persistState();
   flashBoardUpdateStatus(
     supportsArea(row?.name || "", nextArea)
@@ -1076,9 +1216,102 @@ function updateAssignmentArea(assignmentId, nextArea) {
       : `エリアを ${nextArea} に更新しました。対応外のため要確認です。`,
     supportsArea(row?.name || "", nextArea) ? "success" : "warning"
   );
+  if (options.source === "list") {
+    showToast(
+      supportsArea(row?.name || "", nextArea) ? `エリアを ${nextArea} に変更しました。` : `⚠️ 対応外エリアです: ${nextArea}`,
+      supportsArea(row?.name || "", nextArea) ? "success" : "warning"
+    );
+  }
   renderDashboard();
   renderGeneration();
   renderDistribution();
+}
+
+function moveAssignmentBetweenSlots(source, target) {
+  if (!source?.assignmentId) return;
+  const day = state.generatedSchedule[state.selectedDate];
+  if (!day) return;
+
+  const sourceSlots = createSlotArray(day[source.shiftType === "early" ? "earlyAssignments" : "lateAssignments"], source.shiftType);
+  const targetSlots = source.shiftType === target.shiftType
+    ? sourceSlots
+    : createSlotArray(day[target.shiftType === "early" ? "earlyAssignments" : "lateAssignments"], target.shiftType);
+
+  const moving = sourceSlots[source.slotIndex];
+  if (!moving) return;
+
+  const swapped = targetSlots[target.slotIndex] || null;
+  sourceSlots[source.slotIndex] = source.shiftType === target.shiftType ? swapped : null;
+  targetSlots[target.slotIndex] = {
+    ...moving,
+    shiftType: target.shiftType,
+    shiftLabel: target.shiftType === "early" ? samplePrototypeData.settings.shiftLabels.early : samplePrototypeData.settings.shiftLabels.late
+  };
+
+  if (source.shiftType !== target.shiftType && swapped) {
+    sourceSlots[source.slotIndex] = {
+      ...swapped,
+      shiftType: source.shiftType,
+      shiftLabel: source.shiftType === "early" ? samplePrototypeData.settings.shiftLabels.early : samplePrototypeData.settings.shiftLabels.late
+    };
+  }
+
+  day[source.shiftType === "early" ? "earlyAssignments" : "lateAssignments"] = sourceSlots;
+  if (source.shiftType !== target.shiftType) {
+    day[target.shiftType === "early" ? "earlyAssignments" : "lateAssignments"] = targetSlots;
+  }
+
+  refreshDayMetrics(state.selectedDate);
+  state.selectedBoardAssignmentId = moving.id;
+  state.updatedBoardAssignmentId = moving.id;
+  markManualScheduleDirty();
+  persistState();
+  const movedAssignment = findAssignmentById(moving.id);
+  const warnings = collectMoveWarnings(movedAssignment);
+  if (warnings.length) {
+    showToast(`⚠️ ${warnings.join(" / ")}`, "warning");
+  } else {
+    showToast(swapped ? "枠を入れ替えました。" : "空き枠へ移動しました。", "success");
+  }
+  renderDashboard();
+  renderDistribution();
+}
+
+function collectMoveWarnings(assignment) {
+  if (!assignment) return [];
+  const warnings = [];
+  if (assignment.warningArea) warnings.push("対応外エリア");
+  if (assignment.himeReservation === "あり") warnings.push("姫予約あり注意");
+  return warnings;
+}
+
+function createSlotArray(assignments, shiftType) {
+  const slotTotal = Math.max(DASHBOARD_SLOT_COUNT, findRequirement(state.selectedDate)[shiftType === "early" ? "earlyNeeded" : "lateNeeded"] || 0);
+  return Array.from({ length: slotTotal }, (_, index) => {
+    const item = assignments[index] || null;
+    return item ? { ...item } : null;
+  });
+}
+
+function markManualScheduleDirty() {
+  state.hasUnsavedChanges = true;
+  renderSaveState();
+}
+
+function saveManualScheduleChanges() {
+  state.hasUnsavedChanges = false;
+  persistState();
+  renderSaveState();
+  showToast("シフトをローカル保存しました。", "success");
+}
+
+function showToast(message, tone = "success") {
+  elements.globalToast.textContent = message;
+  elements.globalToast.className = `global-toast show ${tone}`;
+  window.clearTimeout(showToast.timerId);
+  showToast.timerId = window.setTimeout(() => {
+    elements.globalToast.className = "global-toast";
+  }, 2600);
 }
 
 function flashBoardUpdateStatus(message, tone) {
@@ -1097,7 +1330,7 @@ function refreshDayMetrics(dateKey) {
   const day = state.generatedSchedule[dateKey];
   if (!day) return;
   const requirement = day.requirement;
-  const filled = day.earlyAssignments.length + day.lateAssignments.length;
+  const filled = countAssignments(day.earlyAssignments) + countAssignments(day.lateAssignments);
   const needed = requirement.earlyNeeded + requirement.lateNeeded;
   day.metrics.shortage = Math.max(needed - filled, 0);
   day.metrics.fillRate = needed ? Math.round((filled / needed) * 100) : 100;
@@ -1214,7 +1447,7 @@ function buildCheckSummary(rows, missingTherapists) {
       const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
       const earlyNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.earlyNeeded || 0);
       const lateNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.lateNeeded || 0);
-      return `${formatSlashDate(dateKey)}(${formatWeekday(dateKey)}) 早番 必要 ${earlyNeeded} / 採用 ${day.earlyAssignments.length} / 不足 ${Math.max(earlyNeeded - day.earlyAssignments.length, 0)} ｜ 遅番 必要 ${lateNeeded} / 採用 ${day.lateAssignments.length} / 不足 ${Math.max(lateNeeded - day.lateAssignments.length, 0)}`;
+      return `${formatSlashDate(dateKey)}(${formatWeekday(dateKey)}) 早番 必要 ${earlyNeeded} / 採用 ${countAssignments(day.earlyAssignments)} / 不足 ${Math.max(earlyNeeded - countAssignments(day.earlyAssignments), 0)} ｜ 遅番 必要 ${lateNeeded} / 採用 ${countAssignments(day.lateAssignments)} / 不足 ${Math.max(lateNeeded - countAssignments(day.lateAssignments), 0)}`;
     }),
     shortages: state.dateList
       .map((dateKey) => {
@@ -1248,14 +1481,14 @@ function renderDashboardRiskSummary() {
 
 function buildDashboardRiskSummary() {
   const allAssignments = Object.values(state.generatedSchedule)
-    .flatMap((day) => [...day.earlyAssignments, ...day.lateAssignments]);
+    .flatMap((day) => [...day.earlyAssignments, ...day.lateAssignments].filter(Boolean));
   const maxShortage = state.dateList.reduce((best, dateKey) => {
     const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
     const requirement = findRequirement(dateKey);
     const earlyNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.earlyNeeded || 0);
     const lateNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.lateNeeded || 0);
-    const earlyShortage = Math.max(earlyNeeded - day.earlyAssignments.length, 0);
-    const lateShortage = Math.max(lateNeeded - day.lateAssignments.length, 0);
+    const earlyShortage = Math.max(earlyNeeded - countAssignments(day.earlyAssignments), 0);
+    const lateShortage = Math.max(lateNeeded - countAssignments(day.lateAssignments), 0);
     if (earlyShortage > best.count) return { label: `${formatSlashDate(dateKey)} 早番 ${earlyShortage}枠`, count: earlyShortage };
     if (lateShortage > best.count) return { label: `${formatSlashDate(dateKey)} 遅番 ${lateShortage}枠`, count: lateShortage };
     return best;
@@ -1276,7 +1509,7 @@ function buildPriorityFixes() {
     .filter((row) => row.status === "accepted" && row.himeReservation === "あり")
     .filter((row) => {
       const day = state.generatedSchedule[row.dateKey];
-      const assignments = day ? [...day.earlyAssignments, ...day.lateAssignments] : [];
+      const assignments = day ? [...day.earlyAssignments, ...day.lateAssignments].filter(Boolean) : [];
       return !assignments.some((item) => item.id === row.id);
     });
   if (unfilledHime.length) {
@@ -1288,14 +1521,14 @@ function buildPriorityFixes() {
     const requirement = findRequirement(dateKey);
     const earlyNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.earlyNeeded || 0);
     const lateNeeded = Math.max(DASHBOARD_SLOT_COUNT, requirement.lateNeeded || 0);
-    return count + Math.max(earlyNeeded - day.earlyAssignments.length, 0) + Math.max(lateNeeded - day.lateAssignments.length, 0);
+    return count + Math.max(earlyNeeded - countAssignments(day.earlyAssignments), 0) + Math.max(lateNeeded - countAssignments(day.lateAssignments), 0);
   }, 0);
   if (totalShortage) {
     fixes.push(`空き枠 ${totalShortage}枠`);
   }
 
   const warningAssignments = Object.values(state.generatedSchedule)
-    .flatMap((day) => [...day.earlyAssignments, ...day.lateAssignments])
+    .flatMap((day) => [...day.earlyAssignments, ...day.lateAssignments].filter(Boolean))
     .filter((assignment) => analyzeAssignmentStatus(assignment, samplePrototypeData.therapistProfiles[assignment.name] || {}).level === "warning");
   if (warningAssignments.length) {
     fixes.push(`非対応エリアなど要確認配置 ${warningAssignments.length}件`);
@@ -1402,7 +1635,9 @@ function restoreGenerationRows(rows) {
 function getAssignmentsForDate(dateKey) {
   const day = state.generatedSchedule[dateKey];
   if (!day) return [];
-  return [...day.earlyAssignments, ...day.lateAssignments].sort((left, right) => left.name.localeCompare(right.name, "ja"));
+  return [...day.earlyAssignments, ...day.lateAssignments]
+    .filter(Boolean)
+    .sort((left, right) => left.name.localeCompare(right.name, "ja"));
 }
 
 function syncSelectedDistributionAssignment() {
@@ -1418,6 +1653,9 @@ function syncSelectedDistributionAssignment() {
 }
 
 function buildDistributionMessage(item) {
+  if (state.distributionFormat === "simple") {
+    return `${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})\n${item.assignedArea}\n${item.startTime}-${normalizeDistributionEnd(item.endTime)}\n${item.himeReservation === "あり" ? "姫予約あり" : "通常"}\nよろしくお願いします`;
+  }
   return `【${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})】\n${item.assignedArea}\n${item.startTime}-${normalizeDistributionEnd(item.endTime)}\n${item.himeReservation === "あり" ? "姫予約あり" : "姫予約なし"}\nよろしくお願いします`;
 }
 
@@ -1429,6 +1667,9 @@ async function copyAllDistributionMessages() {
 
   try {
     await navigator.clipboard.writeText(text);
+    state.copiedDistributionIds = [...new Set([...state.copiedDistributionIds, ...items.map((item) => item.id)])];
+    persistState();
+    renderDistribution();
     elements.copyStatus.textContent = `${formatSlashDate(state.selectedDistributionDate)}分をまとめてコピーしました。`;
     elements.copyStatus.className = "copy-status success";
   } catch (error) {
@@ -1441,8 +1682,16 @@ async function copyDistributionMessage() {
   const text = elements.distributionPreview.textContent;
   if (!text) return;
 
+  const selected = getAssignmentsForDate(state.selectedDistributionDate)
+    .find((item) => item.id === state.selectedDistributionAssignmentId);
+
   try {
     await navigator.clipboard.writeText(text);
+    if (selected) {
+      state.copiedDistributionIds = [...new Set([...state.copiedDistributionIds, selected.id])];
+      persistState();
+    }
+    renderDistribution();
     elements.copyStatus.textContent = "コピーしました。";
     elements.copyStatus.className = "copy-status success";
   } catch (error) {
@@ -1454,7 +1703,7 @@ async function copyDistributionMessage() {
 function findAssignmentById(id) {
   if (!id) return null;
   return Object.values(state.generatedSchedule)
-    .flatMap((day) => [...day.earlyAssignments, ...day.lateAssignments])
+    .flatMap((day) => [...day.earlyAssignments, ...day.lateAssignments].filter(Boolean))
     .find((item) => item.id === id) || null;
 }
 
@@ -1619,6 +1868,28 @@ function emptyDay(dateKey) {
   };
 }
 
+function countAssignments(assignments) {
+  return (assignments || []).filter(Boolean).length;
+}
+
+function restoreGeneratedSchedule(savedSchedule) {
+  return Object.fromEntries(Object.entries(savedSchedule).map(([dateKey, day]) => [
+    normalizeDateKey(dateKey),
+    {
+      dateKey: normalizeDateKey(day.dateKey || dateKey),
+      requirement: day.requirement || findRequirement(dateKey),
+      earlyAssignments: (day.earlyAssignments || []).map((item) => item ? { ...item } : null),
+      lateAssignments: (day.lateAssignments || []).map((item) => item ? { ...item } : null),
+      metrics: {
+        shortage: Number(day.metrics?.shortage) || 0,
+        fillRate: Number(day.metrics?.fillRate) || 0,
+        salesForecast: Number(day.metrics?.salesForecast) || 0,
+        storeForecast: Number(day.metrics?.storeForecast) || 0
+      }
+    }
+  ]));
+}
+
 function normalizeDateKey(value) {
   const text = sanitizeText(value);
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : samplePrototypeData.settings.startDate;
@@ -1649,7 +1920,10 @@ function persistState() {
       activeAppView: state.activeAppView,
       activeDashboardView: state.activeDashboardView,
       activeShiftTab: state.activeShiftTab,
+      distributionFormat: state.distributionFormat,
+      copiedDistributionIds: state.copiedDistributionIds,
       selectedBoardAssignmentId: state.selectedBoardAssignmentId,
+      hasUnsavedChanges: state.hasUnsavedChanges,
       generationRows: state.generationRows.map((row) => ({
         id: row.id,
         name: row.name,
@@ -1662,7 +1936,8 @@ function persistState() {
         status: row.status
       })),
       requirements: state.requirements,
-      historyRows: state.historyRows
+      historyRows: state.historyRows,
+      generatedSchedule: state.generatedSchedule
     }));
   } catch (error) {
     // localStorage is optional

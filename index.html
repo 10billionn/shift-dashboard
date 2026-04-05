@@ -32,6 +32,8 @@
           </div>
         </div>
         <div class="topbar-actions">
+          <p id="saveStateNotice" class="save-state-notice"></p>
+          <button id="saveScheduleButton" class="primary-button" type="button">シフト確定</button>
           <button id="reloadButton" class="ghost-button" type="button">サンプル再読込</button>
         </div>
       </header>
@@ -78,6 +80,16 @@
               <p>当日充足率</p>
               <strong id="fillSummary"></strong>
             </article>
+          </section>
+
+          <section class="content-panel dashboard-risk-panel">
+            <div class="panel-head">
+              <div>
+                <h3>危険度サマリー</h3>
+                <p class="section-note">今日どこを優先して触るべきかを先に出します</p>
+              </div>
+            </div>
+            <div id="dashboardRiskSummary" class="risk-summary-list"></div>
           </section>
 
           <div id="dashboardListView" class="dashboard-view-panel active">
@@ -270,7 +282,14 @@
 
                 <article class="preview-card">
                   <div class="panel-head">
-                    <h3>個別シフト表示</h3>
+                    <div>
+                      <h3>個別シフト表示</h3>
+                      <label class="field-label inline-select-label" for="distributionFormatSelect">文面形式</label>
+                      <select id="distributionFormatSelect" class="select-input compact-select">
+                        <option value="line">LINE用フォーマット</option>
+                        <option value="simple">シンプル版</option>
+                      </select>
+                    </div>
                     <div class="action-row">
                       <button id="copyAllMessagesButton" class="ghost-button" type="button">当日分をまとめてコピー</button>
                       <button id="copyMessageButton" class="primary-button" type="button">コピー</button>
@@ -315,6 +334,8 @@
       </main>
     </div>
   </div>
+
+  <div id="globalToast" class="global-toast" aria-live="polite"></div>
 
   <script src="data.js?v=202604050700"></script>
   <script src="app.js?v=202604050700"></script>

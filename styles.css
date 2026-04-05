@@ -167,10 +167,20 @@ pre {
 .view-subtitle,
 .section-note,
 .generation-result-note,
-.copy-status {
+.copy-status,
+.save-state-notice {
   margin: 4px 0 0;
   color: var(--muted);
   font-size: 0.86rem;
+}
+
+.save-state-notice.warning {
+  color: var(--yellow);
+  font-weight: 700;
+}
+
+.save-state-notice.saved {
+  color: var(--green);
 }
 
 .menu-toggle {
@@ -431,10 +441,12 @@ pre {
   display: grid;
   gap: 8px;
   padding: 10px 12px;
+  min-height: 184px;
   border-radius: 16px;
   border: 1px solid var(--line);
   border-left: 5px solid var(--line-strong);
   background: #fff;
+  align-content: start;
 }
 
 .shift-card.area-kasai { border-left-color: #2e6bcb; }
@@ -460,10 +472,25 @@ pre {
   display: grid;
   gap: 8px;
   padding: 12px;
+  min-height: 120px;
   border: 1px solid var(--line);
   border-left: 5px solid var(--gray);
   border-radius: 14px;
   background: var(--gray-soft);
+}
+
+.drop-slot {
+  transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+}
+
+.drop-slot.drag-over {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 3px rgba(46, 107, 203, 0.18);
+  border-color: var(--blue);
+}
+
+.drop-slot.dragging {
+  opacity: 0.5;
 }
 
 .shift-card-top,
@@ -587,6 +614,21 @@ pre {
   color: var(--text);
 }
 
+.clickable-field {
+  width: auto;
+  border: none;
+}
+
+.compact-select {
+  max-width: 220px;
+}
+
+.inline-select-label {
+  display: block;
+  margin-top: 8px;
+  margin-bottom: 6px;
+}
+
 .pink-text {
   color: #b84b67;
 }
@@ -649,10 +691,23 @@ pre {
   font-size: 0.74rem;
 }
 
+.drag-handle {
+  width: 100%;
+  border: 1px dashed var(--line-strong);
+  background: rgba(255, 255, 255, 0.56);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 .topbar-actions,
 .distribution-layout {
   display: grid;
   gap: 12px;
+}
+
+.topbar-actions {
+  align-items: center;
 }
 
 .card-edit-grid,
@@ -1124,6 +1179,41 @@ pre {
 .copy-status.success { color: var(--green); }
 .copy-status.error { color: var(--danger); }
 
+.global-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 30;
+  max-width: 340px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(17, 36, 63, 0.92);
+  color: #fff;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.global-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.global-toast.success {
+  background: rgba(31, 138, 82, 0.96);
+}
+
+.global-toast.warning {
+  background: rgba(201, 152, 25, 0.96);
+  color: #2d2200;
+}
+
+.global-toast.error {
+  background: rgba(198, 84, 84, 0.96);
+}
+
 .accent-panel {
   background: linear-gradient(135deg, rgba(17, 36, 63, 0.04), rgba(46, 107, 203, 0.06));
 }
@@ -1214,6 +1304,10 @@ pre {
   .shift-tab,
   .status-toggle {
     width: 100%;
+  }
+
+  .compact-select {
+    max-width: none;
   }
 
   .card-edit-grid,
