@@ -1712,6 +1712,7 @@ function clearBoardInteractionHighlights() {
 
 function getBoardMovePreview(moveState, clientX, clientY) {
   const overlayRect = moveState.overlayRoot?.getBoundingClientRect() || moveState.overlayRect;
+  const deltaX = clientX - moveState.initialX;
   const deltaY = clientY - moveState.initialY;
   const visualTop = (moveState.sourceTrackRect.top - overlayRect.top) + moveState.barOffsetTop + deltaY;
   const centerY = overlayRect.top + visualTop + (moveState.barHeight / 2);
@@ -1720,7 +1721,6 @@ function getBoardMovePreview(moveState, clientX, clientY) {
   if (!trackRect.width) return null;
 
   const pxPerMinute = trackRect.width / (moveState.timelineEnd - moveState.timelineStart);
-  const deltaX = clientX - moveState.initialX;
   const rawMinutes = deltaX / pxPerMinute;
   const snappedMinutes = snapMinutes(rawMinutes, 15);
   const rawStartMinutes = Math.max(
@@ -1744,6 +1744,7 @@ function getBoardMovePreview(moveState, clientX, clientY) {
   const snappedWidth = Math.max((((endMinutes - startMinutes) / total) * trackRect.width), 24);
   const trackTop = trackRect.top - overlayRect.top;
   const trackHeight = trackRect.height;
+  const verticalDrag = Math.abs(deltaY) > 10 && Math.abs(deltaY) > Math.abs(deltaX);
   return {
     roomIndex,
     rawStartMinutes,
@@ -1758,7 +1759,8 @@ function getBoardMovePreview(moveState, clientX, clientY) {
     snappedLeft,
     snappedWidth,
     trackTop,
-    trackHeight
+    trackHeight,
+    verticalDrag
   };
 }
 
@@ -1766,10 +1768,13 @@ function applyBoardMovePreview(moveState, preview) {
   clearBoardInteractionHighlights();
   moveState.sourceTrack.classList.add("drag-origin");
   moveState.bar.closest(".board-lane")?.classList.add("drag-source-room");
-  preview.targetTrack?.classList.add("drag-over");
-  preview.targetTrack?.closest(".board-lane")?.classList.add("drag-target-room");
+  if (!preview.verticalDrag) {
+    preview.targetTrack?.classList.add("drag-over");
+    preview.targetTrack?.closest(".board-lane")?.classList.add("drag-target-room");
+  }
 
   const snapNear = Math.abs(preview.rawStartMinutes - preview.startMinutes) < 6;
+  const overlayHeight = (moveState.overlayRoot?.getBoundingClientRect()?.height || moveState.overlayRect?.height || preview.trackHeight);
 
   moveState.movingBar.style.left = `${preview.visualLeft}px`;
   moveState.movingBar.style.top = `${preview.visualTop}px`;
@@ -1781,18 +1786,21 @@ function applyBoardMovePreview(moveState, preview) {
     moveState.guideBand.style.top = `${preview.trackTop}px`;
     moveState.guideBand.style.width = `${preview.snappedWidth}px`;
     moveState.guideBand.style.height = `${preview.trackHeight}px`;
+    moveState.guideBand.style.opacity = preview.verticalDrag ? "0" : "";
     moveState.guideBand.classList.toggle("snap-near", snapNear);
   }
   if (moveState.guideStart) {
     moveState.guideStart.style.left = `${preview.snappedLeft}px`;
-    moveState.guideStart.style.top = `${preview.trackTop}px`;
-    moveState.guideStart.style.height = `${preview.trackHeight}px`;
+    moveState.guideStart.style.top = `${preview.verticalDrag ? 0 : preview.trackTop}px`;
+    moveState.guideStart.style.height = `${preview.verticalDrag ? overlayHeight : preview.trackHeight}px`;
+    moveState.guideStart.style.opacity = preview.verticalDrag ? "0.45" : "";
     moveState.guideStart.classList.toggle("snap-near", snapNear);
   }
   if (moveState.guideEnd) {
     moveState.guideEnd.style.left = `${preview.snappedLeft + preview.snappedWidth}px`;
-    moveState.guideEnd.style.top = `${preview.trackTop}px`;
-    moveState.guideEnd.style.height = `${preview.trackHeight}px`;
+    moveState.guideEnd.style.top = `${preview.verticalDrag ? 0 : preview.trackTop}px`;
+    moveState.guideEnd.style.height = `${preview.verticalDrag ? overlayHeight : preview.trackHeight}px`;
+    moveState.guideEnd.style.opacity = preview.verticalDrag ? "0.45" : "";
     moveState.guideEnd.classList.toggle("snap-near", snapNear);
   }
   if (moveState.subLabel) {
