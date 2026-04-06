@@ -827,7 +827,7 @@ function renderAdjustmentBar(row, index) {
     <button
       class="board-bar board-adjustment-bar area-${colorKey} ${row.id === state.selectedBoardAssignmentId ? "selected" : ""}"
       type="button"
-      draggable="false"
+      draggable="true"
       data-board-assignment-id="${row.id}"
       data-board-slot-index="-1"
       data-board-dropzone="adjustment"
@@ -1605,7 +1605,10 @@ function handleBoardMoveStart(event) {
     initialStartTime,
     initialEndTime,
       duration: initialEndTime - initialStartTime,
-      initialRoomIndex: normalizeRoomIndex(assignment.roomIndex, Number(bar.dataset.boardSlotIndex)),
+      initialDropzone: track.dataset.boardDropzone || "room",
+      initialRoomIndex: (track.dataset.boardDropzone || "room") === "adjustment"
+        ? null
+        : normalizeRoomIndex(assignment.roomIndex, Number(bar.dataset.boardSlotIndex)),
       sourceTrack: track,
       sourceTrackRect: trackRect,
       bar,
@@ -1622,7 +1625,10 @@ function handleBoardMoveStart(event) {
     timelineEnd: settings.businessEndHour * 60,
     moved: false,
     preview: {
-      roomIndex: normalizeRoomIndex(assignment.roomIndex, Number(bar.dataset.boardSlotIndex)),
+      dropzone: track.dataset.boardDropzone || "room",
+      roomIndex: (track.dataset.boardDropzone || "room") === "adjustment"
+        ? null
+        : normalizeRoomIndex(assignment.roomIndex, Number(bar.dataset.boardSlotIndex)),
       rawStartMinutes: initialStartTime,
       rawEndMinutes: initialEndTime,
       startMinutes: initialStartTime,
@@ -1655,6 +1661,7 @@ function handleBoardMoveMove(event) {
       if (!preview) return;
       boardMoveState.preview = preview;
       boardMoveState.moved = boardMoveState.moved
+        || preview.dropzone !== boardMoveState.initialDropzone
         || preview.roomIndex !== boardMoveState.initialRoomIndex
         || preview.startMinutes !== boardMoveState.initialStartTime;
       applyBoardMovePreview(boardMoveState, preview);
