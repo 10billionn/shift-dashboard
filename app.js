@@ -688,10 +688,22 @@ function renderBoardTimeline(day) {
 }
 
 function buildBoardRoomRows(day) {
-  const rowCount = Math.max(getRoomCapacity(), day.earlyAssignments.length, day.lateAssignments.length, 2);
-  return Array.from({ length: rowCount }, (_, index) => {
-    const assignments = [day.earlyAssignments[index], day.lateAssignments[index]]
-      .filter(Boolean)
+  const assignmentsByRoom = new Map();
+  let maxRoomIndex = Math.max(getRoomCapacity() - 1, 1);
+
+  const appendAssignments = (assignments) => assignments.forEach((assignment, index) => {
+    if (!assignment) return;
+    const roomIndex = normalizeRoomIndex(assignment.roomIndex, index);
+    maxRoomIndex = Math.max(maxRoomIndex, roomIndex);
+    if (!assignmentsByRoom.has(roomIndex)) assignmentsByRoom.set(roomIndex, []);
+    assignmentsByRoom.get(roomIndex).push(assignment);
+  });
+  appendAssignments(day.earlyAssignments);
+  appendAssignments(day.lateAssignments);
+
+  return Array.from({ length: maxRoomIndex + 1 }, (_, index) => {
+    const assignments = (assignmentsByRoom.get(index) || [])
+      .slice()
       .sort((left, right) => toMinutes(left.startTime) - toMinutes(right.startTime));
     const lanes = packAssignmentsIntoBoardLanes(assignments);
     return {
@@ -718,7 +730,7 @@ function renderBoardLaneRow(row, index) {
     `;
 
   return `
-    <div class="board-lane">
+    <div class="board-lane ${row.lanes.length > 1 ? "stacked" : ""}">
       <div class="board-lane-head">
         <strong class="board-lane-title">${row.roomLabel}</strong>
         <span class="board-lane-meta">${row.assignments.length ? `${row.assignments.length}件 / ${row.lanes.length}レーン${row.lanes.length > 1 ? "（重なりあり）" : ""}` : "空き多め"}</span>
@@ -1638,19 +1650,20 @@ function moveBoardAssignmentWithinShift(source, target) {
 
   const day = state.generatedSchedule[state.selectedDate];
   if (!day) return;
-  const moveResult = applyRoomMove(day, sourcePosition, target.slotIndex);
-  if (!moveResult) return;
+  const moving = findAssignmentById(source.assignmentId);
+  if (!moving) return;
+  const previousRoomIndex = normalizeRoomIndex(moving.roomIndex, sourcePosition.slotIndex);
+  if (previousRoomIndex === target.slotIndex) return;
+  moving.roomIndex = target.slotIndex;
 
-  state.selectedBoardAssignmentId = moveResult.moving.id;
-  state.updatedBoardAssignmentId = moveResult.moving.id;
+  state.selectedBoardAssignmentId = moving.id;
+  state.updatedBoardAssignmentId = moving.id;
   markManualScheduleDirty();
   recomputeScheduleStateForDates([state.selectedDate]);
   persistState();
-  const warnings = collectMoveWarnings(findAssignmentById(moveResult.moving.id));
+  const warnings = collectMoveWarnings(findAssignmentById(moving.id));
 
-  const actionText = moveResult.swapped
-    ? `${formatRoomMoveLabel(sourcePosition.slotIndex)} ↔ ${formatRoomMoveLabel(moveResult.targetPosition.slotIndex)} を入れ替えました`
-    : `${formatRoomMoveLabel(sourcePosition.slotIndex)} → ${formatRoomMoveLabel(moveResult.targetPosition.slotIndex)} へ移動しました`;
+  const actionText = `${formatRoomMoveLabel(previousRoomIndex)} → ${formatRoomMoveLabel(target.slotIndex)} へ移動しました`;
   if (warnings.length) {
     showToast(`${actionText} / ⚠️ ${warnings.join(" / ")}`, "warning");
   } else {
@@ -2535,6 +2548,12 @@ function normalizeDistributionEnd(timeText) {
   const hours = String(Math.floor(minutes / 60)).padStart(2, "0");
   const mins = String(minutes % 60).padStart(2, "0");
   return `${hours}:${mins}`;
+}
+
+function normalizeRoomIndex(roomIndex, fallbackIndex = 0) {
+  const parsed = Number(roomIndex);
+  if (Number.isInteger(parsed) && parsed >= 0) return parsed;
+  return Math.max(0, Number(fallbackIndex) || 0);
 }
 
 function minutesToTime(totalMinutes) {

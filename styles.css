@@ -1294,6 +1294,13 @@ pre {
   align-items: start;
 }
 
+.board-lane.stacked .board-lane-head {
+  padding: 6px 8px;
+  border-radius: 12px;
+  background: rgba(255, 247, 223, 0.62);
+  border: 1px solid rgba(201, 152, 25, 0.2);
+}
+
 .board-lane-head {
   display: grid;
   gap: 4px;
