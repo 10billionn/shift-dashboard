@@ -1534,6 +1534,8 @@ function handleBoardMoveStart(event) {
     initialEndTime,
     duration: initialEndTime - initialStartTime,
     initialRoomIndex: normalizeRoomIndex(assignment.roomIndex, Number(bar.dataset.boardSlotIndex)),
+    stableTargetTrack: track,
+    stableRoomIndex: normalizeRoomIndex(assignment.roomIndex, Number(bar.dataset.boardSlotIndex)),
     sourceTrack: track,
     sourceTrackRect: trackRect,
     bar,
@@ -1710,7 +1712,8 @@ function clearBoardInteractionHighlights() {
 }
 
 function getBoardMovePreview(moveState, clientX, clientY) {
-  const activeTrack = getBoardTrackFromPoint(clientX, clientY) || moveState.sourceTrack;
+  const rawTargetTrack = getBoardTrackFromPoint(clientX, clientY) || moveState.sourceTrack;
+  const activeTrack = resolveStableBoardTargetTrack(moveState, rawTargetTrack, clientY);
   const trackRect = activeTrack?.getBoundingClientRect() || moveState.sourceTrack.getBoundingClientRect();
   if (!trackRect.width) return null;
 
@@ -1732,6 +1735,8 @@ function getBoardMovePreview(moveState, clientX, clientY) {
 
   const targetTrack = activeTrack || moveState.sourceTrack;
   const roomIndex = normalizeRoomIndex(targetTrack.dataset.boardSlotIndex, moveState.initialRoomIndex);
+  moveState.stableTargetTrack = targetTrack;
+  moveState.stableRoomIndex = roomIndex;
   return {
     roomIndex,
     rawStartMinutes,
@@ -1740,6 +1745,32 @@ function getBoardMovePreview(moveState, clientX, clientY) {
     endMinutes,
     targetTrack
   };
+}
+
+function resolveStableBoardTargetTrack(moveState, rawTargetTrack, clientY) {
+  const stableTrack = moveState.stableTargetTrack || moveState.sourceTrack;
+  if (!rawTargetTrack) return stableTrack;
+  if (rawTargetTrack === stableTrack) return stableTrack;
+
+  const rawRect = rawTargetTrack.getBoundingClientRect();
+  const stableRect = stableTrack.getBoundingClientRect();
+  const hysteresis = Math.min(16, Math.max(8, Math.round(rawRect.height * 0.18)));
+  const rawInnerTop = rawRect.top + hysteresis;
+  const rawInnerBottom = rawRect.bottom - hysteresis;
+
+  if (clientY >= rawInnerTop && clientY <= rawInnerBottom) {
+    return rawTargetTrack;
+  }
+
+  if (clientY < stableRect.top || clientY > stableRect.bottom) {
+    const stableInnerTop = stableRect.top + hysteresis;
+    const stableInnerBottom = stableRect.bottom - hysteresis;
+    if (clientY < stableInnerTop || clientY > stableInnerBottom) {
+      return rawTargetTrack;
+    }
+  }
+
+  return stableTrack;
 }
 
 function applyBoardMovePreview(moveState, preview) {
