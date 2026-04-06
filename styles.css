@@ -1853,9 +1853,25 @@ pre {
 }
 
 .board-quick-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.board-quick-actions-group {
+  display: grid;
+  gap: 6px;
+}
+
+.board-quick-actions-row {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.board-quick-actions .ghost-button {
+  padding: 7px 10px;
+  font-size: 0.78rem;
+  border-radius: 10px;
 }
 
 .danger-button {

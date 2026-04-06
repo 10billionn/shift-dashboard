@@ -1176,13 +1176,29 @@ function renderBoardInspector(day) {
         </label>
       </div>
 
-      <div class="board-quick-actions">
-        <button class="ghost-button" type="button" data-board-action="minus30">-30分</button>
-        <button class="ghost-button" type="button" data-board-action="plus30">+30分</button>
-        <button class="ghost-button" type="button" data-board-action="earlier">前に詰める</button>
-        <button class="ghost-button" type="button" data-board-action="later">後ろにずらす</button>
-        <button class="ghost-button danger-button" type="button" data-board-action="delete">削除</button>
-      </div>
+        <div class="board-quick-actions">
+          <div class="board-quick-actions-group">
+            <span class="field-label">全体スライド</span>
+            <div class="board-quick-actions-row">
+              <button class="ghost-button" type="button" data-board-action="slideBack30">-30分</button>
+              <button class="ghost-button" type="button" data-board-action="slideForward30">+30分</button>
+              <button class="ghost-button" type="button" data-board-action="slideBack60">-60分</button>
+              <button class="ghost-button" type="button" data-board-action="slideForward60">+60分</button>
+            </div>
+          </div>
+          <div class="board-quick-actions-group">
+            <span class="field-label">開始 / 終了だけ調整</span>
+            <div class="board-quick-actions-row">
+              <button class="ghost-button" type="button" data-board-action="startEarlier30">開始 -30分</button>
+              <button class="ghost-button" type="button" data-board-action="startLater30">開始 +30分</button>
+              <button class="ghost-button" type="button" data-board-action="endEarlier30">終了 -30分</button>
+              <button class="ghost-button" type="button" data-board-action="endLater30">終了 +30分</button>
+            </div>
+          </div>
+          <div class="board-quick-actions-row">
+            <button class="ghost-button danger-button" type="button" data-board-action="delete">削除</button>
+          </div>
+        </div>
 
       ${isInvalidTime
         ? `<div class="alert-box warning">営業時間外、または開始/終了の前後関係に注意してください。盤面で整えながら調整できます。</div>`
@@ -1575,32 +1591,64 @@ function handleBoardInspectorAction(event) {
   const settings = getAppSettings();
   const minStart = settings.businessStartHour * 60;
   const maxEnd = settings.businessEndHour * 60;
+  const minDuration = 60;
+  const action = button.dataset.boardAction;
 
-  if (button.dataset.boardAction === "plus30") {
-    updateAssignmentTimeRange(assignment.id, assignment.startTime, minutesToTime(Math.min(maxEnd, end + step)), "終了を30分延長しました。");
-    return;
-  }
-
-  if (button.dataset.boardAction === "minus30") {
-    updateAssignmentTimeRange(assignment.id, assignment.startTime, minutesToTime(Math.max(start + 60, end - step)), "終了を30分短縮しました。");
-    return;
-  }
-
-  if (button.dataset.boardAction === "earlier") {
-    const nextStart = Math.max(minStart, start - step);
+  if (action === "slideBack30" || action === "slideBack60" || action === "slideForward30" || action === "slideForward60") {
+    const amount = action.endsWith("60") ? 60 : 30;
+    const direction = action.startsWith("slideBack") ? -1 : 1;
+    const nextStart = Math.max(minStart, Math.min(maxEnd - duration, start + (amount * direction)));
     const nextEnd = nextStart + duration;
-    updateAssignmentTimeRange(assignment.id, minutesToTime(nextStart), minutesToTime(nextEnd), "30分前に詰めました。");
+    updateAssignmentTimeRange(
+      assignment.id,
+      minutesToTime(nextStart),
+      minutesToTime(nextEnd),
+      `${amount}分${direction < 0 ? "前" : "後ろ"}にずらしました。`
+    );
     return;
   }
 
-  if (button.dataset.boardAction === "later") {
-    const nextEnd = Math.min(maxEnd, end + step);
-    const nextStart = nextEnd - duration;
-    updateAssignmentTimeRange(assignment.id, minutesToTime(nextStart), minutesToTime(nextEnd), "30分後ろにずらしました。");
+  if (action === "startEarlier30") {
+    updateAssignmentTimeRange(
+      assignment.id,
+      minutesToTime(Math.max(minStart, start - step)),
+      assignment.endTime,
+      "開始を30分前に広げました。"
+    );
     return;
   }
 
-  if (button.dataset.boardAction === "delete") {
+  if (action === "startLater30") {
+    updateAssignmentTimeRange(
+      assignment.id,
+      minutesToTime(Math.min(end - minDuration, start + step)),
+      assignment.endTime,
+      "開始を30分後ろへ寄せました。"
+    );
+    return;
+  }
+
+  if (action === "endEarlier30") {
+    updateAssignmentTimeRange(
+      assignment.id,
+      assignment.startTime,
+      minutesToTime(Math.max(start + minDuration, end - step)),
+      "終了を30分短縮しました。"
+    );
+    return;
+  }
+
+  if (action === "endLater30") {
+    updateAssignmentTimeRange(
+      assignment.id,
+      assignment.startTime,
+      minutesToTime(Math.min(maxEnd, end + step)),
+      "終了を30分延長しました。"
+    );
+    return;
+  }
+
+  if (action === "delete") {
     removeBoardAssignment(assignment.id);
   }
 }
