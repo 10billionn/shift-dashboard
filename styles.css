@@ -21,7 +21,7 @@
   --danger: #c65454;
   --danger-soft: #fdeeee;
   --shadow: 0 14px 32px rgba(17, 36, 63, 0.08);
-  --board-lane-height: 40px;
+  --board-lane-height: 48px;
   --board-lane-gap: 4px;
 }
 
@@ -147,7 +147,7 @@ pre {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  padding: 11px 16px;
+  padding: 8px 14px;
   background: rgba(247, 249, 252, 0.92);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid rgba(188, 200, 218, 0.7);
@@ -160,7 +160,7 @@ pre {
 }
 
 .topbar h1 {
-  font-size: 1.48rem;
+  font-size: 1.34rem;
   line-height: 1.1;
 }
 
@@ -187,7 +187,7 @@ pre {
 .save-state-notice {
   margin: 4px 0 0;
   color: rgba(102, 117, 138, 0.82);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
 }
 
 .save-state-notice.warning {
@@ -319,7 +319,7 @@ pre {
 
 .dashboard-summary-grid {
   gap: 10px;
-  order: 5;
+  order: 6;
 }
 
 .summary-grid.compact {
@@ -329,6 +329,7 @@ pre {
 .dashboard-risk-panel {
   padding: 10px 14px;
   background: linear-gradient(180deg, rgba(250, 252, 255, 0.92), rgba(245, 248, 252, 0.88));
+  order: 4;
 }
 
 .dashboard-risk-panel .panel-head {
@@ -711,6 +712,10 @@ pre {
   background: linear-gradient(180deg, rgba(248, 250, 253, 0.9), rgba(243, 246, 250, 0.84));
   border-color: rgba(188, 200, 218, 0.52);
   box-shadow: 0 3px 10px rgba(17, 36, 63, 0.02);
+}
+
+#dashboardListView {
+  order: 5;
 }
 
 .dashboard-list-collapsible .dashboard-collapsible-summary {
@@ -1316,6 +1321,7 @@ pre {
   align-content: center;
   min-width: 0;
   min-height: var(--board-lane-height);
+  padding-block: 2px;
 }
 
 .board-lane-title {
@@ -1432,8 +1438,8 @@ pre {
 
 .board-bar {
   position: absolute;
-  top: 4px;
-  bottom: 4px;
+  top: 5px;
+  bottom: 5px;
   border-radius: 12px;
   border: 2px solid transparent;
   padding: 6px 8px;
@@ -1555,7 +1561,7 @@ pre {
 }
 
 .board-bar-name {
-  font-size: 0.76rem;
+  font-size: 0.79rem;
   font-weight: 700;
   line-height: 1.1;
   white-space: nowrap;
@@ -1570,8 +1576,8 @@ pre {
 }
 
 .board-bar-sub {
-  font-size: 0.62rem;
-  line-height: 1.15;
+  font-size: 0.64rem;
+  line-height: 1.2;
   opacity: 0.98;
 }
 
@@ -1580,7 +1586,7 @@ pre {
 }
 
 .board-bar.compact .board-bar-name {
-  font-size: 0.73rem;
+  font-size: 0.75rem;
 }
 
 .board-bar.tiny {
@@ -1589,7 +1595,7 @@ pre {
 }
 
 .board-bar.tiny .board-bar-name {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
 }
 
 .board-bar.tiny .board-bar-pin {
@@ -1608,7 +1614,7 @@ pre {
 }
 
 .board-timeline.comfortable {
-  --board-lane-height: 56px;
+  --board-lane-height: 60px;
   --board-lane-gap: 6px;
 }
 
@@ -1626,11 +1632,11 @@ pre {
 }
 
 .board-timeline.comfortable .board-bar-name {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
 }
 
 .board-timeline.comfortable .board-bar-sub {
-  font-size: 0.66rem;
+  font-size: 0.68rem;
 }
 
 .board-gap {
