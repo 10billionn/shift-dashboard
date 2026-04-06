@@ -198,6 +198,7 @@ function bindEvents() {
   elements.dashboardBoardCanvas.addEventListener("drop", handleBoardDrop);
   elements.dashboardBoardCanvas.addEventListener("mousedown", handleBoardResizeStart);
   elements.boardInspectorContent.addEventListener("change", handleBoardInspectorChange);
+  elements.boardInspectorContent.addEventListener("click", handleBoardInspectorAction);
   window.addEventListener("mousemove", handleBoardResizeMove);
   window.addEventListener("mouseup", handleBoardResizeEnd);
 
@@ -422,18 +423,22 @@ function renderDashboard() {
   elements.shortageSummary.textContent = `${displayShortage}枠`;
   elements.fillSummary.textContent = `${displayFillRate}%`;
   elements.dashboardRiskSummary.innerHTML = renderDashboardRiskSummary();
-  elements.roomDetailList.innerHTML = renderRoomDetailGroups(boardRows);
   elements.earlyShiftList.innerHTML = renderShiftSlots(day.earlyAssignments, "早番", earlySlotTotal);
   elements.lateShiftList.innerHTML = renderShiftSlots(day.lateAssignments, "遅番", lateSlotTotal);
   elements.cutShiftList.innerHTML = renderCutRows(cutRows);
-  syncSelectedBoardAssignment();
-  elements.dashboardBoardCanvas.innerHTML = renderBoardTimeline(day, boardRows);
-  elements.boardInspectorContent.innerHTML = renderBoardInspector(day);
+  renderBoardWorkspace(day, boardRows);
   elements.weeklyAnalysis.innerHTML = renderWeeklyAnalysis();
 
   updateDayButtons();
   renderDashboardViewState();
   renderShiftTabState();
+}
+
+function renderBoardWorkspace(day = getScheduleDay(state.selectedDate), boardRows = buildBoardRoomRows(day)) {
+  syncSelectedBoardAssignment();
+  elements.roomDetailList.innerHTML = renderRoomDetailGroups(boardRows);
+  elements.dashboardBoardCanvas.innerHTML = renderBoardTimeline(day, boardRows);
+  elements.boardInspectorContent.innerHTML = renderBoardInspector(day);
 }
 
 function renderGeneration() {
@@ -1041,13 +1046,20 @@ function renderRequestRows() {
 function renderBoardInspector(day) {
   const assignment = findAssignmentById(state.selectedBoardAssignmentId);
   if (!assignment || assignment.dateKey !== day.dateKey) {
-    return `<div class="empty-state">盤面のバーを選ぶと、ここで詳細確認とエリア調整ができます。</div>`;
+    return `<div class="empty-state">バーを選択すると、ここで部屋・時間・エリア・メモをまとめて調整できます。</div>`;
   }
 
   const profile = samplePrototypeData.therapistProfiles[assignment.name] || { rank: "G", areas: [] };
   const availableAreas = getAppSettings().areas;
+  const roomOptions = getAppSettings().roomNames;
   const status = analyzeAssignmentStatus(assignment, profile);
   const statusTone = status.level === "danger" ? "danger" : status.level === "warning" ? "warning" : "ok";
+  const settings = getAppSettings();
+  const startMinutes = toMinutes(assignment.startTime);
+  const endMinutes = toMinutes(assignment.endTime);
+  const isInvalidTime = startMinutes >= endMinutes
+    || startMinutes < settings.businessStartHour * 60
+    || endMinutes > settings.businessEndHour * 60;
 
   return `
     <article class="board-inspector-card">
@@ -1065,16 +1077,12 @@ function renderBoardInspector(day) {
 
       <div class="board-inspector-grid">
         <div class="shift-summary-item">
+          <span class="field-label">セラピスト</span>
+          <span class="field-value">${assignment.name}</span>
+        </div>
+        <div class="shift-summary-item">
           <span class="field-label">状態</span>
           <span class="field-value">${status.label}</span>
-        </div>
-        <div class="shift-summary-item">
-          <span class="field-label">現在エリア</span>
-          <span class="field-value">${assignment.assignedArea}</span>
-        </div>
-        <div class="shift-summary-item">
-          <span class="field-label">時間</span>
-          <span class="field-value">${assignment.startTime}-${assignment.endTime}</span>
         </div>
         <div class="shift-summary-item">
           <span class="field-label">対応可能</span>
@@ -1094,14 +1102,50 @@ function renderBoardInspector(day) {
         </div>
       ` : ""}
 
-      <label class="field-block">
-        <span class="field-label">エリア変更</span>
-        <select class="select-input" data-board-field="assignedArea">
-          ${availableAreas.map((area) => `<option value="${area}" ${area === assignment.assignedArea ? "selected" : ""}>${area}</option>`).join("")}
-        </select>
-      </label>
+      <div class="board-editor-grid">
+        <label class="field-block">
+          <span class="field-label">部屋</span>
+          <select class="select-input" data-board-field="roomIndex">
+            ${roomOptions.map((roomName, index) => `<option value="${index}" ${normalizeRoomIndex(assignment.roomIndex, findAssignmentPosition(day.dateKey, assignment.id)?.slotIndex ?? 0) === index ? "selected" : ""}>${roomName}</option>`).join("")}
+          </select>
+        </label>
 
-      ${assignment.warningArea ? `<div class="alert-box warning">この配置は対応可能エリア外です。配置は残しますが、要確認として扱います。</div>` : `<p class="field-help">非対応エリアを選んだ場合は警告付きで反映します。</p>`}
+        <label class="field-block">
+          <span class="field-label">開始時間</span>
+          <input class="time-input ${isInvalidTime ? "board-input-invalid" : ""}" type="time" step="900" value="${assignment.startTime}" data-board-field="startTime">
+        </label>
+
+        <label class="field-block">
+          <span class="field-label">終了時間</span>
+          <input class="time-input ${isInvalidTime ? "board-input-invalid" : ""}" type="time" step="900" value="${assignment.endTime}" data-board-field="endTime">
+        </label>
+
+        <label class="field-block">
+          <span class="field-label">エリア</span>
+          <select class="select-input" data-board-field="assignedArea">
+            ${availableAreas.map((area) => `<option value="${area}" ${area === assignment.assignedArea ? "selected" : ""}>${area}</option>`).join("")}
+          </select>
+        </label>
+
+        <label class="field-block wide">
+          <span class="field-label">メモ</span>
+          <textarea class="text-input board-note-input" data-board-field="note" rows="3" placeholder="終電 / 店泊 / ヘルプ可 など">${escapeHtml(assignment.note || "")}</textarea>
+        </label>
+      </div>
+
+      <div class="board-quick-actions">
+        <button class="ghost-button" type="button" data-board-action="minus30">-30分</button>
+        <button class="ghost-button" type="button" data-board-action="plus30">+30分</button>
+        <button class="ghost-button" type="button" data-board-action="earlier">前に詰める</button>
+        <button class="ghost-button" type="button" data-board-action="later">後ろにずらす</button>
+        <button class="ghost-button danger-button" type="button" data-board-action="delete">削除</button>
+      </div>
+
+      ${isInvalidTime
+        ? `<div class="alert-box warning">営業時間外、または開始/終了の前後関係に注意してください。盤面で整えながら調整できます。</div>`
+        : assignment.warningArea
+          ? `<div class="alert-box warning">この配置は対応可能エリア外です。配置は残しますが、要確認として扱います。</div>`
+          : `<p class="field-help">盤面は仮置き前提です。細かい調整はここで詰めてください。</p>`}
     </article>
   `;
 }
@@ -1415,12 +1459,82 @@ function handleBoardDrop(event) {
 
 function handleBoardInspectorChange(event) {
   const input = event.target.closest("[data-board-field]");
-  if (!input || input.dataset.boardField !== "assignedArea") return;
+  if (!input) return;
 
   const assignment = findAssignmentById(state.selectedBoardAssignmentId);
   if (!assignment) return;
 
-  updateAssignmentArea(assignment.id, input.value);
+  const field = input.dataset.boardField;
+  if (field === "assignedArea") {
+    updateAssignmentArea(assignment.id, input.value);
+    return;
+  }
+
+  if (field === "roomIndex") {
+    updateAssignmentRoom(assignment.id, Number(input.value));
+    return;
+  }
+
+  if (field === "note") {
+    updateBoardAssignmentFields(assignment.id, { note: input.value });
+    return;
+  }
+
+  if (field === "startTime" || field === "endTime") {
+    const nextStart = field === "startTime" ? normalizeTime(input.value) : assignment.startTime;
+    const nextEnd = field === "endTime" ? normalizeTime(input.value) : assignment.endTime;
+    if (!isBoardTimeRangeValid(nextStart, nextEnd)) {
+      input.classList.add("board-input-invalid");
+      flashBoardUpdateStatus("営業時間内、かつ開始 < 終了 になるよう調整してください。", "warning");
+      return;
+    }
+    input.classList.remove("board-input-invalid");
+    updateAssignmentTimeRange(assignment.id, nextStart, nextEnd, "時間を更新しました。");
+  }
+}
+
+function handleBoardInspectorAction(event) {
+  const button = event.target.closest("[data-board-action]");
+  if (!button) return;
+
+  const assignment = findAssignmentById(state.selectedBoardAssignmentId);
+  if (!assignment) return;
+
+  const step = 30;
+  const start = toMinutes(assignment.startTime);
+  const end = toMinutes(assignment.endTime);
+  const duration = end - start;
+  const settings = getAppSettings();
+  const minStart = settings.businessStartHour * 60;
+  const maxEnd = settings.businessEndHour * 60;
+
+  if (button.dataset.boardAction === "plus30") {
+    updateAssignmentTimeRange(assignment.id, assignment.startTime, minutesToTime(Math.min(maxEnd, end + step)), "終了を30分延長しました。");
+    return;
+  }
+
+  if (button.dataset.boardAction === "minus30") {
+    updateAssignmentTimeRange(assignment.id, assignment.startTime, minutesToTime(Math.max(start + 60, end - step)), "終了を30分短縮しました。");
+    return;
+  }
+
+  if (button.dataset.boardAction === "earlier") {
+    const nextStart = Math.max(minStart, start - step);
+    const nextEnd = nextStart + duration;
+    updateAssignmentTimeRange(assignment.id, minutesToTime(nextStart), minutesToTime(nextEnd), "30分前に詰めました。");
+    return;
+  }
+
+  if (button.dataset.boardAction === "later") {
+    const nextEnd = Math.min(maxEnd, end + step);
+    const nextStart = nextEnd - duration;
+    updateAssignmentTimeRange(assignment.id, minutesToTime(nextStart), minutesToTime(nextEnd), "30分後ろにずらしました。");
+    return;
+  }
+
+  if (button.dataset.boardAction === "delete") {
+    removeBoardAssignment(assignment.id);
+  }
 }
 
 function handleRequirementChange(event) {
@@ -1626,9 +1740,96 @@ function updateAssignmentArea(assignmentId, nextArea, options = {}) {
       supportsArea(row?.name || "", nextArea) ? "success" : "warning"
     );
   }
-  renderDashboard();
-  renderGeneration();
-  renderDistribution();
+  renderBoardWorkspace();
+  renderLinkedViewsAfterBoardEdit();
+}
+
+function updateAssignmentRoom(assignmentId, roomIndex) {
+  const assignment = findAssignmentById(assignmentId);
+  if (!assignment) return;
+  assignment.roomIndex = normalizeRoomIndex(roomIndex, 0);
+  state.updatedBoardAssignmentId = assignmentId;
+  markManualScheduleDirty();
+  recomputeScheduleStateForDates([assignment.dateKey]);
+  persistState();
+  flashBoardUpdateStatus(`部屋を ${getRoomLabel(assignment.roomIndex)} に更新しました。`, "success");
+  renderBoardWorkspace();
+  renderLinkedViewsAfterBoardEdit();
+}
+
+function updateBoardAssignmentFields(assignmentId, updates, options = {}) {
+  const row = state.generationRows.find((item) => item.id === assignmentId);
+  if (row) {
+    if (typeof updates.note === "string") row.note = updates.note;
+    row.issues = collectRowIssues(row);
+  }
+
+  Object.values(state.generatedSchedule).forEach((day) => {
+    [...day.earlyAssignments, ...day.lateAssignments].forEach((assignment) => {
+      if (!assignment || assignment.id !== assignmentId) return;
+      Object.assign(assignment, updates);
+    });
+  });
+
+  state.updatedBoardAssignmentId = assignmentId;
+  markManualScheduleDirty();
+  recomputeScheduleStateForDates([row?.dateKey].filter(Boolean));
+  persistState();
+  if (!options.silentStatus) {
+    flashBoardUpdateStatus("更新しました。", "success");
+  }
+  renderBoardWorkspace();
+  renderLinkedViewsAfterBoardEdit();
+}
+
+function updateAssignmentTimeRange(assignmentId, nextStart, nextEnd, message) {
+  if (!isBoardTimeRangeValid(nextStart, nextEnd)) {
+    flashBoardUpdateStatus("営業時間内、かつ開始 < 終了 になるよう調整してください。", "warning");
+    return;
+  }
+  updateBoardAssignmentFields(assignmentId, {
+    startTime: nextStart,
+    endTime: nextEnd
+  }, { silentStatus: true });
+  flashBoardUpdateStatus(message, "success");
+}
+
+function removeBoardAssignment(assignmentId) {
+  const position = findAssignmentPosition(state.selectedDate, assignmentId);
+  if (!position) return;
+  const day = state.generatedSchedule[state.selectedDate];
+  if (!day) return;
+  const key = position.shiftType === "early" ? "earlyAssignments" : "lateAssignments";
+  const slots = createSlotArray(day[key], position.shiftType);
+  slots[position.slotIndex] = null;
+  day[key] = slots;
+
+  const row = state.generationRows.find((item) => item.id === assignmentId);
+  if (row) row.status = "hold";
+
+  state.selectedBoardAssignmentId = "";
+  state.updatedBoardAssignmentId = "";
+  markManualScheduleDirty();
+  recomputeScheduleStateForDates([state.selectedDate]);
+  persistState();
+  flashBoardUpdateStatus("盤面から外しました。", "warning");
+  renderBoardWorkspace();
+  renderLinkedViewsAfterBoardEdit();
+}
+
+function isBoardTimeRangeValid(startTime, endTime) {
+  const settings = getAppSettings();
+  const start = toMinutes(startTime);
+  const end = toMinutes(endTime);
+  return Boolean(startTime && endTime)
+    && start < end
+    && start >= settings.businessStartHour * 60
+    && end <= settings.businessEndHour * 60;
+}
+
+function renderLinkedViewsAfterBoardEdit() {
+  if (state.activeAppView === "generation") renderGeneration();
+  if (state.activeAppView === "distribution") renderDistribution();
 }
 
 function moveAssignmentBetweenSlots(source, target) {
@@ -1806,7 +2007,8 @@ function commitBoardResize(assignmentId, startMinutes, endMinutes) {
   recomputeScheduleStateForDates([row?.dateKey].filter(Boolean));
   persistState();
   showToast(`稼働時間を ${minutesToTime(startMinutes)}-${minutesToTime(endMinutes)} に更新しました。`, "success");
-  renderDashboard();
+  renderBoardWorkspace();
+  renderLinkedViewsAfterBoardEdit();
 }
 
 function collectMoveWarnings(assignment) {
@@ -1858,7 +2060,7 @@ function flashBoardUpdateStatus(message, tone) {
     state.updatedBoardAssignmentId = "";
     elements.boardUpdateStatus.textContent = "";
     elements.boardUpdateStatus.className = "copy-status";
-    renderDashboard();
+    renderBoardWorkspace();
   }, 2400);
 }
 

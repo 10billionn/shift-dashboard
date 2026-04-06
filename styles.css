@@ -1685,6 +1685,37 @@ pre {
   gap: 8px;
 }
 
+.board-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.board-editor-grid .field-block.wide {
+  grid-column: 1 / -1;
+}
+
+.board-note-input {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.board-quick-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.danger-button {
+  background: rgba(198, 84, 84, 0.12);
+  color: var(--danger);
+}
+
+.board-input-invalid {
+  border-color: rgba(198, 84, 84, 0.72);
+  box-shadow: 0 0 0 3px rgba(198, 84, 84, 0.1);
+}
+
 .board-bar-pin {
   position: absolute;
   top: 8px;
@@ -1981,6 +2012,10 @@ pre {
   }
 
   .board-inspector-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .board-editor-grid {
     grid-template-columns: 1fr;
   }
 }
