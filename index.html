@@ -60,16 +60,6 @@
 
           <section id="dashboardBoardView" class="content-panel dashboard-view-panel board-placeholder-panel">
             <div id="dashboardBoardCanvas" class="board-canvas"></div>
-            <section id="boardInspector" class="board-inspector">
-              <div class="subsection-head">
-                <div>
-                  <h3>選択中のセラピスト</h3>
-                  <p class="section-note">セラピスト情報を確認し、必要な時だけ調整を開きます</p>
-                </div>
-                <p id="boardUpdateStatus" class="copy-status"></p>
-              </div>
-              <div id="boardInspectorContent" class="board-inspector-content"></div>
-            </section>
           </section>
 
           <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-weekly-block" open>
@@ -82,6 +72,17 @@
             </summary>
             <div id="weeklyAnalysis" class="weekly-analysis dashboard-collapsible-body"></div>
           </details>
+
+          <section id="boardInspector" class="content-panel board-inspector board-inspector-panel">
+            <div class="subsection-head">
+              <div>
+                <h3>選択中のセラピスト</h3>
+                <p class="section-note">セラピスト情報を確認し、必要な時だけ調整を開きます</p>
+              </div>
+              <p id="boardUpdateStatus" class="copy-status"></p>
+            </div>
+            <div id="boardInspectorContent" class="board-inspector-content"></div>
+          </section>
 
           <section class="content-panel dashboard-risk-panel">
             <div class="panel-head">

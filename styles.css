@@ -853,6 +853,10 @@ pre {
   order: 4;
 }
 
+.board-inspector-panel {
+  order: 5;
+}
+
 .dashboard-weekly-block .dashboard-collapsible-body {
   padding-top: 2px;
 }
@@ -1982,11 +1986,11 @@ button.weekly-day {
 }
 
 .board-inspector {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(200, 211, 225, 0.46);
+  margin-top: 2px;
+  padding-top: 0;
+  border-top: none;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .room-detail-list {
@@ -2042,12 +2046,12 @@ button.weekly-day {
 
 .board-inspector-card {
   display: grid;
-  gap: 8px;
-  padding: 9px 11px;
-  border: 1px solid rgba(200, 211, 225, 0.48);
+  gap: 7px;
+  padding: 8px 10px;
+  border: 1px solid rgba(200, 211, 225, 0.38);
   border-radius: var(--radius-md);
-  background: rgba(249, 251, 253, 0.82);
-  box-shadow: 0 4px 12px rgba(17, 36, 63, 0.035);
+  background: rgba(250, 252, 253, 0.72);
+  box-shadow: 0 2px 8px rgba(17, 36, 63, 0.025);
 }
 
 .board-inspector-head {
@@ -2073,9 +2077,9 @@ button.weekly-day {
 }
 
 .compact-board-inspector-grid .field-value {
-  min-height: 22px;
-  padding: 2px 8px;
-  font-size: 0.7rem;
+  min-height: 21px;
+  padding: 1px 8px;
+  font-size: 0.69rem;
 }
 
 .board-editor-grid {
@@ -2093,7 +2097,7 @@ button.weekly-day {
 }
 
 .board-note-input {
-  min-height: 60px;
+  min-height: 54px;
   resize: vertical;
 }
 
@@ -2118,25 +2122,25 @@ button.weekly-day {
 }
 
 .board-quick-actions .ghost-button {
-  padding: 5px 9px;
-  font-size: 0.72rem;
+  padding: 4px 8px;
+  font-size: 0.7rem;
   border-radius: 9px;
 }
 
 .board-inspector-fold {
   display: grid;
-  gap: 8px;
-  margin-top: 2px;
-  border-top: 1px solid rgba(200, 211, 225, 0.44);
-  padding-top: 7px;
+  gap: 7px;
+  margin-top: 1px;
+  border-top: 1px solid rgba(200, 211, 225, 0.36);
+  padding-top: 6px;
 }
 
 .board-inspector-fold-summary {
   list-style: none;
   cursor: pointer;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
-  color: rgba(27, 36, 50, 0.62);
+  color: rgba(27, 36, 50, 0.56);
 }
 
 .board-inspector-fold-summary::-webkit-details-marker {
@@ -2149,25 +2153,25 @@ button.weekly-day {
 }
 
 .compact-empty-state {
-  padding: 10px 12px;
-  font-size: 0.74rem;
+  padding: 8px 10px;
+  font-size: 0.72rem;
 }
 
 .board-inspector .subsection-head {
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .board-inspector .subsection-head .section-note {
   margin-top: 1px;
-  font-size: 0.68rem;
-  color: rgba(110, 124, 144, 0.68);
+  font-size: 0.66rem;
+  color: rgba(110, 124, 144, 0.62);
 }
 
 .board-inspector .mini-badge {
-  min-height: 22px;
-  padding: 2px 8px;
-  font-size: 0.68rem;
+  min-height: 20px;
+  padding: 1px 7px;
+  font-size: 0.66rem;
   font-weight: 700;
 }
 
@@ -2176,19 +2180,19 @@ button.weekly-day {
 }
 
 .board-inspector .field-help {
-  font-size: 0.7rem;
-  color: rgba(110, 124, 144, 0.72);
+  font-size: 0.68rem;
+  color: rgba(110, 124, 144, 0.66);
 }
 
 .board-inspector .select-input,
 .board-inspector .time-input,
 .board-inspector .text-input {
-  padding: 8px 10px;
+  padding: 7px 9px;
   border-radius: 10px;
 }
 
 .board-inspector .alert-box {
-  padding: 8px 10px;
+  padding: 7px 9px;
   gap: 4px;
 }
 
