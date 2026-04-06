@@ -443,7 +443,7 @@ function renderDashboard() {
   elements.earlyShiftList.innerHTML = renderShiftSlots(day.earlyAssignments, "早番", earlySlotTotal);
   elements.lateShiftList.innerHTML = renderShiftSlots(day.lateAssignments, "遅番", lateSlotTotal);
   elements.cutShiftList.innerHTML = renderCutRows(cutRows);
-  renderBoardWorkspace(day, boardRows);
+  renderBoardWorkspace(day, boardRows, cutRows);
   elements.weeklyAnalysis.innerHTML = renderWeeklyAnalysis();
 
   updateDayButtons();
@@ -451,10 +451,10 @@ function renderDashboard() {
   renderShiftTabState();
 }
 
-function renderBoardWorkspace(day = getScheduleDay(state.selectedDate), boardRows = buildBoardRoomRows(day)) {
+function renderBoardWorkspace(day = getScheduleDay(state.selectedDate), boardRows = buildBoardRoomRows(day), cutRows = getCutRowsForDate(day.dateKey)) {
   syncSelectedBoardAssignment();
   elements.roomDetailList.innerHTML = renderRoomDetailGroups(boardRows);
-  elements.dashboardBoardCanvas.innerHTML = renderBoardTimeline(day, boardRows);
+  elements.dashboardBoardCanvas.innerHTML = renderBoardTimeline(day, boardRows, cutRows);
   elements.boardInspectorContent.innerHTML = renderBoardInspector(day);
   renderBoardDensityState();
 }
@@ -694,7 +694,7 @@ function renderWeeklyAnalysis() {
   }).join("");
 }
 
-function renderBoardTimeline(day, rows = buildBoardRoomRows(day)) {
+function renderBoardTimeline(day, rows = buildBoardRoomRows(day), cutRows = getCutRowsForDate(day.dateKey)) {
   const settings = getAppSettings();
   const hourLabels = buildBoardHourLabels(settings.businessStartHour, settings.businessEndHour);
   const totalAssignments = rows.reduce((count, row) => count + row.assignments.length, 0);
@@ -718,6 +718,7 @@ function renderBoardTimeline(day, rows = buildBoardRoomRows(day)) {
             </div>
             <div class="board-group-body">
               ${rows.map((row, index) => renderBoardLaneRow(row, index)).join("")}
+              ${renderAdjustmentLane(cutRows)}
             </div>
           </section>
         <div class="board-drag-overlay" data-board-drag-overlay></div>
@@ -778,6 +779,59 @@ function renderBoardLaneRow(row, index) {
               <div class="board-track-wrap">
                 ${trackMarkup}
           </div>
+    </div>
+  `;
+}
+
+function renderAdjustmentLane(rows) {
+  const trackMarkup = rows.length
+    ? `
+        <div class="board-track board-track-adjustment">
+          ${rows.map((row, index) => renderAdjustmentBar(row, index)).join("")}
+        </div>
+      `
+    : `
+        <div class="board-track board-track-empty board-track-adjustment">
+          <div class="board-gap board-gap-empty">空き</div>
+        </div>
+      `;
+
+  return `
+    <div class="board-lane board-lane-adjustment ${rows.length ? "has-adjustments" : ""}">
+      <div class="board-lane-head">
+        <strong class="board-lane-title">調整中</strong>
+      </div>
+      <div class="board-track-wrap">
+        ${trackMarkup}
+      </div>
+    </div>
+  `;
+}
+
+function renderAdjustmentBar(row, index) {
+  const settings = getAppSettings();
+  const start = toMinutes(row.startTime);
+  const end = toMinutes(row.endTime);
+  const timelineStart = settings.businessStartHour * 60;
+  const timelineEnd = settings.businessEndHour * 60;
+  const clampedStart = Math.max(start, timelineStart);
+  const clampedEnd = Math.min(end, timelineEnd);
+  const duration = Math.max(clampedEnd - clampedStart, 60);
+  const total = timelineEnd - timelineStart;
+  const left = ((clampedStart - timelineStart) / total) * 100;
+  const width = Math.max((duration / total) * 100, 8);
+  const area = row.preferredArea || "";
+  const colorKey = getAreaColorKey(area);
+  const stackOffset = index * 4;
+  return `
+    <div
+      class="board-bar board-adjustment-bar area-${colorKey}"
+      title="${escapeHtml(`${row.name} / ${row.startTime}-${row.endTime}${area ? ` / 希望 ${area}` : ""}`)}"
+      style="left:${left}%; width:${width}%; --board-stack-offset:${stackOffset}px;">
+      <span class="board-bar-inline">
+        <span class="board-bar-name">${row.name}</span>
+        <span class="board-bar-sub">${formatBoardTimeLabel(row.startTime, row.endTime, width < 20)}</span>
+      </span>
     </div>
   `;
 }
