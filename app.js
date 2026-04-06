@@ -1110,14 +1110,19 @@ function renderBoardInspector(day) {
   const position = findAssignmentPosition(day.dateKey, assignment.id);
   const visualMeta = getAssignmentVisualMeta(assignment, position?.slotIndex ?? 0);
   const status = analyzeAssignmentStatus(assignment, profile);
-    const statusTone = status.level === "danger" ? "danger" : status.level === "warning" ? "warning" : "ok";
+  const statusTone = status.level === "danger" ? "danger" : status.level === "warning" ? "warning" : "ok";
   const settings = getAppSettings();
   const startMinutes = toMinutes(assignment.startTime);
   const endMinutes = toMinutes(assignment.endTime);
-    const isInvalidTime = startMinutes >= endMinutes
-      || startMinutes < settings.businessStartHour * 60
-      || endMinutes > settings.businessEndHour * 60;
-    const overlapInfo = getAssignmentOverlapInfo(day.dateKey, assignment.id);
+  const isInvalidTime = startMinutes >= endMinutes
+    || startMinutes < settings.businessStartHour * 60
+    || endMinutes > settings.businessEndHour * 60;
+  const overlapInfo = getAssignmentOverlapInfo(day.dateKey, assignment.id);
+  const hasAreaMismatch = Boolean(assignment.preferredArea)
+    && visualMeta.currentArea
+    && assignment.preferredArea !== visualMeta.currentArea;
+  const displayStatusLabel = hasAreaMismatch ? "エリア不一致" : status.label;
+  const displayStatusTone = hasAreaMismatch ? "warning" : statusTone;
 
   return `
     <article class="board-inspector-card">
@@ -1144,11 +1149,11 @@ function renderBoardInspector(day) {
         </div>
         <div class="shift-summary-item">
           <span class="field-label">希望</span>
-          <span class="field-value">${assignment.preferredArea || "未設定"}</span>
+          <span class="field-value ${hasAreaMismatch ? "mismatch" : ""}">${assignment.preferredArea || "未設定"}${hasAreaMismatch ? "（不一致）" : ""}</span>
         </div>
         <div class="shift-summary-item">
           <span class="field-label">状態</span>
-          <span class="field-value">${status.label}</span>
+          <span class="field-value ${hasAreaMismatch ? "mismatch" : ""}">${displayStatusLabel}</span>
         </div>
         <div class="shift-summary-item">
           <span class="field-label">姫</span>
@@ -1156,8 +1161,8 @@ function renderBoardInspector(day) {
         </div>
       </div>
 
-      <details class="board-inspector-fold" ${isInvalidTime || assignment.warningArea || overlapInfo.count ? "open" : ""}>
-        <summary class="board-inspector-fold-summary">調整と判断を見る</summary>
+      <details class="board-inspector-fold" ${isInvalidTime || assignment.warningArea || overlapInfo.count || hasAreaMismatch ? "open" : ""}>
+        <summary class="board-inspector-fold-summary">調整・判断</summary>
 
         <div class="board-editor-grid compact-board-editor-grid">
           <label class="field-block">
@@ -1214,9 +1219,12 @@ function renderBoardInspector(day) {
 
         ${(isInvalidTime || assignment.warningArea || overlapInfo.count || status.reasons.length || assignment.generationReasons?.length) ? `
           <div class="board-inspector-alerts">
-            <div class="alert-box ${statusTone}">
+            <div class="alert-box ${displayStatusTone}">
               <strong>判断</strong>
-              <div>${status.reasons.map((reason) => `<div>・${reason}</div>`).join("")}</div>
+              <div>${[
+                ...(hasAreaMismatch ? [`希望エリア ${assignment.preferredArea} と現在配置 ${visualMeta.currentArea} が異なります。`] : []),
+                ...status.reasons
+              ].map((reason) => `<div>・${reason}</div>`).join("")}</div>
             </div>
             ${overlapInfo.count ? `
               <div class="alert-box warning">
