@@ -766,18 +766,13 @@ function renderBoardLaneRow(row, index) {
         </div>
       `;
 
-  const roomMeta = row.assignments.length
-    ? `${row.assignments.length}${row.hasOverlap ? ` • ${row.overlapCount}` : ""}`
-    : "空き";
-
-  return `
-            <div class="board-lane ${row.hasOverlap ? "overlapping-room" : ""} ${isSelectedRoom ? "active-room" : ""}">
-            <div class="board-lane-head">
-              <strong class="board-lane-title">${row.roomLabel}</strong>
-            <span class="board-lane-meta">${row.assignments.length ? `<span>${roomMeta}</span>` : ""}</span>
-            </div>
-            <div class="board-track-wrap">
-              ${trackMarkup}
+    return `
+              <div class="board-lane ${row.hasOverlap ? "overlapping-room" : ""} ${isSelectedRoom ? "active-room" : ""}">
+              <div class="board-lane-head">
+                <strong class="board-lane-title">${row.roomLabel}</strong>
+              </div>
+              <div class="board-track-wrap">
+                ${trackMarkup}
           </div>
     </div>
   `;
