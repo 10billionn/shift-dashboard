@@ -1711,7 +1711,11 @@ function clearBoardInteractionHighlights() {
 }
 
 function getBoardMovePreview(moveState, clientX, clientY) {
-  const activeTrack = getBoardTrackFromCenterY(moveState, clientY) || moveState.sourceTrack;
+  const overlayRect = moveState.overlayRoot?.getBoundingClientRect() || moveState.overlayRect;
+  const deltaY = clientY - moveState.initialY;
+  const visualTop = (moveState.sourceTrackRect.top - overlayRect.top) + moveState.barOffsetTop + deltaY;
+  const centerY = overlayRect.top + visualTop + (moveState.barHeight / 2);
+  const activeTrack = getBoardTrackFromCenterY(centerY) || moveState.sourceTrack;
   const trackRect = activeTrack?.getBoundingClientRect() || moveState.sourceTrack.getBoundingClientRect();
   if (!trackRect.width) return null;
 
@@ -1733,13 +1737,28 @@ function getBoardMovePreview(moveState, clientX, clientY) {
 
   const targetTrack = activeTrack || moveState.sourceTrack;
   const roomIndex = normalizeRoomIndex(targetTrack.dataset.boardSlotIndex, moveState.initialRoomIndex);
+  const total = moveState.timelineEnd - moveState.timelineStart;
+  const visualLeft = trackRect.left - overlayRect.left + (((rawStartMinutes - moveState.timelineStart) / total) * trackRect.width);
+  const visualWidth = Math.max((((rawEndMinutes - rawStartMinutes) / total) * trackRect.width), 24);
+  const snappedLeft = trackRect.left - overlayRect.left + (((startMinutes - moveState.timelineStart) / total) * trackRect.width);
+  const snappedWidth = Math.max((((endMinutes - startMinutes) / total) * trackRect.width), 24);
+  const trackTop = trackRect.top - overlayRect.top;
+  const trackHeight = trackRect.height;
   return {
     roomIndex,
     rawStartMinutes,
     rawEndMinutes,
     startMinutes,
     endMinutes,
-    targetTrack
+    targetTrack,
+    visualTop,
+    visualLeft,
+    visualWidth,
+    centerY,
+    snappedLeft,
+    snappedWidth,
+    trackTop,
+    trackHeight
   };
 }
 
@@ -1750,41 +1769,30 @@ function applyBoardMovePreview(moveState, preview) {
   preview.targetTrack?.classList.add("drag-over");
   preview.targetTrack?.closest(".board-lane")?.classList.add("drag-target-room");
 
-  const total = moveState.timelineEnd - moveState.timelineStart;
-  const activeTrackRect = (preview.targetTrack || moveState.sourceTrack).getBoundingClientRect();
-  const overlayRect = moveState.overlayRoot?.getBoundingClientRect() || moveState.overlayRect;
-  const left = activeTrackRect.left - overlayRect.left + (((preview.rawStartMinutes - moveState.timelineStart) / total) * activeTrackRect.width);
-  const snappedLeft = activeTrackRect.left - overlayRect.left + (((preview.startMinutes - moveState.timelineStart) / total) * activeTrackRect.width);
-  const width = Math.max((((preview.rawEndMinutes - preview.rawStartMinutes) / total) * activeTrackRect.width), 24);
-  const snappedWidth = Math.max((((preview.endMinutes - preview.startMinutes) / total) * activeTrackRect.width), 24);
-  const targetRect = (preview.targetTrack || moveState.sourceTrack).getBoundingClientRect();
-  const top = targetRect.top - overlayRect.top + ((targetRect.height - moveState.barHeight) / 2);
-  const trackTop = targetRect.top - overlayRect.top;
-  const trackHeight = targetRect.height;
   const snapNear = Math.abs(preview.rawStartMinutes - preview.startMinutes) < 6;
 
-  moveState.movingBar.style.left = `${left}px`;
-  moveState.movingBar.style.top = `${top}px`;
-  moveState.movingBar.style.width = `${width}px`;
+  moveState.movingBar.style.left = `${preview.visualLeft}px`;
+  moveState.movingBar.style.top = `${preview.visualTop}px`;
+  moveState.movingBar.style.width = `${preview.visualWidth}px`;
   moveState.movingBar.style.transform = `scale(1.02)`;
   moveState.movingBar.classList.toggle("snap-near", snapNear);
   if (moveState.guideBand) {
-    moveState.guideBand.style.left = `${snappedLeft}px`;
-    moveState.guideBand.style.top = `${trackTop}px`;
-    moveState.guideBand.style.width = `${snappedWidth}px`;
-    moveState.guideBand.style.height = `${trackHeight}px`;
+    moveState.guideBand.style.left = `${preview.snappedLeft}px`;
+    moveState.guideBand.style.top = `${preview.trackTop}px`;
+    moveState.guideBand.style.width = `${preview.snappedWidth}px`;
+    moveState.guideBand.style.height = `${preview.trackHeight}px`;
     moveState.guideBand.classList.toggle("snap-near", snapNear);
   }
   if (moveState.guideStart) {
-    moveState.guideStart.style.left = `${snappedLeft}px`;
-    moveState.guideStart.style.top = `${trackTop}px`;
-    moveState.guideStart.style.height = `${trackHeight}px`;
+    moveState.guideStart.style.left = `${preview.snappedLeft}px`;
+    moveState.guideStart.style.top = `${preview.trackTop}px`;
+    moveState.guideStart.style.height = `${preview.trackHeight}px`;
     moveState.guideStart.classList.toggle("snap-near", snapNear);
   }
   if (moveState.guideEnd) {
-    moveState.guideEnd.style.left = `${snappedLeft + snappedWidth}px`;
-    moveState.guideEnd.style.top = `${trackTop}px`;
-    moveState.guideEnd.style.height = `${trackHeight}px`;
+    moveState.guideEnd.style.left = `${preview.snappedLeft + preview.snappedWidth}px`;
+    moveState.guideEnd.style.top = `${preview.trackTop}px`;
+    moveState.guideEnd.style.height = `${preview.trackHeight}px`;
     moveState.guideEnd.classList.toggle("snap-near", snapNear);
   }
   if (moveState.subLabel) {
@@ -1810,14 +1818,9 @@ function getBoardTrackFromPoint(clientX, clientY) {
   return elementsAtPoint.find((item) => item.classList?.contains("board-track")) || null;
 }
 
-function getBoardTrackFromCenterY(moveState, clientY) {
+function getBoardTrackFromCenterY(centerY) {
   const tracks = Array.from(elements.dashboardBoardCanvas.querySelectorAll(".board-track"));
   if (!tracks.length) return null;
-
-  const sourceTop = moveState.sourceTrackRect?.top ?? moveState.sourceTrack.getBoundingClientRect().top;
-  const deltaY = clientY - moveState.initialY;
-  const visualTop = sourceTop + deltaY;
-  const centerY = visualTop + ((moveState.barHeight || moveState.bar.getBoundingClientRect().height) / 2);
 
   const containingTrack = tracks.find((track) => {
     const rect = track.getBoundingClientRect();
