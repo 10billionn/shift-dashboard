@@ -1515,6 +1515,15 @@ function handleBoardMoveStart(event) {
   movingBar.style.width = `${barRect.width}px`;
   movingBar.style.height = `${barRect.height}px`;
   movingBar.style.bottom = "auto";
+  const guideBand = document.createElement("div");
+  guideBand.className = "board-drag-guide-band";
+  const guideStart = document.createElement("div");
+  guideStart.className = "board-drag-guide-line start";
+  const guideEnd = document.createElement("div");
+  guideEnd.className = "board-drag-guide-line end";
+  overlayRoot?.appendChild(guideBand);
+  overlayRoot?.appendChild(guideStart);
+  overlayRoot?.appendChild(guideEnd);
   overlayRoot?.appendChild(movingBar);
 
   boardMoveState = {
@@ -1529,10 +1538,13 @@ function handleBoardMoveStart(event) {
     sourceTrackRect: trackRect,
     bar,
     barOffsetTop: barRect.top - trackRect.top,
-    overlayRoot,
-    overlayRect,
-    movingBar,
-    subLabel: movingBar.querySelector(".board-bar-sub"),
+      overlayRoot,
+      overlayRect,
+      movingBar,
+      guideBand,
+      guideStart,
+      guideEnd,
+      subLabel: movingBar.querySelector(".board-bar-sub"),
     timelineStart: settings.businessStartHour * 60,
     timelineEnd: settings.businessEndHour * 60,
     moved: false,
@@ -1741,14 +1753,39 @@ function applyBoardMovePreview(moveState, preview) {
   const activeTrackRect = (preview.targetTrack || moveState.sourceTrack).getBoundingClientRect();
   const overlayRect = moveState.overlayRoot?.getBoundingClientRect() || moveState.overlayRect;
   const left = activeTrackRect.left - overlayRect.left + (((preview.rawStartMinutes - moveState.timelineStart) / total) * activeTrackRect.width);
+  const snappedLeft = activeTrackRect.left - overlayRect.left + (((preview.startMinutes - moveState.timelineStart) / total) * activeTrackRect.width);
   const width = Math.max((((preview.rawEndMinutes - preview.rawStartMinutes) / total) * activeTrackRect.width), 24);
+  const snappedWidth = Math.max((((preview.endMinutes - preview.startMinutes) / total) * activeTrackRect.width), 24);
   const targetRect = (preview.targetTrack || moveState.sourceTrack).getBoundingClientRect();
   const top = targetRect.top - overlayRect.top + moveState.barOffsetTop;
+  const trackTop = targetRect.top - overlayRect.top;
+  const trackHeight = targetRect.height;
+  const snapNear = Math.abs(preview.rawStartMinutes - preview.startMinutes) < 6;
 
   moveState.movingBar.style.left = `${left}px`;
   moveState.movingBar.style.top = `${top}px`;
   moveState.movingBar.style.width = `${width}px`;
   moveState.movingBar.style.transform = `scale(1.02)`;
+  moveState.movingBar.classList.toggle("snap-near", snapNear);
+  if (moveState.guideBand) {
+    moveState.guideBand.style.left = `${snappedLeft}px`;
+    moveState.guideBand.style.top = `${trackTop}px`;
+    moveState.guideBand.style.width = `${snappedWidth}px`;
+    moveState.guideBand.style.height = `${trackHeight}px`;
+    moveState.guideBand.classList.toggle("snap-near", snapNear);
+  }
+  if (moveState.guideStart) {
+    moveState.guideStart.style.left = `${snappedLeft}px`;
+    moveState.guideStart.style.top = `${trackTop}px`;
+    moveState.guideStart.style.height = `${trackHeight}px`;
+    moveState.guideStart.classList.toggle("snap-near", snapNear);
+  }
+  if (moveState.guideEnd) {
+    moveState.guideEnd.style.left = `${snappedLeft + snappedWidth}px`;
+    moveState.guideEnd.style.top = `${trackTop}px`;
+    moveState.guideEnd.style.height = `${trackHeight}px`;
+    moveState.guideEnd.classList.toggle("snap-near", snapNear);
+  }
   if (moveState.subLabel) {
     moveState.subLabel.textContent = formatBoardTimeLabel(
       minutesToTime(Math.round(preview.rawStartMinutes)),
@@ -1761,6 +1798,9 @@ function applyBoardMovePreview(moveState, preview) {
 function cleanupBoardMovePreview(moveState) {
   moveState.bar.classList.remove("board-ghost");
   moveState.movingBar?.remove();
+  moveState.guideBand?.remove();
+  moveState.guideStart?.remove();
+  moveState.guideEnd?.remove();
   clearBoardInteractionHighlights();
 }
 
@@ -1801,6 +1841,11 @@ function commitBoardMove(assignmentId, roomIndex, startMinutes, endMinutes) {
   persistState();
   showToast(`${roomMeta.roomLabel} / ${minutesToTime(startMinutes)}-${minutesToTime(endMinutes)} に更新しました。`, "success");
   renderBoardWorkspace();
+  requestAnimationFrame(() => {
+    const settledTrack = elements.dashboardBoardCanvas.querySelector(`.board-track[data-board-slot-index="${normalizedRoomIndex}"]`);
+    settledTrack?.classList.add("drop-settle");
+    window.setTimeout(() => settledTrack?.classList.remove("drop-settle"), 140);
+  });
   renderLinkedViewsAfterBoardEdit();
 }
 
