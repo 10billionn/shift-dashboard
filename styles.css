@@ -1635,6 +1635,20 @@ button.weekly-day {
     inset 0 -1px 2px rgba(0,0,0,0.018);
 }
 
+.board-track-adjustment.drag-over {
+  border-color: rgba(132, 148, 170, 0.34);
+  box-shadow: inset 0 0 0 2px rgba(132, 148, 170, 0.12), 0 0 0 2px rgba(132, 148, 170, 0.04);
+  background:
+    repeating-linear-gradient(
+      to right,
+      rgba(200, 211, 225, 0.1) 0,
+      rgba(200, 211, 225, 0.1) 1px,
+      transparent 1px,
+      transparent calc(100% / 17)
+    ),
+    linear-gradient(180deg, rgba(244, 247, 251, 0.98), rgba(238, 242, 247, 0.94));
+}
+
 .board-track.drag-over {
   border-color: rgba(46, 107, 203, 0.58);
   box-shadow: inset 0 0 0 2px rgba(46, 107, 203, 0.18), 0 0 0 3px rgba(46, 107, 203, 0.08);

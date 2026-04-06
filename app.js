@@ -786,12 +786,12 @@ function renderBoardLaneRow(row, index) {
 function renderAdjustmentLane(rows) {
   const trackMarkup = rows.length
     ? `
-        <div class="board-track board-track-adjustment">
+        <div class="board-track board-track-adjustment" data-board-dropzone="adjustment">
           ${rows.map((row, index) => renderAdjustmentBar(row, index)).join("")}
         </div>
       `
     : `
-        <div class="board-track board-track-empty board-track-adjustment">
+        <div class="board-track board-track-empty board-track-adjustment" data-board-dropzone="adjustment">
           <div class="board-gap board-gap-empty">空き</div>
         </div>
       `;
@@ -824,15 +824,20 @@ function renderAdjustmentBar(row, index) {
   const colorKey = getAreaColorKey(area);
   const stackOffset = index * 4;
   return `
-    <div
-      class="board-bar board-adjustment-bar area-${colorKey}"
+    <button
+      class="board-bar board-adjustment-bar area-${colorKey} ${row.id === state.selectedBoardAssignmentId ? "selected" : ""}"
+      type="button"
+      draggable="false"
+      data-board-assignment-id="${row.id}"
+      data-board-slot-index="-1"
+      data-board-dropzone="adjustment"
       title="${escapeHtml(`${row.name} / ${row.startTime}-${row.endTime}${area ? ` / 希望 ${area}` : ""}`)}"
       style="left:${left}%; width:${width}%; --board-stack-offset:${stackOffset}px;">
       <span class="board-bar-inline">
         <span class="board-bar-name">${row.name}</span>
         <span class="board-bar-sub">${formatBoardTimeLabel(row.startTime, row.endTime, width < 20)}</span>
       </span>
-    </div>
+    </button>
   `;
 }
 
@@ -1165,6 +1170,9 @@ function renderBoardInspector(day) {
   const roomOptions = getAppSettings().roomNames;
   const position = findAssignmentPosition(day.dateKey, assignment.id);
   const visualMeta = getAssignmentVisualMeta(assignment, position?.slotIndex ?? 0);
+  const isAdjustmentLane = Boolean(assignment.isAdjustmentLane);
+  const displayRoomLabel = isAdjustmentLane ? "調整中" : visualMeta.roomLabel;
+  const displayArea = isAdjustmentLane ? (assignment.preferredArea || "未設定") : visualMeta.currentArea;
   const status = analyzeAssignmentStatus(assignment, profile);
   const statusTone = status.level === "danger" ? "danger" : status.level === "warning" ? "warning" : "ok";
   const settings = getAppSettings();
@@ -1185,7 +1193,7 @@ function renderBoardInspector(day) {
       <div class="board-inspector-head">
         <div>
           <strong class="therapist-name">${assignment.name}</strong>
-          <p class="field-help">${visualMeta.roomLabel} / ${visualMeta.currentArea} / ${formatDisplayDate(assignment.dateKey)} (${formatWeekday(assignment.dateKey)})</p>
+          <p class="field-help">${displayRoomLabel} / ${displayArea} / ${formatDisplayDate(assignment.dateKey)} (${formatWeekday(assignment.dateKey)})</p>
         </div>
         <div class="status-row tight">
           <span class="mini-badge rank">${profile.rank || "G"}</span>
@@ -1197,11 +1205,11 @@ function renderBoardInspector(day) {
       <div class="board-inspector-grid compact-board-inspector-grid">
         <div class="shift-summary-item">
           <span class="field-label">配置</span>
-          <span class="field-value">${visualMeta.roomLabel}</span>
+          <span class="field-value">${displayRoomLabel}</span>
         </div>
         <div class="shift-summary-item">
           <span class="field-label">エリア</span>
-          <span class="field-value">${visualMeta.currentArea}</span>
+          <span class="field-value">${displayArea}</span>
         </div>
         <div class="shift-summary-item">
           <span class="field-label">希望</span>
@@ -1522,7 +1530,7 @@ function handleBoardResizeStart(event) {
   const track = handle.closest(".board-track");
   if (!bar || !track) return;
 
-  const assignment = findAssignmentById(bar.dataset.boardAssignmentId);
+  const assignment = findBoardDraggableAssignmentById(bar.dataset.boardAssignmentId);
   if (!assignment) return;
 
   event.preventDefault();
@@ -1696,6 +1704,10 @@ function handleBoardMoveEnd(event) {
   }
 
   boardSuppressClickUntil = Date.now() + 220;
+  if (preview.dropzone === "adjustment") {
+    moveBoardAssignmentToAdjustment(moveState.assignmentId, preview.startMinutes, preview.endMinutes);
+    return;
+  }
   commitBoardMove(moveState.assignmentId, preview.roomIndex, preview.startMinutes, preview.endMinutes);
 }
 
@@ -1713,7 +1725,8 @@ function handleBoardDragStart(event) {
   clearBoardInteractionHighlights();
   boardDragPayload = {
     assignmentId: bar.dataset.boardAssignmentId,
-    slotIndex: Number(bar.dataset.boardSlotIndex)
+    slotIndex: Number(bar.dataset.boardSlotIndex),
+    dropzone: bar.dataset.boardDropzone || "room"
   };
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData("text/plain", JSON.stringify(boardDragPayload));
@@ -1760,9 +1773,16 @@ function handleBoardDrop(event) {
   if (!boardDragPayload) return;
   event.preventDefault();
 
+  if (track.dataset.boardDropzone === "adjustment") {
+    moveBoardAssignmentToAdjustment(boardDragPayload.assignmentId);
+    boardDragPayload = null;
+    return;
+  }
+
   moveBoardAssignmentWithinShift(boardDragPayload, {
     slotIndex: Number(track.dataset.boardSlotIndex)
-    });
+  });
+  boardDragPayload = null;
 }
 
 function clearBoardInteractionHighlights() {
@@ -1800,7 +1820,10 @@ function getBoardMovePreview(moveState, clientX, clientY) {
   if (startMinutes >= endMinutes) return null;
 
   const targetTrack = activeTrack || moveState.sourceTrack;
-  const roomIndex = normalizeRoomIndex(targetTrack.dataset.boardSlotIndex, moveState.initialRoomIndex);
+  const dropzone = targetTrack.dataset.boardDropzone || "room";
+  const roomIndex = dropzone === "adjustment"
+    ? null
+    : normalizeRoomIndex(targetTrack.dataset.boardSlotIndex, moveState.initialRoomIndex);
   const total = moveState.timelineEnd - moveState.timelineStart;
   const visualLeft = trackRect.left - overlayRect.left + (((rawStartMinutes - moveState.timelineStart) / total) * trackRect.width);
   const visualWidth = Math.max((((rawEndMinutes - rawStartMinutes) / total) * trackRect.width), 24);
@@ -1810,6 +1833,7 @@ function getBoardMovePreview(moveState, clientX, clientY) {
   const trackHeight = trackRect.height;
   const verticalDrag = Math.abs(deltaY) > 10 && Math.abs(deltaY) > Math.abs(deltaX);
   return {
+    dropzone,
     roomIndex,
     rawStartMinutes,
     rawEndMinutes,
@@ -1912,7 +1936,8 @@ function getBoardTrackFromCenterY(centerY) {
 
 function commitBoardMove(assignmentId, roomIndex, startMinutes, endMinutes) {
   const row = state.generationRows.find((item) => item.id === assignmentId);
-  const assignment = findAssignmentById(assignmentId);
+  const scheduledAssignment = findScheduledAssignmentById(assignmentId);
+  const assignment = scheduledAssignment || buildBoardAdjustmentAssignment(row);
   if (!assignment) return;
 
   const normalizedRoomIndex = normalizeRoomIndex(roomIndex, assignment.roomIndex ?? 0);
@@ -1921,18 +1946,42 @@ function commitBoardMove(assignmentId, roomIndex, startMinutes, endMinutes) {
   if (row) {
     row.startTime = minutesToTime(startMinutes);
     row.endTime = minutesToTime(endMinutes);
+    row.status = "accepted";
     row.issues = collectRowIssues(row);
   }
 
-  Object.values(state.generatedSchedule).forEach((day) => {
-    [...day.earlyAssignments, ...day.lateAssignments].forEach((item) => {
-      if (!item || item.id !== assignmentId) return;
-      item.roomIndex = normalizedRoomIndex;
-      item.startTime = minutesToTime(startMinutes);
-      item.endTime = minutesToTime(endMinutes);
-      if (roomMeta.area) item.assignedArea = roomMeta.area;
+  if (scheduledAssignment) {
+    Object.values(state.generatedSchedule).forEach((day) => {
+      [...day.earlyAssignments, ...day.lateAssignments].forEach((item) => {
+        if (!item || item.id !== assignmentId) return;
+        item.roomIndex = normalizedRoomIndex;
+        item.startTime = minutesToTime(startMinutes);
+        item.endTime = minutesToTime(endMinutes);
+        if (roomMeta.area) item.assignedArea = roomMeta.area;
+      });
     });
-  });
+  } else if (row) {
+    const dateKey = row.dateKey;
+    const day = state.generatedSchedule[dateKey] || (state.generatedSchedule[dateKey] = emptyDay(dateKey));
+    const shiftType = inferBoardShiftType(row);
+    const key = shiftType === "late" ? "lateAssignments" : "earlyAssignments";
+    const slots = createSlotArray(day[key], shiftType);
+    const insertionIndex = slots.findIndex((item) => !item);
+    const restoredAssignment = {
+      ...assignment,
+      roomIndex: normalizedRoomIndex,
+      assignedArea: roomMeta.area || assignment.assignedArea || assignment.preferredArea,
+      startTime: minutesToTime(startMinutes),
+      endTime: minutesToTime(endMinutes),
+      warningArea: !supportsArea(assignment.name, roomMeta.area || assignment.preferredArea)
+    };
+    if (insertionIndex >= 0) {
+      slots[insertionIndex] = restoredAssignment;
+    } else {
+      slots.push(restoredAssignment);
+    }
+    day[key] = slots;
+  }
 
   state.selectedBoardAssignmentId = assignmentId;
   state.updatedBoardAssignmentId = assignmentId;
@@ -2268,6 +2317,10 @@ function updateAssignmentArea(assignmentId, nextArea, options = {}) {
 function updateAssignmentRoom(assignmentId, roomIndex) {
   const assignment = findAssignmentById(assignmentId);
   if (!assignment) return;
+  if (assignment.isAdjustmentLane) {
+    commitBoardMove(assignmentId, roomIndex, toMinutes(assignment.startTime), toMinutes(assignment.endTime));
+    return;
+  }
   assignment.roomIndex = normalizeRoomIndex(roomIndex, 0);
   const roomMeta = getRoomMeta(assignment.roomIndex, assignment.assignedArea || assignment.preferredArea);
   if (roomMeta.area) {
@@ -2342,6 +2395,36 @@ function removeBoardAssignment(assignmentId) {
   renderLinkedViewsAfterBoardEdit();
 }
 
+function moveBoardAssignmentToAdjustment(assignmentId, startMinutes = null, endMinutes = null) {
+  const position = findAssignmentPosition(state.selectedDate, assignmentId);
+  if (!position) return;
+  const day = state.generatedSchedule[state.selectedDate];
+  if (!day) return;
+  const key = position.shiftType === "early" ? "earlyAssignments" : "lateAssignments";
+  const slots = createSlotArray(day[key], position.shiftType);
+  const assignment = slots[position.slotIndex];
+  slots[position.slotIndex] = null;
+  day[key] = slots;
+
+  const row = state.generationRows.find((item) => item.id === assignmentId);
+  if (row) {
+    row.status = "hold";
+    if (startMinutes !== null) row.startTime = minutesToTime(startMinutes);
+    if (endMinutes !== null) row.endTime = minutesToTime(endMinutes);
+    row.issues = collectRowIssues(row);
+  }
+
+  state.selectedBoardAssignmentId = assignmentId;
+  state.updatedBoardAssignmentId = assignmentId;
+  markManualScheduleDirty();
+  recomputeScheduleStateForDates([state.selectedDate]);
+  persistState();
+  flashBoardUpdateStatus("調整中へ移動しました。", "warning");
+  showToast(`${assignment?.name || "セラピスト"}を調整中へ移動しました。`, "warning");
+  renderBoardWorkspace();
+  renderLinkedViewsAfterBoardEdit();
+}
+
 function isBoardTimeRangeValid(startTime, endTime) {
   const settings = getAppSettings();
   const start = toMinutes(startTime);
@@ -2387,6 +2470,11 @@ function moveAssignmentBetweenSlots(source, target) {
 
 function moveBoardAssignmentWithinShift(source, target) {
   if (!source?.assignmentId) return;
+  const scheduledAssignment = findScheduledAssignmentById(source.assignmentId);
+  if (!scheduledAssignment) {
+    commitBoardMove(source.assignmentId, target.slotIndex, toMinutes(findBoardDraggableAssignmentById(source.assignmentId)?.startTime || "00:00"), toMinutes(findBoardDraggableAssignmentById(source.assignmentId)?.endTime || "01:00"));
+    return;
+  }
   const sourcePosition = findAssignmentPosition(state.selectedDate, source.assignmentId);
   if (!sourcePosition) return;
 
@@ -2859,7 +2947,7 @@ function getMissingTherapists() {
 
 function getCutRowsForDate(dateKey) {
   return state.generationRows
-    .filter((row) => row.dateKey === dateKey && row.status === "cut")
+    .filter((row) => row.dateKey === dateKey && ["cut", "hold"].includes(row.status))
     .sort((left, right) => left.name.localeCompare(right.name, "ja"));
 }
 
@@ -3234,11 +3322,51 @@ function handleWeeklyAnalysisClick(event) {
   renderDashboard();
 }
 
-function findAssignmentById(id) {
+function findScheduledAssignmentById(id) {
   if (!id) return null;
   return Object.values(state.generatedSchedule)
     .flatMap((day) => [...day.earlyAssignments, ...day.lateAssignments].filter(Boolean))
     .find((item) => item.id === id) || null;
+}
+
+function inferBoardShiftType(row) {
+  if (!row) return "early";
+  if (supportsShift(row, "late") && !supportsShift(row, "early")) return "late";
+  if (supportsShift(row, "early") && !supportsShift(row, "late")) return "early";
+  return toMinutes(row.startTime) >= 15 * 60 ? "late" : "early";
+}
+
+function buildBoardAdjustmentAssignment(row) {
+  if (!row) return null;
+  const settings = getAppSettings();
+  const shiftType = inferBoardShiftType(row);
+  return {
+    id: row.id,
+    dateKey: row.dateKey,
+    name: row.name,
+    shiftType,
+    shiftLabel: shiftType === "late" ? settings.shiftLabels.late : settings.shiftLabels.early,
+    preferredArea: row.preferredArea,
+    assignedArea: row.preferredArea,
+    roomIndex: -1,
+    startTime: row.startTime,
+    endTime: row.endTime,
+    himeReservation: row.himeReservation,
+    note: row.note,
+    warningArea: !supportsArea(row.name, row.preferredArea),
+    generationReasons: [],
+    isAdjustmentLane: true
+  };
+}
+
+function findBoardDraggableAssignmentById(id) {
+  return findScheduledAssignmentById(id)
+    || buildBoardAdjustmentAssignment(state.generationRows.find((item) => item.id === id && ["cut", "hold"].includes(item.status)))
+    || null;
+}
+
+function findAssignmentById(id) {
+  return findBoardDraggableAssignmentById(id);
 }
 
 function moveDate(offset) {
