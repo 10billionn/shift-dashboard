@@ -3,6 +3,7 @@
   dateList: [],
   activeAppView: "dashboard",
   activeDashboardView: "board",
+  boardDensity: "compact",
   activeShiftTab: "early",
   generationRows: [],
   generationErrors: [],
@@ -71,6 +72,7 @@ const elements = {
   dashboardListView: document.querySelector("#dashboardListView"),
   dashboardBoardView: document.querySelector("#dashboardBoardView"),
   dashboardBoardCanvas: document.querySelector("#dashboardBoardCanvas"),
+  boardDensityTabs: document.querySelector("#boardDensityTabs"),
   boardInspectorContent: document.querySelector("#boardInspectorContent"),
   boardUpdateStatus: document.querySelector("#boardUpdateStatus"),
   shiftTabs: document.querySelector("#shiftTabs"),
@@ -189,6 +191,14 @@ function bindEvents() {
       renderDashboardViewState();
     });
   });
+  elements.boardDensityTabs?.querySelectorAll(".view-tab").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.boardDensity = button.dataset.boardDensity === "comfortable" ? "comfortable" : "compact";
+      persistState();
+      renderBoardWorkspace();
+      renderBoardDensityState();
+    });
+  });
 
   elements.dashboardBoardCanvas.addEventListener("click", handleBoardCanvasClick);
   elements.dashboardBoardCanvas.addEventListener("dragstart", handleBoardDragStart);
@@ -303,6 +313,7 @@ function hydrateState(saved) {
   state.selectedDistributionDate = normalizeDateKey(saved.selectedDistributionDate) || state.selectedDate;
   state.activeAppView = saved.activeAppView || "dashboard";
   state.activeDashboardView = saved.activeDashboardView || "board";
+  state.boardDensity = saved.boardDensity === "comfortable" ? "comfortable" : "compact";
   state.activeShiftTab = saved.activeShiftTab || "early";
   state.distributionViewMode = ["date", "therapist"].includes(saved.distributionViewMode) ? saved.distributionViewMode : "date";
   state.appSettings = saved.appSettings ? restoreAppSettings(saved.appSettings) : cloneAppSettings(samplePrototypeData.settings);
@@ -335,6 +346,7 @@ function loadSampleState() {
   state.selectedDistributionDate = samplePrototypeData.settings.startDate;
   state.activeAppView = "dashboard";
   state.activeDashboardView = "board";
+  state.boardDensity = "compact";
   state.activeShiftTab = "early";
   state.appSettings = cloneAppSettings(samplePrototypeData.settings);
   state.distributionViewMode = "date";
@@ -439,6 +451,13 @@ function renderBoardWorkspace(day = getScheduleDay(state.selectedDate), boardRow
   elements.roomDetailList.innerHTML = renderRoomDetailGroups(boardRows);
   elements.dashboardBoardCanvas.innerHTML = renderBoardTimeline(day, boardRows);
   elements.boardInspectorContent.innerHTML = renderBoardInspector(day);
+  renderBoardDensityState();
+}
+
+function renderBoardDensityState() {
+  elements.boardDensityTabs?.querySelectorAll(".view-tab").forEach((button) => {
+    button.classList.toggle("active", button.dataset.boardDensity === state.boardDensity);
+  });
 }
 
 function renderGeneration() {
@@ -674,7 +693,7 @@ function renderBoardTimeline(day, rows = buildBoardRoomRows(day)) {
   const totalLanes = rows.reduce((count, row) => count + row.lanes.length, 0);
 
   return `
-    <div class="board-timeline">
+    <div class="board-timeline ${state.boardDensity === "comfortable" ? "comfortable" : "compact"}">
       <div class="board-hours">
         <div class="board-hours-label">営業時間</div>
         <div class="board-hours-track">
@@ -2960,6 +2979,7 @@ function persistState() {
       selectedDistributionDate: state.selectedDistributionDate,
       activeAppView: state.activeAppView,
       activeDashboardView: state.activeDashboardView,
+      boardDensity: state.boardDensity,
       activeShiftTab: state.activeShiftTab,
       distributionViewMode: state.distributionViewMode,
       distributionFormat: state.distributionFormat,
