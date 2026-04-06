@@ -713,12 +713,13 @@ function renderBoardTimeline(day, rows = buildBoardRoomRows(day)) {
             <span class="board-group-meta">${totalAssignments}件${overlapRooms ? ` / ${overlapRooms}部屋で重複中` : ""}</span>
           </div>
           <div class="board-group-body">
-            ${rows.map((row, index) => renderBoardLaneRow(row, index)).join("")}
-          </div>
-        </section>
-    </div>
-  `;
-}
+              ${rows.map((row, index) => renderBoardLaneRow(row, index)).join("")}
+            </div>
+          </section>
+        <div class="board-drag-overlay" data-board-drag-overlay></div>
+      </div>
+    `;
+  }
 
 function buildBoardRoomRows(day) {
   const assignmentsByRoom = new Map();
@@ -1494,14 +1495,27 @@ function handleBoardMoveStart(event) {
   event.preventDefault();
   state.selectedBoardAssignmentId = assignment.id;
   const trackRect = track.getBoundingClientRect();
+  const barRect = bar.getBoundingClientRect();
   const settings = getAppSettings();
   const initialStartTime = toMinutes(assignment.startTime);
   const initialEndTime = toMinutes(assignment.endTime);
+  const overlayRoot = elements.dashboardBoardCanvas.querySelector("[data-board-drag-overlay]");
+  const overlayRect = overlayRoot?.getBoundingClientRect();
 
   clearBoardInteractionHighlights();
-  bar.classList.add("dragging", "board-moving");
+  bar.classList.add("board-ghost");
   track.classList.add("drag-origin");
   bar.closest(".board-lane")?.classList.add("drag-source-room");
+
+  const movingBar = bar.cloneNode(true);
+  movingBar.classList.remove("updated");
+  movingBar.classList.add("dragging", "board-moving", "board-moving-overlay");
+  movingBar.style.left = `${barRect.left - (overlayRect?.left || 0)}px`;
+  movingBar.style.top = `${barRect.top - (overlayRect?.top || 0)}px`;
+  movingBar.style.width = `${barRect.width}px`;
+  movingBar.style.height = `${barRect.height}px`;
+  movingBar.style.bottom = "auto";
+  overlayRoot?.appendChild(movingBar);
 
   boardMoveState = {
     assignmentId: assignment.id,
@@ -1514,7 +1528,11 @@ function handleBoardMoveStart(event) {
     sourceTrack: track,
     sourceTrackRect: trackRect,
     bar,
-    subLabel: bar.querySelector(".board-bar-sub"),
+    barOffsetTop: barRect.top - trackRect.top,
+    overlayRoot,
+    overlayRect,
+    movingBar,
+    subLabel: movingBar.querySelector(".board-bar-sub"),
     timelineStart: settings.businessStartHour * 60,
     timelineEnd: settings.businessEndHour * 60,
     moved: false,
@@ -1720,14 +1738,17 @@ function applyBoardMovePreview(moveState, preview) {
   preview.targetTrack?.closest(".board-lane")?.classList.add("drag-target-room");
 
   const total = moveState.timelineEnd - moveState.timelineStart;
-  const left = ((preview.rawStartMinutes - moveState.timelineStart) / total) * 100;
-  const width = Math.max(((preview.rawEndMinutes - preview.rawStartMinutes) / total) * 100, 8);
+  const activeTrackRect = (preview.targetTrack || moveState.sourceTrack).getBoundingClientRect();
+  const overlayRect = moveState.overlayRoot?.getBoundingClientRect() || moveState.overlayRect;
+  const left = activeTrackRect.left - overlayRect.left + (((preview.rawStartMinutes - moveState.timelineStart) / total) * activeTrackRect.width);
+  const width = Math.max((((preview.rawEndMinutes - preview.rawStartMinutes) / total) * activeTrackRect.width), 24);
   const targetRect = (preview.targetTrack || moveState.sourceTrack).getBoundingClientRect();
-  const deltaY = targetRect.top - moveState.sourceTrackRect.top;
+  const top = targetRect.top - overlayRect.top + moveState.barOffsetTop;
 
-  moveState.bar.style.left = `${left}%`;
-  moveState.bar.style.width = `${width}%`;
-  moveState.bar.style.transform = `translateY(${deltaY}px) scale(1.02)`;
+  moveState.movingBar.style.left = `${left}px`;
+  moveState.movingBar.style.top = `${top}px`;
+  moveState.movingBar.style.width = `${width}px`;
+  moveState.movingBar.style.transform = `scale(1.02)`;
   if (moveState.subLabel) {
     moveState.subLabel.textContent = formatBoardTimeLabel(
       minutesToTime(Math.round(preview.rawStartMinutes)),
@@ -1738,10 +1759,8 @@ function applyBoardMovePreview(moveState, preview) {
 }
 
 function cleanupBoardMovePreview(moveState) {
-  moveState.bar.classList.remove("dragging", "board-moving");
-  moveState.bar.style.transform = "";
-  moveState.bar.style.left = "";
-  moveState.bar.style.width = "";
+  moveState.bar.classList.remove("board-ghost");
+  moveState.movingBar?.remove();
   clearBoardInteractionHighlights();
 }
 

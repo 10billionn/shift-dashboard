@@ -1239,6 +1239,7 @@ pre {
   min-width: 920px;
   display: grid;
   gap: 12px;
+  position: relative;
 }
 
 .board-hours {
@@ -1499,6 +1500,14 @@ pre {
     linear-gradient(180deg, rgba(255, 246, 246, 0.92) 0%, rgba(247, 241, 244, 0.92) 100%);
 }
 
+.board-drag-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 500;
+}
+
 #dashboardBoardView .board-track {
   min-height: var(--board-lane-height);
   background:
@@ -1617,6 +1626,19 @@ pre {
   opacity: 0.96;
   box-shadow: 0 26px 38px rgba(17, 36, 63, 0.36);
   z-index: 999;
+}
+
+.board-bar.board-moving-overlay {
+  position: absolute;
+  margin: 0;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.board-bar.board-ghost {
+  opacity: 0.18;
+  filter: saturate(0.8);
+  box-shadow: none;
 }
 
 .board-bar.resizing {
