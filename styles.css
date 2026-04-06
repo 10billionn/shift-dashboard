@@ -88,9 +88,9 @@ pre {
 .sidebar {
   background: rgba(248, 250, 253, 0.9);
   color: var(--text);
-  padding: 10px 16px;
+  padding: 8px 16px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: minmax(190px, auto) minmax(0, 1fr) auto;
   align-items: center;
   gap: 18px;
   position: sticky;
@@ -103,10 +103,11 @@ pre {
 
 .sidebar-brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   padding: 0;
   min-width: fit-content;
+  min-height: 40px;
 }
 
 .brand-kicker,
@@ -134,14 +135,17 @@ pre {
   justify-content: center;
   flex-wrap: wrap;
   gap: 6px;
+  min-height: 40px;
 }
 
 .sidebar-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 12px;
   min-width: fit-content;
+  min-height: 40px;
+  align-self: center;
 }
 
 .nav-item {
@@ -151,8 +155,13 @@ pre {
   text-align: center;
   font-weight: 600;
   padding: 8px 14px;
+  min-height: 40px;
   border-radius: 999px;
   border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .nav-item.active {
@@ -244,11 +253,22 @@ pre {
   margin: 0;
   font-size: 0.72rem;
   white-space: nowrap;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
 }
 
 .sidebar #saveScheduleButton.primary-button {
-  min-width: 120px;
+  min-width: 116px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 999px;
   box-shadow: 0 10px 20px rgba(17, 36, 63, 0.14);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .view {
