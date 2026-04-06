@@ -679,14 +679,16 @@ function renderWeeklyAnalysis() {
   return state.dateList.map((dateKey) => {
     const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
     const isActive = dateKey === state.selectedDate;
+    const shortageTone = day.metrics.shortage >= 4 ? "danger" : day.metrics.shortage >= 2 ? "warning" : "normal";
+    const fillTone = day.metrics.fillRate >= 90 ? "good" : day.metrics.fillRate < 70 ? "weak" : "normal";
     return `
-      <button class="weekly-day ${isActive ? "active" : ""}" type="button" data-date-key="${dateKey}">
+      <button class="weekly-day ${isActive ? "active" : ""} shortage-${shortageTone} fill-${fillTone}" type="button" data-date-key="${dateKey}">
         <strong>${formatShortDate(dateKey)}</strong>
         <span class="field-label">${formatWeekday(dateKey)}</span>
         <div class="fill-bar"><span style="width:${Math.min(day.metrics.fillRate, 100)}%"></span></div>
-        <span class="field-value">充足率 ${day.metrics.fillRate}%</span>
+        <span class="field-value weekly-fill-value">充足率 ${day.metrics.fillRate}%</span>
         <span class="field-value">売上 ${formatCompactYen(day.metrics.salesForecast)}</span>
-        <span class="field-value">不足 ${day.metrics.shortage}枠</span>
+        <span class="field-value weekly-shortage-value">不足 ${day.metrics.shortage}枠</span>
       </button>
     `;
   }).join("");

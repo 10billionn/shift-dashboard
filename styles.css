@@ -384,7 +384,7 @@ pre {
 
 .dashboard-risk-panel {
   padding: 12px 14px;
-  background: linear-gradient(180deg, rgba(250, 252, 255, 0.94), rgba(246, 249, 253, 0.92));
+  background: linear-gradient(180deg, rgba(250, 252, 255, 0.9), rgba(247, 250, 253, 0.86));
   order: 6;
 }
 
@@ -399,7 +399,7 @@ pre {
 
 .dashboard-risk-panel .section-note {
   font-size: 0.72rem;
-  color: rgba(102, 117, 138, 0.68);
+  color: rgba(102, 117, 138, 0.6);
 }
 
 .dashboard-summary-grid .summary-card {
@@ -442,9 +442,10 @@ pre {
   min-height: 74px;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(200, 211, 225, 0.74);
-  background: rgba(248, 250, 253, 0.9);
+  border: 1px solid rgba(200, 211, 225, 0.62);
+  background: rgba(249, 251, 253, 0.82);
   box-shadow: none;
+  backdrop-filter: blur(4px);
 }
 
 .risk-summary-item strong {
@@ -455,7 +456,7 @@ pre {
 .risk-summary-item span {
   font-size: 0.98rem;
   font-weight: 850;
-  color: rgba(23, 34, 48, 0.92);
+  color: rgba(23, 34, 48, 0.86);
 }
 
 .risk-summary-item small {
@@ -465,16 +466,16 @@ pre {
 }
 
 .risk-summary-item.danger {
-  background: linear-gradient(135deg, rgba(198, 84, 84, 0.14), rgba(226, 140, 163, 0.16));
-  border-color: rgba(198, 84, 84, 0.28);
+  background: linear-gradient(135deg, rgba(198, 84, 84, 0.08), rgba(226, 140, 163, 0.1));
+  border-color: rgba(198, 84, 84, 0.18);
 }
 
 .risk-summary-item.warning {
-  background: rgba(255, 247, 223, 0.9);
+  background: rgba(255, 247, 223, 0.78);
 }
 
 .risk-summary-item.ok {
-  background: rgba(234, 248, 239, 0.88);
+  background: rgba(234, 248, 239, 0.78);
 }
 
 .summary-card,
@@ -1306,6 +1307,54 @@ button.weekly-day {
 
 .weekly-day .field-value {
   justify-content: flex-start;
+  background: rgba(248, 250, 253, 0.88);
+}
+
+.weekly-day .weekly-shortage-value,
+.weekly-day .weekly-fill-value {
+  transition: color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.weekly-day.shortage-normal .weekly-shortage-value {
+  color: rgba(27, 36, 50, 0.68);
+}
+
+.weekly-day.shortage-warning {
+  background: linear-gradient(180deg, rgba(255, 250, 242, 0.98), rgba(250, 245, 238, 0.94));
+  border-color: rgba(201, 152, 25, 0.16);
+}
+
+.weekly-day.shortage-danger {
+  background: linear-gradient(180deg, rgba(255, 246, 246, 0.98), rgba(250, 241, 243, 0.94));
+  border-color: rgba(198, 84, 84, 0.18);
+}
+
+.weekly-day.shortage-warning .weekly-shortage-value {
+  color: #9b6b18;
+  background: rgba(255, 247, 223, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(201, 152, 25, 0.08);
+}
+
+.weekly-day.shortage-danger .weekly-shortage-value {
+  color: #9d4a4a;
+  background: rgba(253, 238, 238, 0.76);
+  box-shadow: inset 0 0 0 1px rgba(198, 84, 84, 0.08);
+}
+
+.weekly-day.fill-good .weekly-fill-value {
+  color: #2f7c57;
+  background: rgba(234, 248, 239, 0.76);
+  box-shadow: inset 0 0 0 1px rgba(31, 138, 82, 0.08);
+}
+
+.weekly-day.fill-normal .weekly-fill-value {
+  color: rgba(27, 36, 50, 0.72);
+}
+
+.weekly-day.fill-weak .weekly-fill-value {
+  color: #9d4a4a;
+  background: rgba(253, 238, 238, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(198, 84, 84, 0.08);
 }
 
 .fill-bar {
