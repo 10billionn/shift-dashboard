@@ -64,13 +64,24 @@
               <div class="subsection-head">
                 <div>
                   <h3>選択中のシフト</h3>
-                  <p class="section-note">盤面バーを選ぶと詳細確認ができ、移動や時間調整の結果もここで追えます</p>
+                  <p class="section-note">要約を確認し、必要な時だけ詳細調整を開きます</p>
                 </div>
                 <p id="boardUpdateStatus" class="copy-status"></p>
               </div>
               <div id="boardInspectorContent" class="board-inspector-content"></div>
             </section>
           </section>
+
+          <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-weekly-block" open>
+            <summary class="dashboard-collapsible-summary">
+              <div>
+                <h2>週間分析</h2>
+                <p class="section-note">日付カードを押すと、その日の盤面へ切り替わります</p>
+              </div>
+              <span class="panel-count">週次</span>
+            </summary>
+            <div id="weeklyAnalysis" class="weekly-analysis dashboard-collapsible-body"></div>
+          </details>
 
           <section class="content-panel dashboard-risk-panel">
             <div class="panel-head">
@@ -156,17 +167,6 @@
               <span id="cutCount" class="panel-count"></span>
             </summary>
             <div id="cutShiftList" class="cut-list dashboard-collapsible-body"></div>
-          </details>
-
-          <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-weekly-block">
-            <summary class="dashboard-collapsible-summary">
-              <div>
-                <h2>週間分析</h2>
-                <p class="section-note">補助情報として充足と予測を確認します</p>
-              </div>
-              <span class="panel-count">補助</span>
-            </summary>
-            <div id="weeklyAnalysis" class="weekly-analysis dashboard-collapsible-body"></div>
           </details>
         </section>
 

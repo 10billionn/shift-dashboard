@@ -213,6 +213,7 @@ function bindEvents() {
   elements.dashboardBoardCanvas.addEventListener("mousedown", handleBoardPointerStart);
   elements.boardInspectorContent.addEventListener("change", handleBoardInspectorChange);
   elements.boardInspectorContent.addEventListener("click", handleBoardInspectorAction);
+  elements.weeklyAnalysis.addEventListener("click", handleWeeklyAnalysisClick);
   window.addEventListener("mousemove", handleBoardPointerMove);
   window.addEventListener("mouseup", handleBoardPointerEnd);
 
@@ -677,15 +678,16 @@ function renderCutRows(rows) {
 function renderWeeklyAnalysis() {
   return state.dateList.map((dateKey) => {
     const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
+    const isActive = dateKey === state.selectedDate;
     return `
-      <article class="weekly-day">
+      <button class="weekly-day ${isActive ? "active" : ""}" type="button" data-date-key="${dateKey}">
         <strong>${formatShortDate(dateKey)}</strong>
         <span class="field-label">${formatWeekday(dateKey)}</span>
         <div class="fill-bar"><span style="width:${Math.min(day.metrics.fillRate, 100)}%"></span></div>
         <span class="field-value">充足率 ${day.metrics.fillRate}%</span>
         <span class="field-value">売上 ${formatCompactYen(day.metrics.salesForecast)}</span>
-        <span class="field-value">不足 ${day.metrics.shortage}名</span>
-      </article>
+        <span class="field-value">不足 ${day.metrics.shortage}枠</span>
+      </button>
     `;
   }).join("");
 }
@@ -1099,7 +1101,7 @@ function renderRequestRows() {
 function renderBoardInspector(day) {
   const assignment = findAssignmentById(state.selectedBoardAssignmentId);
   if (!assignment || assignment.dateKey !== day.dateKey) {
-    return `<div class="empty-state">バーを選択すると、ここで部屋・時間・エリア・メモをまとめて調整できます。</div>`;
+    return `<div class="empty-state compact-empty-state">バーを選ぶと、ここで配置と時間だけを素早く確認・調整できます。</div>`;
   }
 
   const profile = samplePrototypeData.therapistProfiles[assignment.name] || { rank: "G", areas: [] };
@@ -1131,84 +1133,64 @@ function renderBoardInspector(day) {
         </div>
       </div>
 
-      <div class="board-inspector-grid">
+      <div class="board-inspector-grid compact-board-inspector-grid">
         <div class="shift-summary-item">
-          <span class="field-label">セラピスト</span>
-          <span class="field-value">${assignment.name}</span>
+          <span class="field-label">配置</span>
+          <span class="field-value">${visualMeta.roomLabel}</span>
         </div>
         <div class="shift-summary-item">
-          <span class="field-label">現在配置</span>
+          <span class="field-label">エリア</span>
           <span class="field-value">${visualMeta.currentArea}</span>
         </div>
         <div class="shift-summary-item">
-          <span class="field-label">希望エリア</span>
+          <span class="field-label">希望</span>
           <span class="field-value">${assignment.preferredArea || "未設定"}</span>
-        </div>
-        <div class="shift-summary-item">
-          <span class="field-label">現在部屋</span>
-          <span class="field-value">${visualMeta.roomLabel}</span>
         </div>
         <div class="shift-summary-item">
           <span class="field-label">状態</span>
           <span class="field-value">${status.label}</span>
         </div>
         <div class="shift-summary-item">
-          <span class="field-label">対応可能</span>
-          <span class="field-value">${profile.areas?.length ? profile.areas.join(" / ") : "未設定"}</span>
+          <span class="field-label">姫</span>
+          <span class="field-value">${assignment.himeReservation === "あり" ? "あり" : "なし"}</span>
         </div>
       </div>
 
-        <div class="alert-box ${statusTone}">
-          <strong>判断理由</strong>
-          <div>${status.reasons.map((reason) => `<div>・${reason}</div>`).join("")}</div>
+      <details class="board-inspector-fold" ${isInvalidTime || assignment.warningArea || overlapInfo.count ? "open" : ""}>
+        <summary class="board-inspector-fold-summary">調整と判断を見る</summary>
+
+        <div class="board-editor-grid compact-board-editor-grid">
+          <label class="field-block">
+            <span class="field-label">部屋</span>
+            <select class="select-input" data-board-field="roomIndex">
+              ${roomOptions.map((roomName, index) => `<option value="${index}" ${normalizeRoomIndex(assignment.roomIndex, position?.slotIndex ?? 0) === index ? "selected" : ""}>${roomName}</option>`).join("")}
+            </select>
+          </label>
+
+          <label class="field-block">
+            <span class="field-label">開始</span>
+            <input class="time-input ${isInvalidTime ? "board-input-invalid" : ""}" type="time" step="900" value="${assignment.startTime}" data-board-field="startTime">
+          </label>
+
+          <label class="field-block">
+            <span class="field-label">終了</span>
+            <input class="time-input ${isInvalidTime ? "board-input-invalid" : ""}" type="time" step="900" value="${assignment.endTime}" data-board-field="endTime">
+          </label>
+
+          <label class="field-block">
+            <span class="field-label">エリア</span>
+            <select class="select-input" data-board-field="assignedArea">
+              ${availableAreas.map((area) => `<option value="${area}" ${area === assignment.assignedArea ? "selected" : ""}>${area}</option>`).join("")}
+            </select>
+          </label>
+
+          <label class="field-block wide">
+            <span class="field-label">メモ</span>
+            <textarea class="text-input board-note-input" data-board-field="note" rows="2" placeholder="終電 / 店泊 / ヘルプ可 など">${escapeHtml(assignment.note || "")}</textarea>
+          </label>
         </div>
 
-        ${overlapInfo.count ? `
-          <div class="alert-box warning">
-            <strong>重複あり</strong>
-            <div>同室で${overlapInfo.count}件重なっています。盤面上ではそのまま仮置きして調整できます。</div>
-          </div>
-        ` : ""}
-
-      ${assignment.generationReasons?.length ? `
-        <div class="alert-box ok">
-          <strong>生成理由</strong>
-          <div>${assignment.generationReasons.map((reason) => `<div>・${reason}</div>`).join("")}</div>
-        </div>
-      ` : ""}
-
-      <div class="board-editor-grid">
-        <label class="field-block">
-          <span class="field-label">部屋</span>
-          <select class="select-input" data-board-field="roomIndex">
-            ${roomOptions.map((roomName, index) => `<option value="${index}" ${normalizeRoomIndex(assignment.roomIndex, position?.slotIndex ?? 0) === index ? "selected" : ""}>${roomName}</option>`).join("")}
-          </select>
-        </label>
-
-        <label class="field-block">
-          <span class="field-label">開始時間</span>
-          <input class="time-input ${isInvalidTime ? "board-input-invalid" : ""}" type="time" step="900" value="${assignment.startTime}" data-board-field="startTime">
-        </label>
-
-        <label class="field-block">
-          <span class="field-label">終了時間</span>
-          <input class="time-input ${isInvalidTime ? "board-input-invalid" : ""}" type="time" step="900" value="${assignment.endTime}" data-board-field="endTime">
-        </label>
-
-        <label class="field-block">
-          <span class="field-label">エリア</span>
-          <select class="select-input" data-board-field="assignedArea">
-            ${availableAreas.map((area) => `<option value="${area}" ${area === assignment.assignedArea ? "selected" : ""}>${area}</option>`).join("")}
-          </select>
-        </label>
-
-        <label class="field-block wide">
-          <span class="field-label">メモ</span>
-          <textarea class="text-input board-note-input" data-board-field="note" rows="3" placeholder="終電 / 店泊 / ヘルプ可 など">${escapeHtml(assignment.note || "")}</textarea>
-        </label>
-      </div>
-
-        <div class="board-quick-actions">
+        <div class="board-quick-actions compact-board-quick-actions">
           <div class="board-quick-actions-group">
             <span class="field-label">全体スライド</span>
             <div class="board-quick-actions-row">
@@ -1219,24 +1201,43 @@ function renderBoardInspector(day) {
             </div>
           </div>
           <div class="board-quick-actions-group">
-            <span class="field-label">開始 / 終了だけ調整</span>
+            <span class="field-label">開始 / 終了</span>
             <div class="board-quick-actions-row">
               <button class="ghost-button" type="button" data-board-action="startEarlier30">開始 -30分</button>
               <button class="ghost-button" type="button" data-board-action="startLater30">開始 +30分</button>
               <button class="ghost-button" type="button" data-board-action="endEarlier30">終了 -30分</button>
               <button class="ghost-button" type="button" data-board-action="endLater30">終了 +30分</button>
+              <button class="ghost-button danger-button" type="button" data-board-action="delete">削除</button>
             </div>
-          </div>
-          <div class="board-quick-actions-row">
-            <button class="ghost-button danger-button" type="button" data-board-action="delete">削除</button>
           </div>
         </div>
 
-      ${isInvalidTime
-        ? `<div class="alert-box warning">営業時間外、または開始/終了の前後関係に注意してください。盤面で整えながら調整できます。</div>`
-        : assignment.warningArea
-          ? `<div class="alert-box warning">この配置は対応可能エリア外です。配置は残しますが、要確認として扱います。</div>`
-          : `<p class="field-help">盤面は仮置き前提です。細かい調整はここで詰めてください。</p>`}
+        ${(isInvalidTime || assignment.warningArea || overlapInfo.count || status.reasons.length || assignment.generationReasons?.length) ? `
+          <div class="board-inspector-alerts">
+            <div class="alert-box ${statusTone}">
+              <strong>判断</strong>
+              <div>${status.reasons.map((reason) => `<div>・${reason}</div>`).join("")}</div>
+            </div>
+            ${overlapInfo.count ? `
+              <div class="alert-box warning">
+                <strong>重複</strong>
+                <div>同室で${overlapInfo.count}件重なっています。</div>
+              </div>
+            ` : ""}
+            ${assignment.generationReasons?.length ? `
+              <div class="alert-box ok">
+                <strong>生成</strong>
+                <div>${assignment.generationReasons.map((reason) => `<div>・${reason}</div>`).join("")}</div>
+              </div>
+            ` : ""}
+            ${isInvalidTime
+              ? `<div class="alert-box warning">営業時間外、または開始/終了の前後関係に注意してください。</div>`
+              : assignment.warningArea
+                ? `<div class="alert-box warning">対応可能エリア外のため要確認です。</div>`
+                : ""}
+          </div>
+        ` : ""}
+      </details>
     </article>
   `;
 }
@@ -3158,6 +3159,16 @@ async function copyDistributionMessage() {
     elements.copyStatus.textContent = "コピーに失敗しました。";
     elements.copyStatus.className = "copy-status error";
   }
+}
+
+function handleWeeklyAnalysisClick(event) {
+  const card = event.target.closest("[data-date-key]");
+  if (!card) return;
+  const nextDateKey = normalizeDateKey(card.dataset.dateKey);
+  if (!nextDateKey || nextDateKey === state.selectedDate) return;
+  state.selectedDate = nextDateKey;
+  persistState();
+  renderDashboard();
 }
 
 function findAssignmentById(id) {
