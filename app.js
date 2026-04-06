@@ -75,6 +75,7 @@ const elements = {
   shiftPanels: Array.from(document.querySelectorAll("[data-shift-panel]")),
   earlyShiftList: document.querySelector("#earlyShiftList"),
   lateShiftList: document.querySelector("#lateShiftList"),
+  roomDetailList: document.querySelector("#roomDetailList"),
   cutShiftList: document.querySelector("#cutShiftList"),
   earlyCount: document.querySelector("#earlyCount"),
   lateCount: document.querySelector("#lateCount"),
@@ -418,6 +419,7 @@ function renderDashboard() {
   elements.shortageSummary.textContent = `${displayShortage}枠`;
   elements.fillSummary.textContent = `${displayFillRate}%`;
   elements.dashboardRiskSummary.innerHTML = renderDashboardRiskSummary();
+  elements.roomDetailList.innerHTML = renderRoomDetailGroups(day);
   elements.earlyShiftList.innerHTML = renderShiftSlots(day.earlyAssignments, "早番", earlySlotTotal);
   elements.lateShiftList.innerHTML = renderShiftSlots(day.lateAssignments, "遅番", lateSlotTotal);
   elements.cutShiftList.innerHTML = renderCutRows(cutRows);
@@ -661,6 +663,8 @@ function renderBoardTimeline(day) {
   const settings = getAppSettings();
   const hourLabels = buildBoardHourLabels(settings.businessStartHour, settings.businessEndHour);
   const rows = buildBoardRoomRows(day);
+  const totalAssignments = rows.reduce((count, row) => count + row.assignments.length, 0);
+  const totalLanes = rows.reduce((count, row) => count + row.lanes.length, 0);
 
   return `
     <div class="board-timeline">
@@ -673,7 +677,7 @@ function renderBoardTimeline(day) {
       <section class="board-group unified-board-group">
         <div class="board-group-head">
           <strong class="board-group-title">部屋ごとの稼働状況</strong>
-          <span class="board-group-meta">${countAssignments(day.earlyAssignments) + countAssignments(day.lateAssignments)}件 / ${rows.length}レーン</span>
+          <span class="board-group-meta">${totalAssignments}件 / ${totalLanes}レーン</span>
         </div>
         <div class="board-group-body">
           ${rows.map((row, index) => renderBoardLaneRow(row, index)).join("")}
@@ -689,30 +693,38 @@ function buildBoardRoomRows(day) {
     const assignments = [day.earlyAssignments[index], day.lateAssignments[index]]
       .filter(Boolean)
       .sort((left, right) => toMinutes(left.startTime) - toMinutes(right.startTime));
+    const lanes = packAssignmentsIntoBoardLanes(assignments);
     return {
       slotIndex: index,
       roomLabel: getRoomLabel(index),
       assignments,
+      lanes,
       type: assignments.length ? "assigned" : "empty"
     };
   });
 }
 
 function renderBoardLaneRow(row, index) {
-  const markup = row.assignments.length
-    ? row.assignments.map((assignment) => renderBoardBar(assignment, row.slotIndex, assignment.shiftType)).join("")
-    : `<div class="board-gap board-gap-empty">空き時間あり</div>`;
+  const trackMarkup = row.lanes.length
+    ? row.lanes.map((lane, laneIndex) => `
+        <div class="board-track" data-board-slot-index="${row.slotIndex}" data-board-lane-index="${laneIndex}">
+          ${lane.map((assignment) => renderBoardBar(assignment, row.slotIndex, assignment.shiftType)).join("")}
+        </div>
+      `).join("")
+    : `
+      <div class="board-track board-track-empty" data-board-slot-index="${row.slotIndex}" data-board-lane-index="0">
+        <div class="board-gap board-gap-empty">空き時間あり</div>
+      </div>
+    `;
 
   return `
     <div class="board-lane">
       <div class="board-lane-head">
         <strong class="board-lane-title">${row.roomLabel}</strong>
-        <span class="board-lane-meta">${row.assignments.length ? `${row.assignments.length}件稼働中` : "空き多め"}</span>
+        <span class="board-lane-meta">${row.assignments.length ? `${row.assignments.length}件 / ${row.lanes.length}レーン` : "空き多め"}</span>
       </div>
       <div class="board-track-wrap">
-        <div class="board-track" data-board-slot-index="${row.slotIndex}">
-          ${markup}
-        </div>
+        ${trackMarkup}
       </div>
     </div>
   `;
@@ -783,6 +795,88 @@ function packAssignmentsIntoBoardLanes(assignments) {
   });
 
   return lanes;
+}
+
+function renderRoomDetailGroups(day) {
+  const rows = buildBoardRoomRows(day);
+  const activeRows = rows.filter((row) => row.assignments.length);
+
+  if (!activeRows.length) {
+    return `<div class="empty-state">この日の詳細確認対象はまだありません。</div>`;
+  }
+
+  return activeRows.map((row) => `
+    <article class="room-detail-card">
+      <div class="room-detail-head">
+        <div>
+          <strong class="room-detail-title">${row.roomLabel}</strong>
+          <p class="room-detail-note">${row.assignments.length}件 / ${row.lanes.length}レーンで稼働</p>
+        </div>
+        <span class="panel-count">${row.assignments.length}件</span>
+      </div>
+      <div class="room-detail-items">
+        ${row.assignments
+          .slice()
+          .sort((left, right) => toMinutes(left.startTime) - toMinutes(right.startTime) || toMinutes(left.endTime) - toMinutes(right.endTime))
+          .map((assignment) => renderRoomDetailItem(assignment))
+          .join("")}
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderRoomDetailItem(assignment) {
+  const profile = samplePrototypeData.therapistProfiles[assignment.name] || { rank: "G", flags: [] };
+  const attendance = selectAttendanceFlag(profile.flags || []);
+  const tags = buildPriorityTags(assignment);
+  const status = analyzeAssignmentStatus(assignment, profile);
+  const cardClass = status.level === "danger"
+    ? "danger-slot"
+    : assignment.warningArea
+      ? "warning-slot"
+      : assignment.himeReservation === "あり"
+        ? "booked-slot"
+        : "";
+  const statusBadgeClass = status.level === "danger"
+    ? "danger"
+    : assignment.warningArea
+      ? "warning"
+      : assignment.himeReservation === "あり"
+        ? "booked"
+        : "gray";
+
+  return `
+    <article class="shift-card slot-card room-detail-item area-${areaClassName(assignment.assignedArea)} ${cardClass}" data-assignment-id="${assignment.id}">
+      <div class="shift-card-top">
+        <div>
+          <strong class="therapist-name">${assignment.name}</strong>
+          <div class="field-help">${assignment.startTime}-${assignment.endTime} / ${assignment.assignedArea}</div>
+        </div>
+        <div class="status-row tight">
+          <span class="mini-badge rank">${profile.rank}</span>
+          <span class="mini-badge">${attendance}</span>
+          <span class="mini-badge ${statusBadgeClass} ${assignment.himeReservation === "あり" ? "hime-accent" : ""}">${status.level === "danger" ? "危険" : assignment.warningArea ? "要確認" : assignment.himeReservation === "あり" ? "姫あり" : "通常"}</span>
+        </div>
+      </div>
+      <div class="shift-summary-grid slot-summary-grid room-detail-summary">
+        <div class="shift-summary-item">
+          <span class="field-label">時間</span>
+          <span class="field-value">${assignment.startTime}-${assignment.endTime}</span>
+        </div>
+        <div class="shift-summary-item">
+          <span class="field-label">エリア</span>
+          <span class="field-value">${assignment.assignedArea}</span>
+        </div>
+        <div class="shift-summary-item">
+          <span class="field-label">状態</span>
+          <span class="field-value">${status.label}</span>
+        </div>
+      </div>
+      <div class="priority-row">
+        ${tags.length ? tags.filter((tag) => tag !== "要確認").map((tag) => `<span class="priority-tag ${tag === "姫予約あり" ? "hime" : ""}">${tag}</span>`).join("") : `<span class="field-label">補助条件なし</span>`}
+      </div>
+    </article>
+  `;
 }
 
 function renderGenerationAlerts(checkSummary) {
