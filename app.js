@@ -2289,6 +2289,10 @@ function syncSelectedBoardAssignment() {
 
 function updateAssignmentArea(assignmentId, nextArea, options = {}) {
   const row = state.generationRows.find((item) => item.id === assignmentId);
+  if (row) {
+    row.preferredArea = nextArea;
+    row.issues = collectRowIssues(row);
+  }
 
   Object.values(state.generatedSchedule).forEach((day) => {
     [...day.earlyAssignments, ...day.lateAssignments].forEach((assignment) => {
@@ -2346,6 +2350,8 @@ function updateBoardAssignmentFields(assignmentId, updates, options = {}) {
   const row = state.generationRows.find((item) => item.id === assignmentId);
   if (row) {
     if (typeof updates.note === "string") row.note = updates.note;
+    if (typeof updates.startTime === "string") row.startTime = updates.startTime;
+    if (typeof updates.endTime === "string") row.endTime = updates.endTime;
     row.issues = collectRowIssues(row);
   }
 
