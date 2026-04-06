@@ -788,10 +788,16 @@ function renderBoardBar(assignment, slotIndex, shiftType) {
   const densityClass = width < 12 ? "tiny" : width < 20 ? "compact" : "full";
   const status = analyzeAssignmentStatus(assignment, profile);
   const compactTime = `${assignment.startTime}-${assignment.endTime}`;
+  const compactTimeShort = formatBoardTimeLabel(assignment.startTime, assignment.endTime, true);
   const reservationLabel = assignment.himeReservation === "あり" ? "姫" : "";
   const barTitle = `${assignment.name} / ${compactTime}${visualMeta.currentArea ? ` / ${visualMeta.currentArea}` : ""}${reservationLabel ? ` / ${reservationLabel}` : ""}`;
-  const showTime = state.boardDensity === "comfortable" ? densityClass !== "tiny" : densityClass === "full";
+  const showTime = true;
   const showPin = assignment.himeReservation === "あり" && (state.boardDensity === "comfortable" || densityClass === "full");
+  const timeLabel = state.boardDensity === "comfortable"
+    ? compactTime
+    : densityClass === "full"
+      ? compactTime
+      : compactTimeShort;
 
   return `
     <button
@@ -808,7 +814,7 @@ function renderBoardBar(assignment, slotIndex, shiftType) {
       ${showPin ? `<span class="board-bar-pin">姫</span>` : ""}
       <span class="board-bar-inline">
         <span class="board-bar-name">${assignment.name}</span>
-        ${showTime ? `<span class="board-bar-sub">${compactTime}</span>` : ""}
+        ${showTime ? `<span class="board-bar-sub">${timeLabel}</span>` : ""}
       </span>
     </button>
   `;
@@ -2867,6 +2873,11 @@ function formatHourLabel(timeText) {
     return `${hours}`;
   }
   return `${hours}:${String(minutes).padStart(2, "0")}`;
+}
+
+function formatBoardTimeLabel(startTime, endTime, compact = false) {
+  if (!compact) return `${startTime}-${endTime}`;
+  return `${formatHourLabel(startTime)}-${formatHourLabel(endTime)}`;
 }
 
 function formatYen(value) {
