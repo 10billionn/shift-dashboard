@@ -790,6 +790,8 @@ function renderBoardBar(assignment, slotIndex, shiftType) {
   const compactTime = `${assignment.startTime}-${assignment.endTime}`;
   const reservationLabel = assignment.himeReservation === "あり" ? "姫" : "";
   const barTitle = `${assignment.name} / ${compactTime}${visualMeta.currentArea ? ` / ${visualMeta.currentArea}` : ""}${reservationLabel ? ` / ${reservationLabel}` : ""}`;
+  const showTime = state.boardDensity === "comfortable" ? densityClass !== "tiny" : densityClass === "full";
+  const showPin = assignment.himeReservation === "あり" && (state.boardDensity === "comfortable" || densityClass === "full");
 
   return `
     <button
@@ -803,10 +805,10 @@ function renderBoardBar(assignment, slotIndex, shiftType) {
       style="left:${left}%; width:${width}%;">
       <span class="board-resize-handle left" data-resize-handle="start" data-board-assignment-id="${assignment.id}"></span>
       <span class="board-resize-handle right" data-resize-handle="end" data-board-assignment-id="${assignment.id}"></span>
-      ${assignment.himeReservation === "あり" ? `<span class="board-bar-pin">姫</span>` : ""}
+      ${showPin ? `<span class="board-bar-pin">姫</span>` : ""}
       <span class="board-bar-inline">
         <span class="board-bar-name">${assignment.name}</span>
-        ${densityClass === "full" ? `<span class="board-bar-sub">${compactTime}</span>` : ""}
+        ${showTime ? `<span class="board-bar-sub">${compactTime}</span>` : ""}
       </span>
     </button>
   `;

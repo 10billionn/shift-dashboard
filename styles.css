@@ -1582,7 +1582,7 @@ pre {
 .board-bar-inline {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   width: 100%;
 }
@@ -1594,6 +1594,8 @@ pre {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .board-bar-sub {
@@ -1624,6 +1626,13 @@ pre {
   min-width: 22px;
   min-height: 18px;
   font-size: 0.62rem;
+}
+
+.board-timeline.compact .board-bar-pin {
+  min-width: 20px;
+  min-height: 16px;
+  padding: 0 4px;
+  font-size: 0.58rem;
 }
 
 .board-density-tabs {
