@@ -822,7 +822,7 @@ function renderRoomDetailGroups(day) {
       <div class="room-detail-head">
         <div>
           <strong class="room-detail-title">${row.roomLabel}</strong>
-          <p class="room-detail-note">${row.assignments.length}件 / ${row.lanes.length}レーンで稼働</p>
+          <p class="room-detail-note">${row.assignments.length}件 / ${row.lanes.length}レーンで稼働${row.lanes.length > 1 ? " / 同室仮置きあり" : ""}</p>
         </div>
         <span class="panel-count">${row.assignments.length}件</span>
       </div>
