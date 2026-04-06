@@ -690,10 +690,10 @@ function renderBoardTimeline(day, rows = buildBoardRoomRows(day)) {
   const settings = getAppSettings();
   const hourLabels = buildBoardHourLabels(settings.businessStartHour, settings.businessEndHour);
   const totalAssignments = rows.reduce((count, row) => count + row.assignments.length, 0);
-  const totalLanes = rows.reduce((count, row) => count + row.lanes.length, 0);
+  const overlapRooms = rows.filter((row) => row.overlapCount > 0).length;
 
   return `
-    <div class="board-timeline ${state.boardDensity === "comfortable" ? "comfortable" : "compact"}">
+      <div class="board-timeline ${state.boardDensity === "comfortable" ? "comfortable" : "compact"}">
       <div class="board-hours">
         <div class="board-hours-label">営業時間</div>
         <div class="board-hours-track">
@@ -703,15 +703,15 @@ function renderBoardTimeline(day, rows = buildBoardRoomRows(day)) {
           }).join("")}
         </div>
       </div>
-      <section class="board-group unified-board-group">
-        <div class="board-group-head">
-          <strong class="board-group-title">部屋ごとの稼働状況</strong>
-          <span class="board-group-meta">${totalAssignments}件 / ${totalLanes}レーン</span>
-        </div>
-        <div class="board-group-body">
-          ${rows.map((row, index) => renderBoardLaneRow(row, index)).join("")}
-        </div>
-      </section>
+        <section class="board-group unified-board-group">
+          <div class="board-group-head">
+            <strong class="board-group-title">部屋ごとの稼働状況</strong>
+            <span class="board-group-meta">${totalAssignments}件${overlapRooms ? ` / ${overlapRooms}部屋で重複中` : ""}</span>
+          </div>
+          <div class="board-group-body">
+            ${rows.map((row, index) => renderBoardLaneRow(row, index)).join("")}
+          </div>
+        </section>
     </div>
   `;
 }
@@ -730,29 +730,31 @@ function buildBoardRoomRows(day) {
   appendAssignments(day.earlyAssignments);
   appendAssignments(day.lateAssignments);
 
-  return Array.from({ length: maxRoomIndex + 1 }, (_, index) => {
-    const assignments = (assignmentsByRoom.get(index) || [])
-      .slice()
-      .sort((left, right) => toMinutes(left.startTime) - toMinutes(right.startTime));
-    const lanes = packAssignmentsIntoBoardLanes(assignments);
-    return {
-      slotIndex: index,
-      roomLabel: getRoomLabel(index),
-      assignments,
-      lanes,
-      type: assignments.length ? "assigned" : "empty"
-    };
-  });
-}
+    return Array.from({ length: maxRoomIndex + 1 }, (_, index) => {
+      const assignments = (assignmentsByRoom.get(index) || [])
+        .slice()
+        .sort((left, right) => toMinutes(left.startTime) - toMinutes(right.startTime));
+      const stackedAssignments = buildBoardStackedAssignments(assignments);
+      return {
+        slotIndex: index,
+        roomLabel: getRoomLabel(index),
+        assignments,
+        stackedAssignments,
+        overlapCount: stackedAssignments.filter((item) => item.isOverlapping).length,
+        stackDepth: stackedAssignments.reduce((max, item) => Math.max(max, item.stackIndex + 1), 1),
+        type: assignments.length ? "assigned" : "empty"
+      };
+    });
+  }
 
 function renderBoardLaneRow(row, index) {
   const isSelectedRoom = row.assignments.some((assignment) => assignment.id === state.selectedBoardAssignmentId);
-  const trackMarkup = row.lanes.length
-    ? row.lanes.map((lane, laneIndex) => `
-        <div class="board-track" data-board-slot-index="${row.slotIndex}" data-board-lane-index="${laneIndex}">
-          ${lane.map((assignment) => renderBoardBar(assignment, row.slotIndex, assignment.shiftType)).join("")}
+  const trackMarkup = row.assignments.length
+    ? `
+        <div class="board-track ${row.overlapCount ? "board-track-overlap" : ""}" data-board-slot-index="${row.slotIndex}" data-board-lane-index="0">
+          ${row.stackedAssignments.map((item) => renderBoardBar(item.assignment, row.slotIndex, item.assignment.shiftType, item)).join("")}
         </div>
-      `).join("")
+      `
     : `
       <div class="board-track board-track-empty" data-board-slot-index="${row.slotIndex}" data-board-lane-index="0">
         <div class="board-gap board-gap-empty">空き時間あり</div>
@@ -760,19 +762,19 @@ function renderBoardLaneRow(row, index) {
     `;
 
   return `
-      <div class="board-lane ${row.lanes.length > 1 ? "stacked" : ""} ${isSelectedRoom ? "active-room" : ""}">
-      <div class="board-lane-head">
-        <strong class="board-lane-title">${row.roomLabel}</strong>
-        <span class="board-lane-meta">${row.assignments.length ? `<span>${row.assignments.length}件</span><span>${row.lanes.length}レーン</span>${row.lanes.length > 1 ? `<span>仮置き</span>` : ""}` : "空き多め"}</span>
-      </div>
-      <div class="board-track-wrap">
-        ${trackMarkup}
-      </div>
+        <div class="board-lane ${row.overlapCount ? "stacked overlapping-room" : ""} ${isSelectedRoom ? "active-room" : ""}">
+        <div class="board-lane-head">
+          <strong class="board-lane-title">${row.roomLabel}</strong>
+          <span class="board-lane-meta">${row.assignments.length ? `<span>${row.assignments.length}件</span>${row.overlapCount ? `<span>${row.stackDepth}重なり</span><span>仮置き</span>` : ""}` : "空き多め"}</span>
+        </div>
+        <div class="board-track-wrap">
+          ${trackMarkup}
+        </div>
     </div>
   `;
 }
 
-function renderBoardBar(assignment, slotIndex, shiftType) {
+function renderBoardBar(assignment, slotIndex, shiftType, stackMeta = null) {
   const settings = getAppSettings();
   const profile = samplePrototypeData.therapistProfiles[assignment.name] || { flags: [], rank: "G" };
   const visualMeta = getAssignmentVisualMeta(assignment, slotIndex);
@@ -800,20 +802,20 @@ function renderBoardBar(assignment, slotIndex, shiftType) {
       ? compactTime
       : compactTimeShort;
 
-  return `
-    <button
-      class="board-bar ${densityClass} area-${visualMeta.colorKey} ${assignment.himeReservation === "あり" ? "has-pin is-hime" : ""} ${status.level === "danger" ? "is-danger" : ""} ${status.level === "warning" ? "is-warning" : ""} ${assignment.id === state.selectedBoardAssignmentId ? "selected" : ""} ${assignment.id === state.updatedBoardAssignmentId ? "updated" : ""}"
-      type="button"
-      draggable="true"
-      title="${escapeHtml(barTitle)}"
-      data-board-assignment-id="${assignment.id}"
-      data-board-shift-type="${shiftType}"
-      data-board-slot-index="${slotIndex}"
-      style="left:${left}%; width:${width}%;">
-      <span class="board-resize-handle left" data-resize-handle="start" data-board-assignment-id="${assignment.id}"></span>
-      <span class="board-resize-handle right" data-resize-handle="end" data-board-assignment-id="${assignment.id}"></span>
-      ${showPin ? `<span class="board-bar-pin">姫</span>` : ""}
-      <span class="board-bar-inline">
+    return `
+      <button
+        class="board-bar ${densityClass} area-${visualMeta.colorKey} ${assignment.himeReservation === "あり" ? "has-pin is-hime" : ""} ${status.level === "danger" ? "is-danger" : ""} ${status.level === "warning" ? "is-warning" : ""} ${stackMeta?.isOverlapping ? "overlap" : ""} ${assignment.id === state.selectedBoardAssignmentId ? "selected" : ""} ${assignment.id === state.updatedBoardAssignmentId ? "updated" : ""}"
+        type="button"
+        draggable="true"
+        title="${escapeHtml(barTitle)}"
+        data-board-assignment-id="${assignment.id}"
+        data-board-shift-type="${shiftType}"
+        data-board-slot-index="${slotIndex}"
+        style="left:${left}%; width:${width}%; --board-stack-offset:${(stackMeta?.stackIndex || 0) * 4}px;">
+        <span class="board-resize-handle left" data-resize-handle="start" data-board-assignment-id="${assignment.id}"></span>
+        <span class="board-resize-handle right" data-resize-handle="end" data-board-assignment-id="${assignment.id}"></span>
+        ${showPin ? `<span class="board-bar-pin">姫</span>` : ""}
+        <span class="board-bar-inline">
         <span class="board-bar-name">${assignment.name}</span>
         ${showTime ? `<span class="board-bar-sub">${timeLabel}</span>` : ""}
       </span>
@@ -821,28 +823,46 @@ function renderBoardBar(assignment, slotIndex, shiftType) {
   `;
 }
 
-function packAssignmentsIntoBoardLanes(assignments) {
+function buildBoardStackedAssignments(assignments) {
   const sortedAssignments = assignments
     .slice()
     .sort((left, right) => toMinutes(left.startTime) - toMinutes(right.startTime) || toMinutes(left.endTime) - toMinutes(right.endTime));
-  const lanes = [];
+  const active = [];
+  const stackUsage = new Set();
+  const overlapIds = new Set();
 
-  sortedAssignments.forEach((assignment) => {
+  return sortedAssignments.map((assignment) => {
     const start = toMinutes(assignment.startTime);
-    const targetLane = lanes.find((lane) => {
-      const last = lane[lane.length - 1];
-      return toMinutes(last.endTime) <= start;
-    });
+    const end = toMinutes(assignment.endTime);
 
-    if (targetLane) {
-      targetLane.push(assignment);
-      return;
+    for (let index = active.length - 1; index >= 0; index -= 1) {
+      if (active[index].end <= start) {
+        stackUsage.delete(active[index].stackIndex);
+        active.splice(index, 1);
+      }
     }
 
-    lanes.push([assignment]);
-  });
+    let stackIndex = 0;
+    while (stackUsage.has(stackIndex)) stackIndex += 1;
 
-  return lanes;
+    if (active.length) {
+      overlapIds.add(assignment.id);
+      active.forEach((item) => overlapIds.add(item.assignment.id));
+    }
+
+    const stacked = {
+      assignment,
+      stackIndex,
+      isOverlapping: false
+    };
+
+    active.push({ assignment, end, stackIndex });
+    stackUsage.add(stackIndex);
+    return stacked;
+  }).map((item) => ({
+    ...item,
+    isOverlapping: overlapIds.has(item.assignment.id)
+  }));
 }
 
 function renderRoomDetailGroups(rows) {
@@ -852,15 +872,15 @@ function renderRoomDetailGroups(rows) {
     return `<div class="empty-state">この日の詳細確認対象はまだありません。</div>`;
   }
 
-  return activeRows.map((row) => `
-    <article class="room-detail-card">
-      <div class="room-detail-head">
-        <div>
-          <strong class="room-detail-title">${row.roomLabel}</strong>
-          <p class="room-detail-note">${row.assignments.length}件 / ${row.lanes.length}レーンで稼働${row.lanes.length > 1 ? " / 同室仮置きあり" : ""}</p>
+    return activeRows.map((row) => `
+      <article class="room-detail-card">
+        <div class="room-detail-head">
+          <div>
+            <strong class="room-detail-title">${row.roomLabel}</strong>
+            <p class="room-detail-note">${row.assignments.length}件で稼働${row.overlapCount ? ` / 同室仮置き ${row.overlapCount}件` : ""}</p>
+          </div>
+          <span class="panel-count">${row.assignments.length}件</span>
         </div>
-        <span class="panel-count">${row.assignments.length}件</span>
-      </div>
       <div class="room-detail-items">
         ${row.assignments
           .slice()
@@ -1084,13 +1104,14 @@ function renderBoardInspector(day) {
   const position = findAssignmentPosition(day.dateKey, assignment.id);
   const visualMeta = getAssignmentVisualMeta(assignment, position?.slotIndex ?? 0);
   const status = analyzeAssignmentStatus(assignment, profile);
-  const statusTone = status.level === "danger" ? "danger" : status.level === "warning" ? "warning" : "ok";
+    const statusTone = status.level === "danger" ? "danger" : status.level === "warning" ? "warning" : "ok";
   const settings = getAppSettings();
   const startMinutes = toMinutes(assignment.startTime);
   const endMinutes = toMinutes(assignment.endTime);
-  const isInvalidTime = startMinutes >= endMinutes
-    || startMinutes < settings.businessStartHour * 60
-    || endMinutes > settings.businessEndHour * 60;
+    const isInvalidTime = startMinutes >= endMinutes
+      || startMinutes < settings.businessStartHour * 60
+      || endMinutes > settings.businessEndHour * 60;
+    const overlapInfo = getAssignmentOverlapInfo(day.dateKey, assignment.id);
 
   return `
     <article class="board-inspector-card">
@@ -1133,10 +1154,17 @@ function renderBoardInspector(day) {
         </div>
       </div>
 
-      <div class="alert-box ${statusTone}">
-        <strong>判断理由</strong>
-        <div>${status.reasons.map((reason) => `<div>・${reason}</div>`).join("")}</div>
-      </div>
+        <div class="alert-box ${statusTone}">
+          <strong>判断理由</strong>
+          <div>${status.reasons.map((reason) => `<div>・${reason}</div>`).join("")}</div>
+        </div>
+
+        ${overlapInfo.count ? `
+          <div class="alert-box warning">
+            <strong>重複あり</strong>
+            <div>${overlapInfo.count}件と同室・同時間帯で重なっています。盤面上では仮置きのまま調整できます。</div>
+          </div>
+        ` : ""}
 
       ${assignment.generationReasons?.length ? `
         <div class="alert-box ok">
@@ -2224,6 +2252,23 @@ function buildAssignmentWarnings(assignment, assignmentsForDay) {
   }
   if (assignment.assignedArea && sameAreaCount >= concentrationThreshold) warnings.push("同一エリア偏り");
   return warnings;
+}
+
+function getAssignmentOverlapInfo(dateKey, assignmentId) {
+  const assignment = findAssignmentById(assignmentId);
+  if (!assignment) return { count: 0, names: [] };
+  const roomIndex = normalizeRoomIndex(assignment.roomIndex, 0);
+  const day = state.generatedSchedule[dateKey];
+  if (!day) return { count: 0, names: [] };
+  const overlaps = [...day.earlyAssignments, ...day.lateAssignments]
+    .filter(Boolean)
+    .filter((item) => item.id !== assignmentId)
+    .filter((item) => normalizeRoomIndex(item.roomIndex, 0) === roomIndex)
+    .filter((item) => isTimeOverlapping(item, assignment));
+  return {
+    count: overlaps.length,
+    names: overlaps.map((item) => item.name)
+  };
 }
 
 function isWeakHimePlacement(assignment) {
