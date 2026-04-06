@@ -1422,7 +1422,7 @@ pre {
   align-items: center;
   min-width: 0;
   min-height: var(--board-lane-height);
-  padding-block: 2px;
+  padding: 2px 0;
 }
 
 .board-lane.active-room .board-lane-head {
@@ -1467,10 +1467,6 @@ pre {
   font-size: 0.79rem;
   color: rgba(27, 36, 50, 0.88);
   white-space: nowrap;
-}
-
-.board-lane-meta {
-  display: none;
 }
 
 .board-track-wrap {
