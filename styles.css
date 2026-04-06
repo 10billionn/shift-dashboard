@@ -332,6 +332,12 @@ pre {
   gap: 8px;
 }
 
+#dashboardViewTabs,
+#boardDensityTabs,
+.hero-panel .inline-meta {
+  display: none !important;
+}
+
 .meta-chip,
 .panel-count,
 .status-pill,
@@ -597,7 +603,26 @@ pre {
   margin-top: -8px;
   border-color: rgba(46, 107, 203, 0.18);
   box-shadow: 0 18px 40px rgba(17, 36, 63, 0.08);
-  padding-top: 8px;
+  padding-top: 10px;
+}
+
+.hero-panel .panel-head,
+#dashboardBoardView .panel-head {
+  justify-content: flex-start;
+  align-items: end;
+}
+
+.hero-panel .panel-head {
+  margin-bottom: 2px;
+}
+
+.hero-panel .toolbar-row {
+  justify-content: flex-start;
+  gap: 12px;
+}
+
+#dashboardBoardView .panel-head {
+  margin-bottom: 6px;
 }
 
 #dashboardListView {
