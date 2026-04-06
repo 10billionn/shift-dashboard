@@ -298,12 +298,12 @@ pre {
 }
 
 .hero-panel {
-  background: linear-gradient(135deg, rgba(17, 36, 63, 0.98), rgba(39, 71, 119, 0.98));
+  background: linear-gradient(135deg, rgba(17, 36, 63, 0.9), rgba(39, 71, 119, 0.88));
   color: #fff;
-  padding: 8px 12px;
+  padding: 6px 10px;
   margin-top: -2px;
   margin-bottom: -4px;
-  box-shadow: 0 14px 30px rgba(17, 36, 63, 0.12);
+  box-shadow: 0 12px 24px rgba(17, 36, 63, 0.1);
 }
 
 .hero-panel .selected-date-label,
@@ -1347,13 +1347,13 @@ pre {
   text-align: left;
   color: var(--muted);
   font-size: 0.74rem;
-  border-left: 1px solid rgba(200, 211, 225, 0.42);
+  border-left: 1px solid rgba(200, 211, 225, 0.22);
 }
 
 .board-hour-cell.major {
   color: var(--navy);
   font-weight: 800;
-  border-left-color: rgba(46, 107, 203, 0.28);
+  border-left-color: rgba(46, 107, 203, 0.2);
 }
 
 .board-hour-cell:first-child {
@@ -1470,18 +1470,18 @@ pre {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  color: rgba(110, 124, 144, 0.68);
-  font-size: 0.64rem;
+  color: rgba(110, 124, 144, 0.62);
+  font-size: 0.62rem;
 }
 
 .board-lane-meta span {
   display: inline-flex;
   align-items: center;
-  min-height: 20px;
-  padding: 1px 7px;
+  min-height: 18px;
+  padding: 0 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(200, 211, 225, 0.36);
+  background: rgba(255, 255, 255, 0.54);
+  border: 1px solid rgba(200, 211, 225, 0.26);
 }
 
 .board-track-wrap {
@@ -1500,8 +1500,8 @@ pre {
   background:
       repeating-linear-gradient(
         to right,
-        rgba(200, 211, 225, 0.22) 0,
-        rgba(200, 211, 225, 0.22) 1px,
+          rgba(200, 211, 225, 0.14) 0,
+          rgba(200, 211, 225, 0.14) 1px,
         transparent 1px,
         transparent calc(100% / 17)
       ),
@@ -1514,8 +1514,8 @@ pre {
   background:
       repeating-linear-gradient(
         to right,
-        rgba(200, 211, 225, 0.2) 0,
-        rgba(200, 211, 225, 0.2) 1px,
+        rgba(200, 211, 225, 0.12) 0,
+        rgba(200, 211, 225, 0.12) 1px,
         transparent 1px,
         transparent calc(100% / 17)
       ),
@@ -1732,14 +1732,15 @@ pre {
 
 .board-bar:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 22px rgba(17, 36, 63, 0.18);
+  box-shadow: 0 14px 24px rgba(17, 36, 63, 0.2);
   z-index: 3;
+  cursor: grab;
 }
 
 .board-bar.dragging {
   opacity: 0.74;
   filter: saturate(1.02) brightness(1.04);
-  transform: translateY(-2px) scale(1.015);
+  transform: translateY(-2px) scale(1.02);
   box-shadow: 0 20px 30px rgba(17, 36, 63, 0.28);
   z-index: 8;
 }
@@ -1936,12 +1937,13 @@ pre {
 
 .board-gap {
   position: absolute;
-  inset: 8px;
+  inset: 8px 10px;
   border-radius: 12px;
-  display: grid;
-  place-items: center;
-  font-size: 0.74rem;
-  font-weight: 700;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  font-size: 0.64rem;
+  font-weight: 600;
 }
 
 .board-gap-shortage {
@@ -1952,10 +1954,10 @@ pre {
 }
 
 .board-gap-empty {
-  border: 1px dashed rgba(188, 200, 218, 0.95);
+  border: 1px dashed rgba(188, 200, 218, 0.62);
   background:
-    linear-gradient(180deg, rgba(247, 249, 252, 0.9), rgba(241, 245, 250, 0.82));
-  color: rgba(102, 117, 138, 0.84);
+      linear-gradient(180deg, rgba(247, 249, 252, 0.86), rgba(241, 245, 250, 0.74));
+  color: rgba(110, 124, 144, 0.72);
 }
 
 .board-inspector {

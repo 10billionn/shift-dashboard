@@ -707,12 +707,12 @@ function renderBoardTimeline(day, rows = buildBoardRoomRows(day)) {
           }).join("")}
         </div>
       </div>
-        <section class="board-group unified-board-group">
-          <div class="board-group-head">
-            <strong class="board-group-title">部屋ごとの稼働状況</strong>
-            <span class="board-group-meta">${totalAssignments}件${overlapRooms ? ` / ${overlapRooms}部屋で重複中` : ""}</span>
-          </div>
-          <div class="board-group-body">
+          <section class="board-group unified-board-group">
+            <div class="board-group-head">
+              <strong class="board-group-title">シフト</strong>
+              <span class="board-group-meta">${totalAssignments}${overlapRooms ? ` / ${overlapRooms}` : ""}</span>
+            </div>
+            <div class="board-group-body">
               ${rows.map((row, index) => renderBoardLaneRow(row, index)).join("")}
             </div>
           </section>
@@ -760,20 +760,24 @@ function renderBoardLaneRow(row, index) {
           ${row.stackedAssignments.map((item) => renderBoardBar(item.assignment, row.slotIndex, item.assignment.shiftType, item)).join("")}
         </div>
       `
-    : `
-      <div class="board-track board-track-empty" data-board-slot-index="${row.slotIndex}" data-board-lane-index="0">
-        <div class="board-gap board-gap-empty">空き時間あり</div>
-      </div>
-    `;
+      : `
+        <div class="board-track board-track-empty" data-board-slot-index="${row.slotIndex}" data-board-lane-index="0">
+        <div class="board-gap board-gap-empty">空き</div>
+        </div>
+      `;
+
+  const roomMeta = row.assignments.length
+    ? `${row.assignments.length}${row.hasOverlap ? ` • ${row.overlapCount}` : ""}`
+    : "空き";
 
   return `
-          <div class="board-lane ${row.hasOverlap ? "overlapping-room" : ""} ${isSelectedRoom ? "active-room" : ""}">
-          <div class="board-lane-head">
-            <strong class="board-lane-title">${row.roomLabel}</strong>
-            <span class="board-lane-meta">${row.assignments.length ? `<span>${row.assignments.length}件</span>${row.hasOverlap ? `<span>重なり中</span><span>仮置き</span>` : ""}` : "空き多め"}</span>
-          </div>
-          <div class="board-track-wrap">
-            ${trackMarkup}
+            <div class="board-lane ${row.hasOverlap ? "overlapping-room" : ""} ${isSelectedRoom ? "active-room" : ""}">
+            <div class="board-lane-head">
+              <strong class="board-lane-title">${row.roomLabel}</strong>
+            <span class="board-lane-meta">${row.assignments.length ? `<span>${roomMeta}</span>` : ""}</span>
+            </div>
+            <div class="board-track-wrap">
+              ${trackMarkup}
           </div>
     </div>
   `;
@@ -877,15 +881,15 @@ function renderRoomDetailGroups(rows) {
     return `<div class="empty-state">この日の詳細確認対象はまだありません。</div>`;
   }
 
-    return activeRows.map((row) => `
-      <article class="room-detail-card">
-          <div class="room-detail-head">
-            <div>
-              <strong class="room-detail-title">${row.roomLabel}</strong>
-              <p class="room-detail-note">${row.assignments.length}件で稼働${row.hasOverlap ? ` / 同室重なりあり` : ""}</p>
+      return activeRows.map((row) => `
+        <article class="room-detail-card">
+            <div class="room-detail-head">
+              <div>
+                <strong class="room-detail-title">${row.roomLabel}</strong>
+                <p class="room-detail-note">${row.assignments.length}件${row.hasOverlap ? ` / 重複` : ""}</p>
+              </div>
+              <span class="panel-count">${row.assignments.length}件</span>
             </div>
-            <span class="panel-count">${row.assignments.length}件</span>
-          </div>
       <div class="room-detail-items">
         ${row.assignments
           .slice()
