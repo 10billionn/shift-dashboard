@@ -1546,14 +1546,14 @@ function handleBoardMoveMove(event) {
   boardMoveFrameId = window.requestAnimationFrame(() => {
     boardMoveFrameId = null;
     if (!boardMoveState) return;
-    const preview = getBoardMovePreview(boardMoveState, boardMovePointer.x, boardMovePointer.y);
-    if (!preview) return;
-    boardMoveState.preview = preview;
-    boardMoveState.moved = boardMoveState.moved
-      || preview.roomIndex !== boardMoveState.initialRoomIndex
-      || preview.startMinutes !== boardMoveState.initialStartTime;
-    applyBoardMovePreview(boardMoveState, preview);
-  });
+      const preview = getBoardMovePreview(boardMoveState, boardMovePointer.x, boardMovePointer.y);
+      if (!preview) return;
+      boardMoveState.preview = preview;
+      boardMoveState.moved = boardMoveState.moved
+        || preview.roomIndex !== boardMoveState.initialRoomIndex
+        || preview.startMinutes !== boardMoveState.initialStartTime;
+      applyBoardMovePreview(boardMoveState, preview);
+    });
 }
 
 function handleBoardResizeEnd(event) {
@@ -1678,12 +1678,13 @@ function clearBoardInteractionHighlights() {
 }
 
 function getBoardMovePreview(moveState, clientX, clientY) {
-  const trackRect = moveState.sourceTrackRect;
+  const activeTrack = getBoardTrackFromPoint(clientX, clientY) || moveState.sourceTrack;
+  const trackRect = activeTrack?.getBoundingClientRect() || moveState.sourceTrack.getBoundingClientRect();
   if (!trackRect.width) return null;
 
-  const minutesPerPixel = (moveState.timelineEnd - moveState.timelineStart) / trackRect.width;
+  const pxPerMinute = trackRect.width / (moveState.timelineEnd - moveState.timelineStart);
   const deltaX = clientX - moveState.initialX;
-  const deltaMinutes = snapMinutes(deltaX * minutesPerPixel, 15);
+  const deltaMinutes = snapMinutes(deltaX / pxPerMinute, 15);
   const clampedStart = Math.max(
     moveState.timelineStart,
     Math.min(moveState.timelineEnd - moveState.duration, moveState.initialStartTime + deltaMinutes)
@@ -1692,8 +1693,8 @@ function getBoardMovePreview(moveState, clientX, clientY) {
   const endMinutes = startMinutes + moveState.duration;
   if (startMinutes >= endMinutes) return null;
 
-  const targetTrack = getBoardTrackFromPoint(clientX, clientY) || moveState.sourceTrack;
-  const roomIndex = normalizeRoomIndex(targetTrack?.dataset.boardSlotIndex, moveState.initialRoomIndex);
+  const targetTrack = activeTrack || moveState.sourceTrack;
+  const roomIndex = normalizeRoomIndex(targetTrack.dataset.boardSlotIndex, moveState.initialRoomIndex);
   return {
     roomIndex,
     startMinutes,
