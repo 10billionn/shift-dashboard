@@ -1711,8 +1711,7 @@ function clearBoardInteractionHighlights() {
 }
 
 function getBoardMovePreview(moveState, clientX, clientY) {
-  const centerY = clientY;
-  const activeTrack = getBoardTrackFromCenterY(centerY) || moveState.sourceTrack;
+  const activeTrack = getBoardTrackFromCenterY(moveState, clientY) || moveState.sourceTrack;
   const trackRect = activeTrack?.getBoundingClientRect() || moveState.sourceTrack.getBoundingClientRect();
   if (!trackRect.width) return null;
 
@@ -1811,9 +1810,14 @@ function getBoardTrackFromPoint(clientX, clientY) {
   return elementsAtPoint.find((item) => item.classList?.contains("board-track")) || null;
 }
 
-function getBoardTrackFromCenterY(centerY) {
+function getBoardTrackFromCenterY(moveState, clientY) {
   const tracks = Array.from(elements.dashboardBoardCanvas.querySelectorAll(".board-track"));
   if (!tracks.length) return null;
+
+  const sourceTop = moveState.sourceTrackRect?.top ?? moveState.sourceTrack.getBoundingClientRect().top;
+  const deltaY = clientY - moveState.initialY;
+  const visualTop = sourceTop + deltaY;
+  const centerY = visualTop + ((moveState.barHeight || moveState.bar.getBoundingClientRect().height) / 2);
 
   const containingTrack = tracks.find((track) => {
     const rect = track.getBoundingClientRect();
