@@ -709,7 +709,7 @@ function renderBoardTimeline(day, rows = buildBoardRoomRows(day)) {
       </div>
           <section class="board-group unified-board-group">
             <div class="board-group-head">
-              <strong class="board-group-title">シフト</strong>
+              <strong class="board-group-title">シフト配置</strong>
               <span class="board-group-meta">${totalAssignments}${overlapRooms ? ` / ${overlapRooms}` : ""}</span>
             </div>
             <div class="board-group-body">
