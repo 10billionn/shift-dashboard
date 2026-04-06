@@ -804,9 +804,10 @@ function renderBoardBar(assignment, slotIndex, shiftType) {
       <span class="board-resize-handle left" data-resize-handle="start" data-board-assignment-id="${assignment.id}"></span>
       <span class="board-resize-handle right" data-resize-handle="end" data-board-assignment-id="${assignment.id}"></span>
       ${assignment.himeReservation === "あり" ? `<span class="board-bar-pin">姫</span>` : ""}
-      <span class="board-bar-name">${assignment.name}</span>
-      ${densityClass !== "tiny" ? `<span class="board-bar-sub">${compactTime}</span>` : ""}
-      ${densityClass === "full" ? `<span class="board-bar-meta">${visualMeta.currentArea}${reservationLabel ? `｜${reservationLabel}` : ""}</span>` : ""}
+      <span class="board-bar-inline">
+        <span class="board-bar-name">${assignment.name}</span>
+        ${densityClass === "full" ? `<span class="board-bar-sub">${compactTime}</span>` : ""}
+      </span>
     </button>
   `;
 }
