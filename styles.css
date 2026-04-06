@@ -295,6 +295,13 @@ pre {
   background: rgba(255, 255, 255, 0.16);
 }
 
+.hero-panel .meta-chip {
+  cursor: default;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.74);
+}
+
 .selected-date-label {
   margin: 4px 0 0;
   font-weight: 700;
@@ -495,6 +502,18 @@ pre {
 #dashboardViewTabs .view-tab[data-dashboard-view="board"] {
   background: rgba(255, 255, 255, 0.2);
   color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+#dashboardViewTabs .view-tab.active[data-dashboard-view="list"] {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+#dashboardViewTabs .view-tab.active[data-dashboard-view="board"] {
+  background: rgba(255, 255, 255, 0.28);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 8px 16px rgba(17, 36, 63, 0.14);
 }
 
 .dashboard-view-panel {
@@ -1377,9 +1396,10 @@ pre {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 10px;
+  width: 12px;
   opacity: 0;
   transition: opacity 0.14s ease, background 0.14s ease;
+  z-index: 1;
 }
 
 .board-resize-handle.left {

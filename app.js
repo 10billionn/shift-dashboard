@@ -2,7 +2,7 @@
   selectedDate: "",
   dateList: [],
   activeAppView: "dashboard",
-  activeDashboardView: "list",
+  activeDashboardView: "board",
   activeShiftTab: "early",
   generationRows: [],
   generationErrors: [],
@@ -298,7 +298,7 @@ function hydrateState(saved) {
   state.selectedDate = normalizeDateKey(saved.selectedDate) || samplePrototypeData.settings.startDate;
   state.selectedDistributionDate = normalizeDateKey(saved.selectedDistributionDate) || state.selectedDate;
   state.activeAppView = saved.activeAppView || "dashboard";
-  state.activeDashboardView = saved.activeDashboardView || "list";
+  state.activeDashboardView = saved.activeDashboardView || "board";
   state.activeShiftTab = saved.activeShiftTab || "early";
   state.distributionViewMode = ["date", "therapist"].includes(saved.distributionViewMode) ? saved.distributionViewMode : "date";
   state.appSettings = saved.appSettings ? restoreAppSettings(saved.appSettings) : cloneAppSettings(samplePrototypeData.settings);
@@ -330,7 +330,7 @@ function loadSampleState() {
   state.selectedDate = samplePrototypeData.settings.startDate;
   state.selectedDistributionDate = samplePrototypeData.settings.startDate;
   state.activeAppView = "dashboard";
-  state.activeDashboardView = "list";
+  state.activeDashboardView = "board";
   state.activeShiftTab = "early";
   state.appSettings = cloneAppSettings(samplePrototypeData.settings);
   state.distributionViewMode = "date";
@@ -1202,11 +1202,12 @@ function handleBoardResizeStart(event) {
   bar.classList.add("resizing");
   boardResizeState = {
     assignmentId: assignment.id,
-    edge: handle.dataset.resizeHandle,
+    resizeType: handle.dataset.resizeHandle,
     shiftType: assignment.shiftType,
     slotIndex: Number(bar.dataset.boardSlotIndex),
-    startMinutes: toMinutes(assignment.startTime),
-    endMinutes: toMinutes(assignment.endTime),
+    initialX: event.clientX,
+    initialStartTime: toMinutes(assignment.startTime),
+    initialEndTime: toMinutes(assignment.endTime),
     track,
     bar,
     subLabel: bar.querySelector(".board-bar-sub")
@@ -1231,7 +1232,7 @@ function handleBoardResizeEnd(event) {
     return;
   }
 
-  if (preview.startMinutes === resizeState.startMinutes && preview.endMinutes === resizeState.endMinutes) {
+  if (preview.startMinutes === resizeState.initialStartTime && preview.endMinutes === resizeState.initialEndTime) {
     renderDashboard();
     return;
   }
@@ -1600,19 +1601,18 @@ function getBoardResizePreview(clientX, resizeState) {
   const settings = getAppSettings();
   const timelineStart = settings.businessStartHour * 60;
   const timelineEnd = settings.businessEndHour * 60;
-  const rawRatio = (clientX - rect.left) / rect.width;
-  const clampedRatio = Math.max(0, Math.min(1, rawRatio));
-  const rawMinutes = timelineStart + Math.round((timelineEnd - timelineStart) * clampedRatio);
-  const snappedMinutes = snapMinutes(rawMinutes, 60);
+  const pxPerMinute = rect.width / (timelineEnd - timelineStart);
+  const deltaX = clientX - resizeState.initialX;
+  const deltaMinutes = snapMinutes(deltaX / pxPerMinute, 60);
   const minDuration = 60;
 
-  let startMinutes = resizeState.startMinutes;
-  let endMinutes = resizeState.endMinutes;
+  let startMinutes = resizeState.initialStartTime;
+  let endMinutes = resizeState.initialEndTime;
 
-  if (resizeState.edge === "start") {
-    startMinutes = Math.max(timelineStart, Math.min(snappedMinutes, endMinutes - minDuration));
+  if (resizeState.resizeType === "start") {
+    startMinutes = Math.max(timelineStart, Math.min(resizeState.initialStartTime + deltaMinutes, endMinutes - minDuration));
   } else {
-    endMinutes = Math.min(timelineEnd, Math.max(snappedMinutes, startMinutes + minDuration));
+    endMinutes = Math.min(timelineEnd, Math.max(resizeState.initialEndTime + deltaMinutes, startMinutes + minDuration));
   }
 
   if (startMinutes >= endMinutes) return null;
