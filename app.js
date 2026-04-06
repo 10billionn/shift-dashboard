@@ -29,6 +29,7 @@
 const STORAGE_KEY = "shift-dashboard-state-v1";
 const DASHBOARD_SLOT_COUNT = 7;
 let boardFeedbackTimer = null;
+let boardDragPayload = null;
 
 const viewMeta = {
   dashboard: {
@@ -186,6 +187,11 @@ function bindEvents() {
   });
 
   elements.dashboardBoardCanvas.addEventListener("click", handleBoardCanvasClick);
+  elements.dashboardBoardCanvas.addEventListener("dragstart", handleBoardDragStart);
+  elements.dashboardBoardCanvas.addEventListener("dragend", handleBoardDragEnd);
+  elements.dashboardBoardCanvas.addEventListener("dragover", handleBoardDragOver);
+  elements.dashboardBoardCanvas.addEventListener("dragleave", handleBoardDragLeave);
+  elements.dashboardBoardCanvas.addEventListener("drop", handleBoardDrop);
   elements.boardInspectorContent.addEventListener("change", handleBoardInspectorChange);
 
   elements.shiftTabs.querySelectorAll(".shift-tab").forEach((button) => {
@@ -654,13 +660,15 @@ function renderBoardTimeline(day) {
     {
       key: "early",
       label: "早番",
-      assignments: day.earlyAssignments.filter(Boolean),
+      slots: day.earlyAssignments,
+      filled: countAssignments(day.earlyAssignments),
       needed: day.requirement?.earlyNeeded || 0
     },
     {
       key: "late",
       label: "遅番",
-      assignments: day.lateAssignments.filter(Boolean),
+      slots: day.lateAssignments,
+      filled: countAssignments(day.lateAssignments),
       needed: day.requirement?.lateNeeded || 0
     }
   ];
@@ -679,25 +687,20 @@ function renderBoardTimeline(day) {
 }
 
 function renderBoardGroup(group) {
-  const assignedLanes = packAssignmentsIntoBoardLanes(group.assignments);
-  const baseLaneCount = Math.max(getRoomCapacity(), assignedLanes.length);
-  const shortageCount = Math.max((group.needed || 0) - group.assignments.length, 0);
-  const visualLaneCount = Math.max(baseLaneCount, assignedLanes.length + shortageCount, 2);
+  const baseLaneCount = Math.max(getRoomCapacity(), group.slots.length, 2);
+  const visualLaneCount = Math.max(baseLaneCount, group.needed || 0, 2);
   const lanes = Array.from({ length: visualLaneCount }, (_, index) => {
-    if (index < assignedLanes.length) {
-      return { type: "assigned", items: assignedLanes[index], label: `${group.label}${index + 1}` };
-    }
-    if (index < assignedLanes.length + shortageCount) {
-      return { type: "shortage", items: [], label: `${group.label}${index + 1}` };
-    }
-    return { type: "empty", items: [], label: `${group.label}${index + 1}` };
+    const assignment = group.slots[index] || null;
+    if (assignment) return { type: "assigned", assignment, slotIndex: index };
+    if (index < (group.needed || 0)) return { type: "shortage", assignment: null, slotIndex: index };
+    return { type: "empty", assignment: null, slotIndex: index };
   });
 
   return `
     <section class="board-group">
       <div class="board-group-head">
         <strong class="board-group-title">${group.label}</strong>
-        <span class="board-group-meta">${group.assignments.length}/${baseLaneCount}枠 ・ 必要 ${group.needed || 0}</span>
+        <span class="board-group-meta">${group.filled}/${baseLaneCount}枠 ・ 必要 ${group.needed || 0}</span>
       </div>
       <div class="board-group-body">
         ${lanes.map((lane, index) => renderBoardLaneRow(group, lane, index)).join("")}
@@ -712,7 +715,7 @@ function renderBoardLaneRow(group, lane, index) {
     ? `<div class="board-gap board-gap-shortage">空き｜未配置</div>`
     : lane.type === "empty"
       ? `<div class="board-gap board-gap-empty">${roomLabel}</div>`
-      : lane.items.map((assignment) => renderBoardBar(assignment)).join("");
+      : renderBoardBar(lane.assignment, lane.slotIndex, group.key);
 
   return `
     <div class="board-lane">
@@ -721,7 +724,7 @@ function renderBoardLaneRow(group, lane, index) {
         <span class="board-lane-meta">${lane.type === "shortage" ? "不足" : lane.type === "assigned" ? "稼働中" : "待機"}</span>
       </div>
       <div class="board-track-wrap">
-        <div class="board-track">
+        <div class="board-track" data-board-shift-type="${group.key}" data-board-slot-index="${lane.slotIndex}">
           ${shortageMarkup}
         </div>
       </div>
@@ -729,7 +732,7 @@ function renderBoardLaneRow(group, lane, index) {
   `;
 }
 
-function renderBoardBar(assignment) {
+function renderBoardBar(assignment, slotIndex, shiftType) {
   const settings = getAppSettings();
   const profile = samplePrototypeData.therapistProfiles[assignment.name] || { flags: [], rank: "G" };
   const start = toMinutes(assignment.startTime);
@@ -757,7 +760,10 @@ function renderBoardBar(assignment) {
     <button
       class="board-bar ${barClass} ${assignment.himeReservation === "あり" ? "has-pin" : ""} ${assignment.id === state.selectedBoardAssignmentId ? "selected" : ""} ${assignment.id === state.updatedBoardAssignmentId ? "updated" : ""}"
       type="button"
+      draggable="true"
       data-board-assignment-id="${assignment.id}"
+      data-board-shift-type="${shiftType}"
+      data-board-slot-index="${slotIndex}"
       style="left:${left}%; width:${width}%;">
       ${assignment.himeReservation === "あり" ? `<span class="board-bar-pin">姫</span>` : ""}
       <span class="board-bar-name">${assignment.name}</span>
@@ -1190,6 +1196,56 @@ function handleBoardCanvasClick(event) {
   renderDashboard();
 }
 
+function handleBoardDragStart(event) {
+  const bar = event.target.closest("[data-board-assignment-id]");
+  if (!bar) return;
+  boardDragPayload = {
+    assignmentId: bar.dataset.boardAssignmentId,
+    shiftType: bar.dataset.boardShiftType,
+    slotIndex: Number(bar.dataset.boardSlotIndex)
+  };
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", JSON.stringify(boardDragPayload));
+  bar.classList.add("dragging");
+}
+
+function handleBoardDragEnd(event) {
+  event.target.closest(".board-bar")?.classList.remove("dragging");
+  boardDragPayload = null;
+  document.querySelectorAll(".board-track.drag-over").forEach((item) => item.classList.remove("drag-over"));
+}
+
+function handleBoardDragOver(event) {
+  const track = event.target.closest(".board-track");
+  if (!track || !boardDragPayload) return;
+  if (track.dataset.boardShiftType !== boardDragPayload.shiftType) return;
+  event.preventDefault();
+  document.querySelectorAll(".board-track.drag-over").forEach((item) => {
+    if (item !== track) item.classList.remove("drag-over");
+  });
+  track.classList.add("drag-over");
+}
+
+function handleBoardDragLeave(event) {
+  const track = event.target.closest(".board-track");
+  if (!track || track.contains(event.relatedTarget)) return;
+  track.classList.remove("drag-over");
+}
+
+function handleBoardDrop(event) {
+  const track = event.target.closest(".board-track");
+  if (!track) return;
+  track.classList.remove("drag-over");
+  if (!boardDragPayload) return;
+  if (track.dataset.boardShiftType !== boardDragPayload.shiftType) return;
+  event.preventDefault();
+
+  moveBoardAssignmentWithinShift(boardDragPayload, {
+    shiftType: track.dataset.boardShiftType,
+    slotIndex: Number(track.dataset.boardSlotIndex)
+  });
+}
+
 function handleBoardInspectorChange(event) {
   const input = event.target.closest("[data-board-field]");
   if (!input || input.dataset.boardField !== "assignedArea") return;
@@ -1457,6 +1513,38 @@ function moveAssignmentBetweenSlots(source, target) {
   } else {
     showToast(actionText, "success");
   }
+  renderDashboard();
+  renderDistribution();
+}
+
+function moveBoardAssignmentWithinShift(source, target) {
+  if (!source?.assignmentId) return;
+  if (source.shiftType !== target.shiftType) return;
+  if (source.slotIndex === target.slotIndex) return;
+
+  const day = state.generatedSchedule[state.selectedDate];
+  if (!day) return;
+
+  const key = source.shiftType === "early" ? "earlyAssignments" : "lateAssignments";
+  const slots = createSlotArray(day[key], source.shiftType);
+  const moving = slots[source.slotIndex];
+  if (!moving) return;
+
+  const swapped = slots[target.slotIndex] || null;
+  slots[source.slotIndex] = swapped;
+  slots[target.slotIndex] = moving;
+  day[key] = slots;
+
+  state.selectedBoardAssignmentId = moving.id;
+  state.updatedBoardAssignmentId = moving.id;
+  markManualScheduleDirty();
+  recomputeScheduleStateForDates([state.selectedDate]);
+  persistState();
+
+  const actionText = swapped
+    ? `${formatSlotLabel(source.shiftType, source.slotIndex)} ↔ ${formatSlotLabel(target.shiftType, target.slotIndex)} を入れ替えました`
+    : `${formatSlotLabel(source.shiftType, source.slotIndex)} → ${formatSlotLabel(target.shiftType, target.slotIndex)} へ移動しました`;
+  showToast(actionText, "success");
   renderDashboard();
   renderDistribution();
 }
