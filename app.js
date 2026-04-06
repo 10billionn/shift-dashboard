@@ -774,6 +774,7 @@ function renderBoardLaneRow(row, index) {
 function renderBoardBar(assignment, slotIndex, shiftType) {
   const settings = getAppSettings();
   const profile = samplePrototypeData.therapistProfiles[assignment.name] || { flags: [], rank: "G" };
+  const visualMeta = getAssignmentVisualMeta(assignment, slotIndex);
   const start = toMinutes(assignment.startTime);
   const end = toMinutes(assignment.endTime);
   const timelineStart = settings.businessStartHour * 60;
@@ -786,20 +787,13 @@ function renderBoardBar(assignment, slotIndex, shiftType) {
   const width = Math.max((duration / total) * 100, 8);
   const densityClass = width < 12 ? "tiny" : width < 20 ? "compact" : "full";
   const status = analyzeAssignmentStatus(assignment, profile);
-  const barClass = status.level === "danger"
-    ? "danger"
-    : assignment.warningArea
-      ? "warning"
-      : assignment.himeReservation === "あり"
-        ? "booked"
-        : "normal";
   const compactTime = `${assignment.startTime}-${assignment.endTime}`;
   const reservationLabel = assignment.himeReservation === "あり" ? "姫" : "";
-  const barTitle = `${assignment.name} / ${compactTime}${assignment.assignedArea ? ` / ${assignment.assignedArea}` : ""}${reservationLabel ? ` / ${reservationLabel}` : ""}`;
+  const barTitle = `${assignment.name} / ${compactTime}${visualMeta.currentArea ? ` / ${visualMeta.currentArea}` : ""}${reservationLabel ? ` / ${reservationLabel}` : ""}`;
 
   return `
     <button
-      class="board-bar ${densityClass} ${barClass} ${assignment.himeReservation === "あり" ? "has-pin" : ""} ${assignment.id === state.selectedBoardAssignmentId ? "selected" : ""} ${assignment.id === state.updatedBoardAssignmentId ? "updated" : ""}"
+      class="board-bar ${densityClass} area-${visualMeta.colorKey} ${assignment.himeReservation === "あり" ? "has-pin is-hime" : ""} ${status.level === "danger" ? "is-danger" : ""} ${status.level === "warning" ? "is-warning" : ""} ${assignment.id === state.selectedBoardAssignmentId ? "selected" : ""} ${assignment.id === state.updatedBoardAssignmentId ? "updated" : ""}"
       type="button"
       draggable="true"
       title="${escapeHtml(barTitle)}"
@@ -812,7 +806,7 @@ function renderBoardBar(assignment, slotIndex, shiftType) {
       ${assignment.himeReservation === "あり" ? `<span class="board-bar-pin">姫</span>` : ""}
       <span class="board-bar-name">${assignment.name}</span>
       ${densityClass !== "tiny" ? `<span class="board-bar-sub">${compactTime}</span>` : ""}
-      ${densityClass === "full" ? `<span class="board-bar-meta">${assignment.assignedArea}${reservationLabel ? `｜${reservationLabel}` : ""}</span>` : ""}
+      ${densityClass === "full" ? `<span class="board-bar-meta">${visualMeta.currentArea}${reservationLabel ? `｜${reservationLabel}` : ""}</span>` : ""}
     </button>
   `;
 }
@@ -873,6 +867,8 @@ function renderRoomDetailItem(assignment) {
   const attendance = selectAttendanceFlag(profile.flags || []);
   const tags = buildPriorityTags(assignment);
   const status = analyzeAssignmentStatus(assignment, profile);
+  const position = findAssignmentPosition(assignment.dateKey, assignment.id);
+  const visualMeta = getAssignmentVisualMeta(assignment, position?.slotIndex ?? 0);
   const cardClass = status.level === "danger"
     ? "danger-slot"
     : assignment.warningArea
@@ -889,11 +885,11 @@ function renderRoomDetailItem(assignment) {
         : "gray";
 
   return `
-    <article class="shift-card slot-card room-detail-item area-${areaClassName(assignment.assignedArea)} ${cardClass}" data-assignment-id="${assignment.id}">
+    <article class="shift-card slot-card room-detail-item area-${visualMeta.colorKey} ${cardClass}" data-assignment-id="${assignment.id}">
       <div class="shift-card-top">
         <div>
           <strong class="therapist-name">${assignment.name}</strong>
-          <div class="field-help">${assignment.startTime}-${assignment.endTime} / ${assignment.assignedArea}</div>
+          <div class="field-help">${assignment.startTime}-${assignment.endTime} / ${visualMeta.roomLabel} / ${visualMeta.currentArea}</div>
         </div>
         <div class="status-row tight">
           <span class="mini-badge rank">${profile.rank}</span>
@@ -903,12 +899,16 @@ function renderRoomDetailItem(assignment) {
       </div>
       <div class="shift-summary-grid slot-summary-grid room-detail-summary">
         <div class="shift-summary-item">
+          <span class="field-label">部屋</span>
+          <span class="field-value">${visualMeta.roomLabel}</span>
+        </div>
+        <div class="shift-summary-item">
           <span class="field-label">時間</span>
           <span class="field-value">${assignment.startTime}-${assignment.endTime}</span>
         </div>
         <div class="shift-summary-item">
           <span class="field-label">エリア</span>
-          <span class="field-value">${assignment.assignedArea}</span>
+          <span class="field-value">${visualMeta.currentArea}</span>
         </div>
         <div class="shift-summary-item">
           <span class="field-label">状態</span>
@@ -1071,6 +1071,8 @@ function renderBoardInspector(day) {
   const profile = samplePrototypeData.therapistProfiles[assignment.name] || { rank: "G", areas: [] };
   const availableAreas = getAppSettings().areas;
   const roomOptions = getAppSettings().roomNames;
+  const position = findAssignmentPosition(day.dateKey, assignment.id);
+  const visualMeta = getAssignmentVisualMeta(assignment, position?.slotIndex ?? 0);
   const status = analyzeAssignmentStatus(assignment, profile);
   const statusTone = status.level === "danger" ? "danger" : status.level === "warning" ? "warning" : "ok";
   const settings = getAppSettings();
@@ -1085,7 +1087,7 @@ function renderBoardInspector(day) {
       <div class="board-inspector-head">
         <div>
           <strong class="therapist-name">${assignment.name}</strong>
-          <p class="field-help">${assignment.assignedArea} / ${formatDisplayDate(assignment.dateKey)} (${formatWeekday(assignment.dateKey)})</p>
+          <p class="field-help">${visualMeta.roomLabel} / ${visualMeta.currentArea} / ${formatDisplayDate(assignment.dateKey)} (${formatWeekday(assignment.dateKey)})</p>
         </div>
         <div class="status-row tight">
           <span class="mini-badge rank">${profile.rank || "G"}</span>
@@ -1098,6 +1100,18 @@ function renderBoardInspector(day) {
         <div class="shift-summary-item">
           <span class="field-label">セラピスト</span>
           <span class="field-value">${assignment.name}</span>
+        </div>
+        <div class="shift-summary-item">
+          <span class="field-label">現在配置</span>
+          <span class="field-value">${visualMeta.currentArea}</span>
+        </div>
+        <div class="shift-summary-item">
+          <span class="field-label">希望エリア</span>
+          <span class="field-value">${assignment.preferredArea || "未設定"}</span>
+        </div>
+        <div class="shift-summary-item">
+          <span class="field-label">現在部屋</span>
+          <span class="field-value">${visualMeta.roomLabel}</span>
         </div>
         <div class="shift-summary-item">
           <span class="field-label">状態</span>
@@ -1125,7 +1139,7 @@ function renderBoardInspector(day) {
         <label class="field-block">
           <span class="field-label">部屋</span>
           <select class="select-input" data-board-field="roomIndex">
-            ${roomOptions.map((roomName, index) => `<option value="${index}" ${normalizeRoomIndex(assignment.roomIndex, findAssignmentPosition(day.dateKey, assignment.id)?.slotIndex ?? 0) === index ? "selected" : ""}>${roomName}</option>`).join("")}
+            ${roomOptions.map((roomName, index) => `<option value="${index}" ${normalizeRoomIndex(assignment.roomIndex, position?.slotIndex ?? 0) === index ? "selected" : ""}>${roomName}</option>`).join("")}
           </select>
         </label>
 
@@ -1727,10 +1741,6 @@ function syncSelectedBoardAssignment() {
 
 function updateAssignmentArea(assignmentId, nextArea, options = {}) {
   const row = state.generationRows.find((item) => item.id === assignmentId);
-  if (row) {
-    row.preferredArea = nextArea;
-    row.issues = collectRowIssues(row);
-  }
 
   Object.values(state.generatedSchedule).forEach((day) => {
     [...day.earlyAssignments, ...day.lateAssignments].forEach((assignment) => {
@@ -1767,11 +1777,15 @@ function updateAssignmentRoom(assignmentId, roomIndex) {
   const assignment = findAssignmentById(assignmentId);
   if (!assignment) return;
   assignment.roomIndex = normalizeRoomIndex(roomIndex, 0);
+  const roomMeta = getRoomMeta(assignment.roomIndex, assignment.assignedArea || assignment.preferredArea);
+  if (roomMeta.area) {
+    assignment.assignedArea = roomMeta.area;
+  }
   state.updatedBoardAssignmentId = assignmentId;
   markManualScheduleDirty();
   recomputeScheduleStateForDates([assignment.dateKey]);
   persistState();
-  flashBoardUpdateStatus(`部屋を ${getRoomLabel(assignment.roomIndex)} に更新しました。`, "success");
+  flashBoardUpdateStatus(`部屋を ${roomMeta.roomLabel} に更新しました。`, "success");
   renderBoardWorkspace();
   renderLinkedViewsAfterBoardEdit();
 }
@@ -2912,6 +2926,38 @@ function escapeHtml(text) {
 
 function areaClassName(area) {
   return ({ "葛西": "kasai", "浦安": "urayasu", "船橋": "funabashi", "浅草橋": "asakusabashi", "八千代": "yachiyo" }[area] || "default");
+}
+
+function getAreaColorKey(area) {
+  return areaClassName(area);
+}
+
+function getRoomArea(roomName, fallbackArea = "") {
+  const safeRoomName = String(roomName || "");
+  const matchedArea = getAppSettings().areas.find((area) => safeRoomName.includes(area));
+  return matchedArea || fallbackArea || "";
+}
+
+function getRoomMeta(roomIndex, fallbackArea = "") {
+  const resolvedIndex = normalizeRoomIndex(roomIndex, 0);
+  const roomLabel = getRoomLabel(resolvedIndex);
+  const area = getRoomArea(roomLabel, fallbackArea);
+  return {
+    roomIndex: resolvedIndex,
+    roomLabel,
+    area,
+    colorKey: getAreaColorKey(area)
+  };
+}
+
+function getAssignmentVisualMeta(assignment, fallbackSlotIndex = 0) {
+  const roomMeta = getRoomMeta(assignment.roomIndex ?? fallbackSlotIndex, assignment.assignedArea || assignment.preferredArea);
+  return {
+    roomIndex: roomMeta.roomIndex,
+    roomLabel: roomMeta.roomLabel,
+    currentArea: roomMeta.area || assignment.assignedArea || assignment.preferredArea || "未設定",
+    colorKey: roomMeta.colorKey || getAreaColorKey(assignment.assignedArea || assignment.preferredArea)
+  };
 }
 
 function emptyDay(dateKey) {
