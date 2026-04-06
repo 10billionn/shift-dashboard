@@ -746,6 +746,7 @@ function buildBoardRoomRows(day) {
 }
 
 function renderBoardLaneRow(row, index) {
+  const isSelectedRoom = row.assignments.some((assignment) => assignment.id === state.selectedBoardAssignmentId);
   const trackMarkup = row.lanes.length
     ? row.lanes.map((lane, laneIndex) => `
         <div class="board-track" data-board-slot-index="${row.slotIndex}" data-board-lane-index="${laneIndex}">
@@ -759,7 +760,7 @@ function renderBoardLaneRow(row, index) {
     `;
 
   return `
-    <div class="board-lane ${row.lanes.length > 1 ? "stacked" : ""}">
+      <div class="board-lane ${row.lanes.length > 1 ? "stacked" : ""} ${isSelectedRoom ? "active-room" : ""}">
       <div class="board-lane-head">
         <strong class="board-lane-title">${row.roomLabel}</strong>
         <span class="board-lane-meta">${row.assignments.length ? `<span>${row.assignments.length}件</span><span>${row.lanes.length}レーン</span>${row.lanes.length > 1 ? `<span>仮置き</span>` : ""}` : "空き多め"}</span>
@@ -1399,6 +1400,8 @@ function handleBoardResizeStart(event) {
   boardDragPayload = null;
   state.selectedBoardAssignmentId = assignment.id;
   bar.classList.add("resizing");
+  track.classList.add("editing-track");
+  bar.closest(".board-lane")?.classList.add("resizing-room");
   boardResizeState = {
     assignmentId: assignment.id,
     resizeType: handle.dataset.resizeHandle,
@@ -1435,6 +1438,8 @@ function handleBoardResizeEnd(event) {
   const resizeState = boardResizeState;
   boardResizeState = null;
   resizeState.bar.classList.remove("resizing");
+  resizeState.track?.classList.remove("editing-track");
+  resizeState.bar.closest(".board-lane")?.classList.remove("resizing-room");
   const preview = getBoardResizePreview(event.clientX, resizeState);
   if (!preview) {
     renderDashboard();
@@ -1456,6 +1461,7 @@ function handleBoardDragStart(event) {
   }
   const bar = event.target.closest("[data-board-assignment-id]");
   if (!bar) return;
+  clearBoardInteractionHighlights();
   boardDragPayload = {
     assignmentId: bar.dataset.boardAssignmentId,
     slotIndex: Number(bar.dataset.boardSlotIndex)
@@ -1463,12 +1469,14 @@ function handleBoardDragStart(event) {
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData("text/plain", JSON.stringify(boardDragPayload));
   bar.classList.add("dragging");
+  bar.closest(".board-track")?.classList.add("drag-origin");
+  bar.closest(".board-lane")?.classList.add("drag-source-room");
 }
 
 function handleBoardDragEnd(event) {
   event.target.closest(".board-bar")?.classList.remove("dragging");
   boardDragPayload = null;
-  document.querySelectorAll(".board-track.drag-over").forEach((item) => item.classList.remove("drag-over"));
+  clearBoardInteractionHighlights();
 }
 
 function handleBoardDragOver(event) {
@@ -1478,24 +1486,42 @@ function handleBoardDragOver(event) {
   document.querySelectorAll(".board-track.drag-over").forEach((item) => {
     if (item !== track) item.classList.remove("drag-over");
   });
+  document.querySelectorAll(".board-lane.drag-target-room").forEach((item) => {
+    if (!item.contains(track)) item.classList.remove("drag-target-room");
+  });
   track.classList.add("drag-over");
+  track.closest(".board-lane")?.classList.add("drag-target-room");
 }
 
 function handleBoardDragLeave(event) {
   const track = event.target.closest(".board-track");
   if (!track || track.contains(event.relatedTarget)) return;
   track.classList.remove("drag-over");
+  const lane = track.closest(".board-lane");
+  if (lane && !lane.querySelector(".board-track.drag-over")) {
+    lane.classList.remove("drag-target-room");
+  }
 }
 
 function handleBoardDrop(event) {
   const track = event.target.closest(".board-track");
   if (!track) return;
   track.classList.remove("drag-over");
+  track.closest(".board-lane")?.classList.remove("drag-target-room");
   if (!boardDragPayload) return;
   event.preventDefault();
 
   moveBoardAssignmentWithinShift(boardDragPayload, {
     slotIndex: Number(track.dataset.boardSlotIndex)
+    });
+}
+
+function clearBoardInteractionHighlights() {
+  document.querySelectorAll(".board-track.drag-over, .board-track.drag-origin, .board-track.editing-track").forEach((item) => {
+    item.classList.remove("drag-over", "drag-origin", "editing-track");
+  });
+  document.querySelectorAll(".board-lane.drag-target-room, .board-lane.drag-source-room, .board-lane.resizing-room").forEach((item) => {
+    item.classList.remove("drag-target-room", "drag-source-room", "resizing-room");
   });
 }
 
