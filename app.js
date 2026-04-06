@@ -1532,16 +1532,15 @@ function handleBoardMoveStart(event) {
     initialY: event.clientY,
     initialStartTime,
     initialEndTime,
-    duration: initialEndTime - initialStartTime,
-    initialRoomIndex: normalizeRoomIndex(assignment.roomIndex, Number(bar.dataset.boardSlotIndex)),
-    stableTargetTrack: track,
-    stableRoomIndex: normalizeRoomIndex(assignment.roomIndex, Number(bar.dataset.boardSlotIndex)),
-    sourceTrack: track,
-    sourceTrackRect: trackRect,
-    bar,
-    barOffsetTop: barRect.top - trackRect.top,
-      overlayRoot,
-      overlayRect,
+      duration: initialEndTime - initialStartTime,
+      initialRoomIndex: normalizeRoomIndex(assignment.roomIndex, Number(bar.dataset.boardSlotIndex)),
+      sourceTrack: track,
+      sourceTrackRect: trackRect,
+      bar,
+      barHeight: barRect.height,
+      barOffsetTop: barRect.top - trackRect.top,
+        overlayRoot,
+        overlayRect,
       movingBar,
       guideBand,
       guideStart,
@@ -1712,8 +1711,8 @@ function clearBoardInteractionHighlights() {
 }
 
 function getBoardMovePreview(moveState, clientX, clientY) {
-  const rawTargetTrack = getBoardTrackFromPoint(clientX, clientY) || moveState.sourceTrack;
-  const activeTrack = resolveStableBoardTargetTrack(moveState, rawTargetTrack, clientY);
+  const centerY = clientY;
+  const activeTrack = getBoardTrackFromCenterY(centerY) || moveState.sourceTrack;
   const trackRect = activeTrack?.getBoundingClientRect() || moveState.sourceTrack.getBoundingClientRect();
   if (!trackRect.width) return null;
 
@@ -1735,8 +1734,6 @@ function getBoardMovePreview(moveState, clientX, clientY) {
 
   const targetTrack = activeTrack || moveState.sourceTrack;
   const roomIndex = normalizeRoomIndex(targetTrack.dataset.boardSlotIndex, moveState.initialRoomIndex);
-  moveState.stableTargetTrack = targetTrack;
-  moveState.stableRoomIndex = roomIndex;
   return {
     roomIndex,
     rawStartMinutes,
@@ -1745,32 +1742,6 @@ function getBoardMovePreview(moveState, clientX, clientY) {
     endMinutes,
     targetTrack
   };
-}
-
-function resolveStableBoardTargetTrack(moveState, rawTargetTrack, clientY) {
-  const stableTrack = moveState.stableTargetTrack || moveState.sourceTrack;
-  if (!rawTargetTrack) return stableTrack;
-  if (rawTargetTrack === stableTrack) return stableTrack;
-
-  const rawRect = rawTargetTrack.getBoundingClientRect();
-  const stableRect = stableTrack.getBoundingClientRect();
-  const hysteresis = Math.min(16, Math.max(8, Math.round(rawRect.height * 0.18)));
-  const rawInnerTop = rawRect.top + hysteresis;
-  const rawInnerBottom = rawRect.bottom - hysteresis;
-
-  if (clientY >= rawInnerTop && clientY <= rawInnerBottom) {
-    return rawTargetTrack;
-  }
-
-  if (clientY < stableRect.top || clientY > stableRect.bottom) {
-    const stableInnerTop = stableRect.top + hysteresis;
-    const stableInnerBottom = stableRect.bottom - hysteresis;
-    if (clientY < stableInnerTop || clientY > stableInnerBottom) {
-      return rawTargetTrack;
-    }
-  }
-
-  return stableTrack;
 }
 
 function applyBoardMovePreview(moveState, preview) {
@@ -1788,7 +1759,7 @@ function applyBoardMovePreview(moveState, preview) {
   const width = Math.max((((preview.rawEndMinutes - preview.rawStartMinutes) / total) * activeTrackRect.width), 24);
   const snappedWidth = Math.max((((preview.endMinutes - preview.startMinutes) / total) * activeTrackRect.width), 24);
   const targetRect = (preview.targetTrack || moveState.sourceTrack).getBoundingClientRect();
-  const top = targetRect.top - overlayRect.top + moveState.barOffsetTop;
+  const top = targetRect.top - overlayRect.top + ((targetRect.height - moveState.barHeight) / 2);
   const trackTop = targetRect.top - overlayRect.top;
   const trackHeight = targetRect.height;
   const snapNear = Math.abs(preview.rawStartMinutes - preview.startMinutes) < 6;
@@ -1838,6 +1809,26 @@ function cleanupBoardMovePreview(moveState) {
 function getBoardTrackFromPoint(clientX, clientY) {
   const elementsAtPoint = document.elementsFromPoint(clientX, clientY);
   return elementsAtPoint.find((item) => item.classList?.contains("board-track")) || null;
+}
+
+function getBoardTrackFromCenterY(centerY) {
+  const tracks = Array.from(elements.dashboardBoardCanvas.querySelectorAll(".board-track"));
+  if (!tracks.length) return null;
+
+  const containingTrack = tracks.find((track) => {
+    const rect = track.getBoundingClientRect();
+    return centerY >= rect.top && centerY <= rect.bottom;
+  });
+  if (containingTrack) return containingTrack;
+
+  return tracks.reduce((closest, track) => {
+    const rect = track.getBoundingClientRect();
+    const distance = centerY < rect.top ? rect.top - centerY : centerY - rect.bottom;
+    if (!closest || distance < closest.distance) {
+      return { track, distance };
+    }
+    return closest;
+  }, null)?.track || null;
 }
 
 function commitBoardMove(assignmentId, roomIndex, startMinutes, endMinutes) {
