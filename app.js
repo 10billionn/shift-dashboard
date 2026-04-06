@@ -2866,12 +2866,11 @@ function getCutRowsForDate(dateKey) {
 function renderDashboardRiskSummary() {
   const summary = buildDashboardRiskSummary();
   return summary.map((item) => `
-    <article class="risk-summary-item ${item.level}">
+    <article class="risk-summary-inline-item ${item.level}">
       <strong>${item.title}</strong>
       <span>${item.value}</span>
-      <small>${item.detail || ""}</small>
     </article>
-  `).join("");
+  `).join('<span class="risk-summary-separator">/</span>');
 }
 
 function buildDashboardRiskSummary() {
