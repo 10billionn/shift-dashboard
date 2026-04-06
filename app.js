@@ -721,7 +721,7 @@ function renderBoardLaneRow(row, index) {
     <div class="board-lane">
       <div class="board-lane-head">
         <strong class="board-lane-title">${row.roomLabel}</strong>
-        <span class="board-lane-meta">${row.assignments.length ? `${row.assignments.length}件 / ${row.lanes.length}レーン` : "空き多め"}</span>
+        <span class="board-lane-meta">${row.assignments.length ? `${row.assignments.length}件 / ${row.lanes.length}レーン${row.lanes.length > 1 ? "（重なりあり）" : ""}` : "空き多め"}</span>
       </div>
       <div class="board-track-wrap">
         ${trackMarkup}
@@ -1604,48 +1604,24 @@ function updateAssignmentArea(assignmentId, nextArea, options = {}) {
 
 function moveAssignmentBetweenSlots(source, target) {
   if (!source?.assignmentId) return;
-  if (source.shiftType === target.shiftType && source.slotIndex === target.slotIndex) return;
   const day = state.generatedSchedule[state.selectedDate];
   if (!day) return;
+  const sourcePosition = findAssignmentPosition(state.selectedDate, source.assignmentId);
+  if (!sourcePosition) return;
+  if (sourcePosition.slotIndex === target.slotIndex && sourcePosition.shiftType === target.shiftType) return;
 
-  const sourceSlots = createSlotArray(day[source.shiftType === "early" ? "earlyAssignments" : "lateAssignments"], source.shiftType);
-  const targetSlots = source.shiftType === target.shiftType
-    ? sourceSlots
-    : createSlotArray(day[target.shiftType === "early" ? "earlyAssignments" : "lateAssignments"], target.shiftType);
+  const moveResult = applyRoomMove(day, sourcePosition, target.slotIndex, target.shiftType);
+  if (!moveResult) return;
 
-  const moving = sourceSlots[source.slotIndex];
-  if (!moving) return;
-
-  const swapped = targetSlots[target.slotIndex] || null;
-  sourceSlots[source.slotIndex] = source.shiftType === target.shiftType ? swapped : null;
-  targetSlots[target.slotIndex] = {
-    ...moving,
-    shiftType: target.shiftType,
-    shiftLabel: target.shiftType === "early" ? getAppSettings().shiftLabels.early : getAppSettings().shiftLabels.late
-  };
-
-  if (source.shiftType !== target.shiftType && swapped) {
-    sourceSlots[source.slotIndex] = {
-      ...swapped,
-      shiftType: source.shiftType,
-      shiftLabel: source.shiftType === "early" ? getAppSettings().shiftLabels.early : getAppSettings().shiftLabels.late
-    };
-  }
-
-  day[source.shiftType === "early" ? "earlyAssignments" : "lateAssignments"] = sourceSlots;
-  if (source.shiftType !== target.shiftType) {
-    day[target.shiftType === "early" ? "earlyAssignments" : "lateAssignments"] = targetSlots;
-  }
-
-  state.selectedBoardAssignmentId = moving.id;
-  state.updatedBoardAssignmentId = moving.id;
+  state.selectedBoardAssignmentId = moveResult.moving.id;
+  state.updatedBoardAssignmentId = moveResult.moving.id;
   markManualScheduleDirty();
   recomputeScheduleStateForDates([state.selectedDate]);
   persistState();
-  const warnings = collectMoveWarnings(findAssignmentById(moving.id));
-  const actionText = swapped
-    ? `${formatSlotLabel(source.shiftType, source.slotIndex)} ↔ ${formatSlotLabel(target.shiftType, target.slotIndex)} を入れ替えました`
-    : `${formatSlotLabel(source.shiftType, source.slotIndex)} → ${formatSlotLabel(target.shiftType, target.slotIndex)} へ移動しました`;
+  const warnings = collectMoveWarnings(findAssignmentById(moveResult.moving.id));
+  const actionText = moveResult.swapped
+    ? `${formatRoomMoveLabel(sourcePosition.slotIndex)} ↔ ${formatRoomMoveLabel(moveResult.targetPosition.slotIndex)} を入れ替えました`
+    : `${formatRoomMoveLabel(sourcePosition.slotIndex)} → ${formatRoomMoveLabel(moveResult.targetPosition.slotIndex)} へ移動しました`;
   if (warnings.length) {
     showToast(`${actionText} / ⚠️ ${warnings.join(" / ")}`, "warning");
   } else {
@@ -1659,33 +1635,90 @@ function moveBoardAssignmentWithinShift(source, target) {
   if (!source?.assignmentId) return;
   const sourcePosition = findAssignmentPosition(state.selectedDate, source.assignmentId);
   if (!sourcePosition) return;
-  if (sourcePosition.slotIndex === target.slotIndex) return;
 
   const day = state.generatedSchedule[state.selectedDate];
   if (!day) return;
+  const moveResult = applyRoomMove(day, sourcePosition, target.slotIndex);
+  if (!moveResult) return;
 
-  const key = sourcePosition.shiftType === "early" ? "earlyAssignments" : "lateAssignments";
-  const slots = createSlotArray(day[key], sourcePosition.shiftType);
-  const moving = slots[sourcePosition.slotIndex];
-  if (!moving) return;
-
-  const swapped = slots[target.slotIndex] || null;
-  slots[sourcePosition.slotIndex] = swapped;
-  slots[target.slotIndex] = moving;
-  day[key] = slots;
-
-  state.selectedBoardAssignmentId = moving.id;
-  state.updatedBoardAssignmentId = moving.id;
+  state.selectedBoardAssignmentId = moveResult.moving.id;
+  state.updatedBoardAssignmentId = moveResult.moving.id;
   markManualScheduleDirty();
   recomputeScheduleStateForDates([state.selectedDate]);
   persistState();
+  const warnings = collectMoveWarnings(findAssignmentById(moveResult.moving.id));
 
-  const actionText = swapped
-    ? `${formatRoomMoveLabel(sourcePosition.slotIndex)} ↔ ${formatRoomMoveLabel(target.slotIndex)} を入れ替えました`
-    : `${formatRoomMoveLabel(sourcePosition.slotIndex)} → ${formatRoomMoveLabel(target.slotIndex)} へ移動しました`;
-  showToast(actionText, "success");
+  const actionText = moveResult.swapped
+    ? `${formatRoomMoveLabel(sourcePosition.slotIndex)} ↔ ${formatRoomMoveLabel(moveResult.targetPosition.slotIndex)} を入れ替えました`
+    : `${formatRoomMoveLabel(sourcePosition.slotIndex)} → ${formatRoomMoveLabel(moveResult.targetPosition.slotIndex)} へ移動しました`;
+  if (warnings.length) {
+    showToast(`${actionText} / ⚠️ ${warnings.join(" / ")}`, "warning");
+  } else {
+    showToast(actionText, "success");
+  }
   renderDashboard();
   renderDistribution();
+}
+
+function applyRoomMove(day, sourcePosition, targetSlotIndex, preferredShiftType = sourcePosition.shiftType) {
+  if (targetSlotIndex < 0) return null;
+  const slots = {
+    early: createSlotArray(day.earlyAssignments, "early"),
+    late: createSlotArray(day.lateAssignments, "late")
+  };
+  const moving = getAssignmentFromSlots(slots, sourcePosition);
+  if (!moving) return null;
+
+  const targetPosition = resolveRoomTargetPosition(slots, sourcePosition, targetSlotIndex, preferredShiftType);
+  if (!targetPosition) return null;
+  if (sourcePosition.slotIndex === targetPosition.slotIndex && sourcePosition.shiftType === targetPosition.shiftType) return null;
+
+  const swapped = getAssignmentFromSlots(slots, targetPosition) || null;
+  setAssignmentInSlots(slots, sourcePosition, swapped ? withShiftMeta(swapped, sourcePosition.shiftType) : null);
+  setAssignmentInSlots(slots, targetPosition, withShiftMeta(moving, targetPosition.shiftType));
+
+  day.earlyAssignments = slots.early;
+  day.lateAssignments = slots.late;
+
+  return {
+    moving,
+    swapped,
+    targetPosition
+  };
+}
+
+function resolveRoomTargetPosition(slots, sourcePosition, targetSlotIndex, preferredShiftType) {
+  const primaryShift = preferredShiftType === "late" ? "late" : "early";
+  const alternateShift = primaryShift === "early" ? "late" : "early";
+  const candidates = [
+    { shiftType: primaryShift, slotIndex: targetSlotIndex },
+    { shiftType: alternateShift, slotIndex: targetSlotIndex }
+  ];
+
+  const emptyCandidate = candidates.find((position) => !getAssignmentFromSlots(slots, position));
+  if (emptyCandidate) return emptyCandidate;
+
+  const sameShiftCandidate = candidates.find((position) => position.shiftType === sourcePosition.shiftType);
+  return sameShiftCandidate || candidates[0];
+}
+
+function getAssignmentFromSlots(slots, position) {
+  const key = position.shiftType === "early" ? "early" : "late";
+  return slots[key][position.slotIndex] || null;
+}
+
+function setAssignmentInSlots(slots, position, assignment) {
+  const key = position.shiftType === "early" ? "early" : "late";
+  slots[key][position.slotIndex] = assignment;
+}
+
+function withShiftMeta(assignment, shiftType) {
+  if (!assignment) return null;
+  return {
+    ...assignment,
+    shiftType,
+    shiftLabel: shiftType === "early" ? getAppSettings().shiftLabels.early : getAppSettings().shiftLabels.late
+  };
 }
 
 function getBoardResizePreview(clientX, resizeState) {
