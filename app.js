@@ -34,6 +34,10 @@ let boardDragPayload = null;
 let boardResizeState = null;
 let boardResizeFrameId = null;
 let boardResizeClientX = 0;
+let boardMoveState = null;
+let boardMoveFrameId = null;
+let boardMovePointer = { x: 0, y: 0 };
+let boardSuppressClickUntil = 0;
 
 const viewMeta = {
   dashboard: {
@@ -206,11 +210,11 @@ function bindEvents() {
   elements.dashboardBoardCanvas.addEventListener("dragover", handleBoardDragOver);
   elements.dashboardBoardCanvas.addEventListener("dragleave", handleBoardDragLeave);
   elements.dashboardBoardCanvas.addEventListener("drop", handleBoardDrop);
-  elements.dashboardBoardCanvas.addEventListener("mousedown", handleBoardResizeStart);
+  elements.dashboardBoardCanvas.addEventListener("mousedown", handleBoardPointerStart);
   elements.boardInspectorContent.addEventListener("change", handleBoardInspectorChange);
   elements.boardInspectorContent.addEventListener("click", handleBoardInspectorAction);
-  window.addEventListener("mousemove", handleBoardResizeMove);
-  window.addEventListener("mouseup", handleBoardResizeEnd);
+  window.addEventListener("mousemove", handleBoardPointerMove);
+  window.addEventListener("mouseup", handleBoardPointerEnd);
 
   elements.shiftTabs.querySelectorAll(".shift-tab").forEach((button) => {
     button.addEventListener("click", () => {
@@ -803,11 +807,11 @@ function renderBoardBar(assignment, slotIndex, shiftType, stackMeta = null) {
       : compactTimeShort;
 
     return `
-      <button
-        class="board-bar ${densityClass} area-${visualMeta.colorKey} ${assignment.himeReservation === "あり" ? "has-pin is-hime" : ""} ${status.level === "danger" ? "is-danger" : ""} ${status.level === "warning" ? "is-warning" : ""} ${stackMeta?.isOverlapping ? "overlap" : ""} ${assignment.id === state.selectedBoardAssignmentId ? "selected" : ""} ${assignment.id === state.updatedBoardAssignmentId ? "updated" : ""}"
-        type="button"
-        draggable="true"
-        title="${escapeHtml(barTitle)}"
+        <button
+          class="board-bar ${densityClass} area-${visualMeta.colorKey} ${assignment.himeReservation === "あり" ? "has-pin is-hime" : ""} ${status.level === "danger" ? "is-danger" : ""} ${status.level === "warning" ? "is-warning" : ""} ${stackMeta?.isOverlapping ? "overlap" : ""} ${assignment.id === state.selectedBoardAssignmentId ? "selected" : ""} ${assignment.id === state.updatedBoardAssignmentId ? "updated" : ""}"
+          type="button"
+          draggable="false"
+          title="${escapeHtml(barTitle)}"
         data-board-assignment-id="${assignment.id}"
         data-board-shift-type="${shiftType}"
         data-board-slot-index="${slotIndex}"
@@ -1420,6 +1424,7 @@ function handleGenerateScheduleClick() {
 }
 
 function handleBoardCanvasClick(event) {
+  if (Date.now() < boardSuppressClickUntil) return;
   if (event.target.closest("[data-resize-handle]")) return;
   const bar = event.target.closest("[data-board-assignment-id]");
   if (!bar) return;
@@ -1427,6 +1432,22 @@ function handleBoardCanvasClick(event) {
   state.selectedBoardAssignmentId = bar.dataset.boardAssignmentId;
   persistState();
   renderDashboard();
+}
+
+function handleBoardPointerStart(event) {
+  handleBoardResizeStart(event);
+  if (boardResizeState) return;
+  handleBoardMoveStart(event);
+}
+
+function handleBoardPointerMove(event) {
+  handleBoardResizeMove(event);
+  handleBoardMoveMove(event);
+}
+
+function handleBoardPointerEnd(event) {
+  handleBoardResizeEnd(event);
+  handleBoardMoveEnd(event);
 }
 
 function handleBoardResizeStart(event) {
@@ -1460,6 +1481,51 @@ function handleBoardResizeStart(event) {
   };
 }
 
+function handleBoardMoveStart(event) {
+  if (event.button !== 0) return;
+  const bar = event.target.closest("[data-board-assignment-id]");
+  if (!bar || event.target.closest("[data-resize-handle]")) return;
+  const track = bar.closest(".board-track");
+  if (!track) return;
+
+  const assignment = findAssignmentById(bar.dataset.boardAssignmentId);
+  if (!assignment) return;
+
+  event.preventDefault();
+  state.selectedBoardAssignmentId = assignment.id;
+  const trackRect = track.getBoundingClientRect();
+  const settings = getAppSettings();
+  const initialStartTime = toMinutes(assignment.startTime);
+  const initialEndTime = toMinutes(assignment.endTime);
+
+  clearBoardInteractionHighlights();
+  bar.classList.add("dragging", "board-moving");
+  track.classList.add("drag-origin");
+  bar.closest(".board-lane")?.classList.add("drag-source-room");
+
+  boardMoveState = {
+    assignmentId: assignment.id,
+    initialX: event.clientX,
+    initialY: event.clientY,
+    initialStartTime,
+    initialEndTime,
+    duration: initialEndTime - initialStartTime,
+    initialRoomIndex: normalizeRoomIndex(assignment.roomIndex, Number(bar.dataset.boardSlotIndex)),
+    sourceTrack: track,
+    sourceTrackRect: trackRect,
+    bar,
+    subLabel: bar.querySelector(".board-bar-sub"),
+    timelineStart: settings.businessStartHour * 60,
+    timelineEnd: settings.businessEndHour * 60,
+    moved: false,
+    preview: {
+      roomIndex: normalizeRoomIndex(assignment.roomIndex, Number(bar.dataset.boardSlotIndex)),
+      startMinutes: initialStartTime,
+      endMinutes: initialEndTime
+    }
+  };
+}
+
 function handleBoardResizeMove(event) {
   if (!boardResizeState) return;
   boardResizeClientX = event.clientX;
@@ -1470,6 +1536,23 @@ function handleBoardResizeMove(event) {
     const preview = getBoardResizePreview(boardResizeClientX, boardResizeState);
     if (!preview) return;
     applyBoardResizePreview(boardResizeState, preview);
+  });
+}
+
+function handleBoardMoveMove(event) {
+  if (!boardMoveState) return;
+  boardMovePointer = { x: event.clientX, y: event.clientY };
+  if (boardMoveFrameId) return;
+  boardMoveFrameId = window.requestAnimationFrame(() => {
+    boardMoveFrameId = null;
+    if (!boardMoveState) return;
+    const preview = getBoardMovePreview(boardMoveState, boardMovePointer.x, boardMovePointer.y);
+    if (!preview) return;
+    boardMoveState.preview = preview;
+    boardMoveState.moved = boardMoveState.moved
+      || preview.roomIndex !== boardMoveState.initialRoomIndex
+      || preview.startMinutes !== boardMoveState.initialStartTime;
+    applyBoardMovePreview(boardMoveState, preview);
   });
 }
 
@@ -1498,7 +1581,32 @@ function handleBoardResizeEnd(event) {
   commitBoardResize(resizeState.assignmentId, preview.startMinutes, preview.endMinutes);
 }
 
+function handleBoardMoveEnd(event) {
+  if (!boardMoveState) return;
+  if (boardMoveFrameId) {
+    window.cancelAnimationFrame(boardMoveFrameId);
+    boardMoveFrameId = null;
+  }
+
+  const moveState = boardMoveState;
+  boardMoveState = null;
+  const preview = getBoardMovePreview(moveState, event.clientX, event.clientY) || moveState.preview;
+  cleanupBoardMovePreview(moveState);
+
+  if (!preview || !moveState.moved) {
+    renderBoardWorkspace();
+    return;
+  }
+
+  boardSuppressClickUntil = Date.now() + 220;
+  commitBoardMove(moveState.assignmentId, preview.roomIndex, preview.startMinutes, preview.endMinutes);
+}
+
 function handleBoardDragStart(event) {
+  if (boardMoveState) {
+    event.preventDefault();
+    return;
+  }
   if (event.target.closest("[data-resize-handle]") || boardResizeState) {
     event.preventDefault();
     return;
@@ -1567,6 +1675,100 @@ function clearBoardInteractionHighlights() {
   document.querySelectorAll(".board-lane.drag-target-room, .board-lane.drag-source-room, .board-lane.resizing-room").forEach((item) => {
     item.classList.remove("drag-target-room", "drag-source-room", "resizing-room");
   });
+}
+
+function getBoardMovePreview(moveState, clientX, clientY) {
+  const trackRect = moveState.sourceTrackRect;
+  if (!trackRect.width) return null;
+
+  const minutesPerPixel = (moveState.timelineEnd - moveState.timelineStart) / trackRect.width;
+  const deltaX = clientX - moveState.initialX;
+  const deltaMinutes = snapMinutes(deltaX * minutesPerPixel, 15);
+  const clampedStart = Math.max(
+    moveState.timelineStart,
+    Math.min(moveState.timelineEnd - moveState.duration, moveState.initialStartTime + deltaMinutes)
+  );
+  const startMinutes = clampedStart;
+  const endMinutes = startMinutes + moveState.duration;
+  if (startMinutes >= endMinutes) return null;
+
+  const targetTrack = getBoardTrackFromPoint(clientX, clientY) || moveState.sourceTrack;
+  const roomIndex = normalizeRoomIndex(targetTrack?.dataset.boardSlotIndex, moveState.initialRoomIndex);
+  return {
+    roomIndex,
+    startMinutes,
+    endMinutes,
+    targetTrack
+  };
+}
+
+function applyBoardMovePreview(moveState, preview) {
+  clearBoardInteractionHighlights();
+  moveState.sourceTrack.classList.add("drag-origin");
+  moveState.bar.closest(".board-lane")?.classList.add("drag-source-room");
+  preview.targetTrack?.classList.add("drag-over");
+  preview.targetTrack?.closest(".board-lane")?.classList.add("drag-target-room");
+
+  const total = moveState.timelineEnd - moveState.timelineStart;
+  const left = ((preview.startMinutes - moveState.timelineStart) / total) * 100;
+  const width = Math.max(((preview.endMinutes - preview.startMinutes) / total) * 100, 8);
+  const targetRect = (preview.targetTrack || moveState.sourceTrack).getBoundingClientRect();
+  const deltaY = targetRect.top - moveState.sourceTrackRect.top;
+
+  moveState.bar.style.left = `${left}%`;
+  moveState.bar.style.width = `${width}%`;
+  moveState.bar.style.transform = `translateY(${deltaY}px) scale(1.015)`;
+  if (moveState.subLabel) {
+    moveState.subLabel.textContent = formatBoardTimeLabel(minutesToTime(preview.startMinutes), minutesToTime(preview.endMinutes), state.boardDensity !== "comfortable");
+  }
+}
+
+function cleanupBoardMovePreview(moveState) {
+  moveState.bar.classList.remove("dragging", "board-moving");
+  moveState.bar.style.transform = "";
+  moveState.bar.style.left = "";
+  moveState.bar.style.width = "";
+  clearBoardInteractionHighlights();
+}
+
+function getBoardTrackFromPoint(clientX, clientY) {
+  const elementsAtPoint = document.elementsFromPoint(clientX, clientY);
+  return elementsAtPoint.find((item) => item.classList?.contains("board-track")) || null;
+}
+
+function commitBoardMove(assignmentId, roomIndex, startMinutes, endMinutes) {
+  const row = state.generationRows.find((item) => item.id === assignmentId);
+  const assignment = findAssignmentById(assignmentId);
+  if (!assignment) return;
+
+  const normalizedRoomIndex = normalizeRoomIndex(roomIndex, assignment.roomIndex ?? 0);
+  const roomMeta = getRoomMeta(normalizedRoomIndex, assignment.assignedArea || assignment.preferredArea);
+
+  if (row) {
+    row.startTime = minutesToTime(startMinutes);
+    row.endTime = minutesToTime(endMinutes);
+    row.issues = collectRowIssues(row);
+  }
+
+  Object.values(state.generatedSchedule).forEach((day) => {
+    [...day.earlyAssignments, ...day.lateAssignments].forEach((item) => {
+      if (!item || item.id !== assignmentId) return;
+      item.roomIndex = normalizedRoomIndex;
+      item.startTime = minutesToTime(startMinutes);
+      item.endTime = minutesToTime(endMinutes);
+      if (roomMeta.area) item.assignedArea = roomMeta.area;
+    });
+  });
+
+  state.selectedBoardAssignmentId = assignmentId;
+  state.updatedBoardAssignmentId = assignmentId;
+  state.generationWarnings = collectGenerationWarnings(state.generationRows);
+  markManualScheduleDirty();
+  recomputeScheduleStateForDates([assignment.dateKey]);
+  persistState();
+  showToast(`${roomMeta.roomLabel} / ${minutesToTime(startMinutes)}-${minutesToTime(endMinutes)} に更新しました。`, "success");
+  renderBoardWorkspace();
+  renderLinkedViewsAfterBoardEdit();
 }
 
 function handleBoardInspectorChange(event) {

@@ -1530,6 +1530,7 @@ pre {
   text-align: left;
   transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, filter 0.22s ease;
   z-index: 1;
+  cursor: grab;
 }
 
 .board-resize-handle {
@@ -1583,6 +1584,11 @@ pre {
   transform: translateY(-2px) scale(1.015);
   box-shadow: 0 20px 30px rgba(17, 36, 63, 0.28);
   z-index: 8;
+}
+
+.board-bar.board-moving {
+  pointer-events: none;
+  cursor: grabbing;
 }
 
 .board-bar.resizing {
