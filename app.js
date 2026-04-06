@@ -30,6 +30,7 @@ const STORAGE_KEY = "shift-dashboard-state-v1";
 const DASHBOARD_SLOT_COUNT = 7;
 let boardFeedbackTimer = null;
 let boardDragPayload = null;
+let boardResizeState = null;
 
 const viewMeta = {
   dashboard: {
@@ -192,7 +193,10 @@ function bindEvents() {
   elements.dashboardBoardCanvas.addEventListener("dragover", handleBoardDragOver);
   elements.dashboardBoardCanvas.addEventListener("dragleave", handleBoardDragLeave);
   elements.dashboardBoardCanvas.addEventListener("drop", handleBoardDrop);
+  elements.dashboardBoardCanvas.addEventListener("mousedown", handleBoardResizeStart);
   elements.boardInspectorContent.addEventListener("change", handleBoardInspectorChange);
+  window.addEventListener("mousemove", handleBoardResizeMove);
+  window.addEventListener("mouseup", handleBoardResizeEnd);
 
   elements.shiftTabs.querySelectorAll(".shift-tab").forEach((button) => {
     button.addEventListener("click", () => {
@@ -703,7 +707,7 @@ function renderBoardLaneRow(row, index) {
     <div class="board-lane">
       <div class="board-lane-head">
         <strong class="board-lane-title">${row.roomLabel}</strong>
-        <span class="board-lane-meta">${row.assignments.length ? row.assignments.map((assignment) => assignment.shiftLabel).join(" / ") : "空き多め"}</span>
+        <span class="board-lane-meta">${row.assignments.length ? `${row.assignments.length}件稼働中` : "空き多め"}</span>
       </div>
       <div class="board-track-wrap">
         <div class="board-track" data-board-slot-index="${row.slotIndex}">
@@ -747,6 +751,8 @@ function renderBoardBar(assignment, slotIndex, shiftType) {
       data-board-shift-type="${shiftType}"
       data-board-slot-index="${slotIndex}"
       style="left:${left}%; width:${width}%;">
+      <span class="board-resize-handle left" data-resize-handle="start" data-board-assignment-id="${assignment.id}"></span>
+      <span class="board-resize-handle right" data-resize-handle="end" data-board-assignment-id="${assignment.id}"></span>
       ${assignment.himeReservation === "あり" ? `<span class="board-bar-pin">姫</span>` : ""}
       <span class="board-bar-name">${assignment.name}</span>
       <span class="board-bar-meta">${assignment.assignedArea}${reservationLabel ? `｜${reservationLabel}` : ""}</span>
@@ -1170,6 +1176,7 @@ function handleGenerateScheduleClick() {
 }
 
 function handleBoardCanvasClick(event) {
+  if (event.target.closest("[data-resize-handle]")) return;
   const bar = event.target.closest("[data-board-assignment-id]");
   if (!bar) return;
 
@@ -1178,7 +1185,65 @@ function handleBoardCanvasClick(event) {
   renderDashboard();
 }
 
+function handleBoardResizeStart(event) {
+  const handle = event.target.closest("[data-resize-handle]");
+  if (!handle) return;
+  const bar = handle.closest("[data-board-assignment-id]");
+  const track = handle.closest(".board-track");
+  if (!bar || !track) return;
+
+  const assignment = findAssignmentById(bar.dataset.boardAssignmentId);
+  if (!assignment) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  boardDragPayload = null;
+  state.selectedBoardAssignmentId = assignment.id;
+  bar.classList.add("resizing");
+  boardResizeState = {
+    assignmentId: assignment.id,
+    edge: handle.dataset.resizeHandle,
+    shiftType: assignment.shiftType,
+    slotIndex: Number(bar.dataset.boardSlotIndex),
+    startMinutes: toMinutes(assignment.startTime),
+    endMinutes: toMinutes(assignment.endTime),
+    track,
+    bar,
+    subLabel: bar.querySelector(".board-bar-sub")
+  };
+}
+
+function handleBoardResizeMove(event) {
+  if (!boardResizeState) return;
+  const preview = getBoardResizePreview(event.clientX, boardResizeState);
+  if (!preview) return;
+  applyBoardResizePreview(boardResizeState, preview);
+}
+
+function handleBoardResizeEnd(event) {
+  if (!boardResizeState) return;
+  const resizeState = boardResizeState;
+  boardResizeState = null;
+  resizeState.bar.classList.remove("resizing");
+  const preview = getBoardResizePreview(event.clientX, resizeState);
+  if (!preview) {
+    renderDashboard();
+    return;
+  }
+
+  if (preview.startMinutes === resizeState.startMinutes && preview.endMinutes === resizeState.endMinutes) {
+    renderDashboard();
+    return;
+  }
+
+  commitBoardResize(resizeState.assignmentId, preview.startMinutes, preview.endMinutes);
+}
+
 function handleBoardDragStart(event) {
+  if (event.target.closest("[data-resize-handle]") || boardResizeState) {
+    event.preventDefault();
+    return;
+  }
   const bar = event.target.closest("[data-board-assignment-id]");
   if (!bar) return;
   boardDragPayload = {
@@ -1526,6 +1591,69 @@ function moveBoardAssignmentWithinShift(source, target) {
     : `${formatSlotLabel(source.shiftType, source.slotIndex)} → ${formatSlotLabel(target.shiftType, target.slotIndex)} へ移動しました`;
   showToast(actionText, "success");
   renderDashboard();
+  renderDistribution();
+}
+
+function getBoardResizePreview(clientX, resizeState) {
+  const rect = resizeState.track.getBoundingClientRect();
+  if (!rect.width) return null;
+  const settings = getAppSettings();
+  const timelineStart = settings.businessStartHour * 60;
+  const timelineEnd = settings.businessEndHour * 60;
+  const rawRatio = (clientX - rect.left) / rect.width;
+  const clampedRatio = Math.max(0, Math.min(1, rawRatio));
+  const rawMinutes = timelineStart + Math.round((timelineEnd - timelineStart) * clampedRatio);
+  const snappedMinutes = snapMinutes(rawMinutes, 60);
+  const minDuration = 60;
+
+  let startMinutes = resizeState.startMinutes;
+  let endMinutes = resizeState.endMinutes;
+
+  if (resizeState.edge === "start") {
+    startMinutes = Math.max(timelineStart, Math.min(snappedMinutes, endMinutes - minDuration));
+  } else {
+    endMinutes = Math.min(timelineEnd, Math.max(snappedMinutes, startMinutes + minDuration));
+  }
+
+  if (startMinutes >= endMinutes) return null;
+  return { startMinutes, endMinutes, timelineStart, timelineEnd };
+}
+
+function applyBoardResizePreview(resizeState, preview) {
+  const total = preview.timelineEnd - preview.timelineStart;
+  const left = ((preview.startMinutes - preview.timelineStart) / total) * 100;
+  const width = Math.max(((preview.endMinutes - preview.startMinutes) / total) * 100, 4);
+  resizeState.bar.style.left = `${left}%`;
+  resizeState.bar.style.width = `${width}%`;
+  if (resizeState.subLabel) {
+    resizeState.subLabel.textContent = `${minutesToTime(preview.startMinutes)}-${minutesToTime(preview.endMinutes)}`;
+  }
+}
+
+function commitBoardResize(assignmentId, startMinutes, endMinutes) {
+  const row = state.generationRows.find((item) => item.id === assignmentId);
+  if (row) {
+    row.startTime = minutesToTime(startMinutes);
+    row.endTime = minutesToTime(endMinutes);
+    row.issues = collectRowIssues(row);
+  }
+
+  Object.values(state.generatedSchedule).forEach((day) => {
+    [...day.earlyAssignments, ...day.lateAssignments].forEach((assignment) => {
+      if (!assignment || assignment.id !== assignmentId) return;
+      assignment.startTime = minutesToTime(startMinutes);
+      assignment.endTime = minutesToTime(endMinutes);
+    });
+  });
+
+  state.updatedBoardAssignmentId = assignmentId;
+  state.generationWarnings = collectGenerationWarnings(state.generationRows);
+  markManualScheduleDirty();
+  recomputeScheduleStateForDates([row?.dateKey].filter(Boolean));
+  persistState();
+  showToast(`稼働時間を ${minutesToTime(startMinutes)}-${minutesToTime(endMinutes)} に更新しました。`, "success");
+  renderDashboard();
+  renderGeneration();
   renderDistribution();
 }
 
@@ -2261,10 +2389,20 @@ function normalizeDistributionEnd(timeText) {
   return `${hours}:${mins}`;
 }
 
+function minutesToTime(totalMinutes) {
+  const hours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+  const minutes = String(totalMinutes % 60).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
 function toMinutes(timeText) {
   const safe = String(timeText || "00:00");
   const [hours, minutes] = safe.split(":").map(Number);
   return (hours || 0) * 60 + (minutes || 0);
+}
+
+function snapMinutes(totalMinutes, step) {
+  return Math.round(totalMinutes / step) * step;
 }
 
 function formatDate(date) {
