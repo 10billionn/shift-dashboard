@@ -31,6 +31,8 @@ const DASHBOARD_SLOT_COUNT = 7;
 let boardFeedbackTimer = null;
 let boardDragPayload = null;
 let boardResizeState = null;
+let boardResizeFrameId = null;
+let boardResizeClientX = 0;
 
 const viewMeta = {
   dashboard: {
@@ -397,6 +399,7 @@ function renderSettings() {
 
 function renderDashboard() {
   const day = getScheduleDay(state.selectedDate);
+  const boardRows = buildBoardRoomRows(day);
   const requirement = findRequirement(state.selectedDate);
   const cutRows = getCutRowsForDate(state.selectedDate);
   const earlySlotTotal = getShiftSlotTotal(state.selectedDate, "early");
@@ -419,12 +422,12 @@ function renderDashboard() {
   elements.shortageSummary.textContent = `${displayShortage}枠`;
   elements.fillSummary.textContent = `${displayFillRate}%`;
   elements.dashboardRiskSummary.innerHTML = renderDashboardRiskSummary();
-  elements.roomDetailList.innerHTML = renderRoomDetailGroups(day);
+  elements.roomDetailList.innerHTML = renderRoomDetailGroups(boardRows);
   elements.earlyShiftList.innerHTML = renderShiftSlots(day.earlyAssignments, "早番", earlySlotTotal);
   elements.lateShiftList.innerHTML = renderShiftSlots(day.lateAssignments, "遅番", lateSlotTotal);
   elements.cutShiftList.innerHTML = renderCutRows(cutRows);
   syncSelectedBoardAssignment();
-  elements.dashboardBoardCanvas.innerHTML = renderBoardTimeline(day);
+  elements.dashboardBoardCanvas.innerHTML = renderBoardTimeline(day, boardRows);
   elements.boardInspectorContent.innerHTML = renderBoardInspector(day);
   elements.weeklyAnalysis.innerHTML = renderWeeklyAnalysis();
 
@@ -659,10 +662,9 @@ function renderWeeklyAnalysis() {
   }).join("");
 }
 
-function renderBoardTimeline(day) {
+function renderBoardTimeline(day, rows = buildBoardRoomRows(day)) {
   const settings = getAppSettings();
   const hourLabels = buildBoardHourLabels(settings.businessStartHour, settings.businessEndHour);
-  const rows = buildBoardRoomRows(day);
   const totalAssignments = rows.reduce((count, row) => count + row.assignments.length, 0);
   const totalLanes = rows.reduce((count, row) => count + row.lanes.length, 0);
 
@@ -671,7 +673,10 @@ function renderBoardTimeline(day) {
       <div class="board-hours">
         <div class="board-hours-label">営業時間</div>
         <div class="board-hours-track">
-          ${hourLabels.map((label) => `<div class="board-hour-cell">${label}</div>`).join("")}
+          ${hourLabels.map((label, index) => {
+            const hour = settings.businessStartHour + index;
+            return `<div class="board-hour-cell ${isMajorBoardHour(hour) ? "major" : ""}">${label}</div>`;
+          }).join("")}
         </div>
       </div>
       <section class="board-group unified-board-group">
@@ -733,7 +738,7 @@ function renderBoardLaneRow(row, index) {
     <div class="board-lane ${row.lanes.length > 1 ? "stacked" : ""}">
       <div class="board-lane-head">
         <strong class="board-lane-title">${row.roomLabel}</strong>
-        <span class="board-lane-meta">${row.assignments.length ? `${row.assignments.length}件 / ${row.lanes.length}レーン${row.lanes.length > 1 ? "（重なりあり）" : ""}` : "空き多め"}</span>
+        <span class="board-lane-meta">${row.assignments.length ? `<span>${row.assignments.length}件</span><span>${row.lanes.length}レーン</span>${row.lanes.length > 1 ? `<span>仮置き</span>` : ""}` : "空き多め"}</span>
       </div>
       <div class="board-track-wrap">
         ${trackMarkup}
@@ -755,6 +760,7 @@ function renderBoardBar(assignment, slotIndex, shiftType) {
   const total = timelineEnd - timelineStart;
   const left = ((clampedStart - timelineStart) / total) * 100;
   const width = Math.max((duration / total) * 100, 8);
+  const densityClass = width < 12 ? "tiny" : width < 20 ? "compact" : "full";
   const status = analyzeAssignmentStatus(assignment, profile);
   const barClass = status.level === "danger"
     ? "danger"
@@ -765,12 +771,14 @@ function renderBoardBar(assignment, slotIndex, shiftType) {
         : "normal";
   const compactTime = `${assignment.startTime}-${assignment.endTime}`;
   const reservationLabel = assignment.himeReservation === "あり" ? "姫" : "";
+  const barTitle = `${assignment.name} / ${compactTime}${assignment.assignedArea ? ` / ${assignment.assignedArea}` : ""}${reservationLabel ? ` / ${reservationLabel}` : ""}`;
 
   return `
     <button
-      class="board-bar ${barClass} ${assignment.himeReservation === "あり" ? "has-pin" : ""} ${assignment.id === state.selectedBoardAssignmentId ? "selected" : ""} ${assignment.id === state.updatedBoardAssignmentId ? "updated" : ""}"
+      class="board-bar ${densityClass} ${barClass} ${assignment.himeReservation === "あり" ? "has-pin" : ""} ${assignment.id === state.selectedBoardAssignmentId ? "selected" : ""} ${assignment.id === state.updatedBoardAssignmentId ? "updated" : ""}"
       type="button"
       draggable="true"
+      title="${escapeHtml(barTitle)}"
       data-board-assignment-id="${assignment.id}"
       data-board-shift-type="${shiftType}"
       data-board-slot-index="${slotIndex}"
@@ -779,8 +787,8 @@ function renderBoardBar(assignment, slotIndex, shiftType) {
       <span class="board-resize-handle right" data-resize-handle="end" data-board-assignment-id="${assignment.id}"></span>
       ${assignment.himeReservation === "あり" ? `<span class="board-bar-pin">姫</span>` : ""}
       <span class="board-bar-name">${assignment.name}</span>
-      <span class="board-bar-meta">${assignment.assignedArea}${reservationLabel ? `｜${reservationLabel}` : ""}</span>
-      <span class="board-bar-sub">${compactTime}</span>
+      ${densityClass !== "tiny" ? `<span class="board-bar-sub">${compactTime}</span>` : ""}
+      ${densityClass === "full" ? `<span class="board-bar-meta">${assignment.assignedArea}${reservationLabel ? `｜${reservationLabel}` : ""}</span>` : ""}
     </button>
   `;
 }
@@ -809,8 +817,7 @@ function packAssignmentsIntoBoardLanes(assignments) {
   return lanes;
 }
 
-function renderRoomDetailGroups(day) {
-  const rows = buildBoardRoomRows(day);
+function renderRoomDetailGroups(rows) {
   const activeRows = rows.filter((row) => row.assignments.length);
 
   if (!activeRows.length) {
@@ -1322,13 +1329,23 @@ function handleBoardResizeStart(event) {
 
 function handleBoardResizeMove(event) {
   if (!boardResizeState) return;
-  const preview = getBoardResizePreview(event.clientX, boardResizeState);
-  if (!preview) return;
-  applyBoardResizePreview(boardResizeState, preview);
+  boardResizeClientX = event.clientX;
+  if (boardResizeFrameId) return;
+  boardResizeFrameId = window.requestAnimationFrame(() => {
+    boardResizeFrameId = null;
+    if (!boardResizeState) return;
+    const preview = getBoardResizePreview(boardResizeClientX, boardResizeState);
+    if (!preview) return;
+    applyBoardResizePreview(boardResizeState, preview);
+  });
 }
 
 function handleBoardResizeEnd(event) {
   if (!boardResizeState) return;
+  if (boardResizeFrameId) {
+    window.cancelAnimationFrame(boardResizeFrameId);
+    boardResizeFrameId = null;
+  }
   const resizeState = boardResizeState;
   boardResizeState = null;
   resizeState.bar.classList.remove("resizing");
@@ -1640,7 +1657,6 @@ function moveAssignmentBetweenSlots(source, target) {
     showToast(actionText, "success");
   }
   renderDashboard();
-  renderDistribution();
 }
 
 function moveBoardAssignmentWithinShift(source, target) {
@@ -1670,7 +1686,6 @@ function moveBoardAssignmentWithinShift(source, target) {
     showToast(actionText, "success");
   }
   renderDashboard();
-  renderDistribution();
 }
 
 function applyRoomMove(day, sourcePosition, targetSlotIndex, preferredShiftType = sourcePosition.shiftType) {
@@ -1742,7 +1757,7 @@ function getBoardResizePreview(clientX, resizeState) {
   const timelineEnd = settings.businessEndHour * 60;
   const pxPerMinute = rect.width / (timelineEnd - timelineStart);
   const deltaX = clientX - resizeState.initialX;
-  const deltaMinutes = snapMinutes(deltaX / pxPerMinute, 60);
+  const deltaMinutes = snapMinutes(deltaX / pxPerMinute, 15);
   const minDuration = 60;
 
   let startMinutes = resizeState.initialStartTime;
@@ -1792,8 +1807,6 @@ function commitBoardResize(assignmentId, startMinutes, endMinutes) {
   persistState();
   showToast(`稼働時間を ${minutesToTime(startMinutes)}-${minutesToTime(endMinutes)} に更新しました。`, "success");
   renderDashboard();
-  renderGeneration();
-  renderDistribution();
 }
 
 function collectMoveWarnings(assignment) {
@@ -1897,6 +1910,10 @@ function buildAssignmentWarnings(assignment, assignmentsForDay) {
 
 function isWeakHimePlacement(assignment) {
   return assignment.shiftType !== "late" || toMinutes(assignment.endTime) < 21 * 60;
+}
+
+function isMajorBoardHour(hour) {
+  return [11, 17, 19, 22, 24, 27].includes(hour);
 }
 
 function formatSlotLabel(shiftType, slotIndex) {
