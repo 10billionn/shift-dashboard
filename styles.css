@@ -327,17 +327,6 @@ pre {
   flex-wrap: wrap;
 }
 
-.inline-meta {
-  display: flex;
-  gap: 8px;
-}
-
-#dashboardViewTabs,
-#boardDensityTabs,
-.hero-panel .inline-meta {
-  display: none !important;
-}
-
 .meta-chip,
 .panel-count,
 .status-pill,
@@ -619,6 +608,10 @@ pre {
 .hero-panel .toolbar-row {
   justify-content: flex-start;
   gap: 12px;
+}
+
+.hero-panel .toolbar-row {
+  margin-top: 2px;
 }
 
 #dashboardBoardView .panel-head {

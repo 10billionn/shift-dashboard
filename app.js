@@ -186,7 +186,7 @@ function bindEvents() {
     });
   });
 
-  elements.dashboardViewTabs.querySelectorAll(".view-tab").forEach((button) => {
+  elements.dashboardViewTabs?.querySelectorAll(".view-tab").forEach((button) => {
     button.addEventListener("click", () => {
       state.activeDashboardView = button.dataset.dashboardView;
       if (state.activeDashboardView === "board") {
@@ -522,7 +522,7 @@ function renderDashboardViewState() {
   const isList = state.activeDashboardView === "list";
   elements.dashboardListView.classList.toggle("active", isList);
   elements.dashboardBoardView.classList.toggle("active", !isList);
-  elements.dashboardViewTabs.querySelectorAll(".view-tab").forEach((button) => {
+  elements.dashboardViewTabs?.querySelectorAll(".view-tab").forEach((button) => {
     button.classList.toggle("active", button.dataset.dashboardView === state.activeDashboardView);
   });
 }
