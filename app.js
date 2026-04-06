@@ -1520,6 +1520,8 @@ function handleBoardMoveStart(event) {
     moved: false,
     preview: {
       roomIndex: normalizeRoomIndex(assignment.roomIndex, Number(bar.dataset.boardSlotIndex)),
+      rawStartMinutes: initialStartTime,
+      rawEndMinutes: initialEndTime,
       startMinutes: initialStartTime,
       endMinutes: initialEndTime
     }
@@ -1684,12 +1686,17 @@ function getBoardMovePreview(moveState, clientX, clientY) {
 
   const pxPerMinute = trackRect.width / (moveState.timelineEnd - moveState.timelineStart);
   const deltaX = clientX - moveState.initialX;
-  const deltaMinutes = snapMinutes(deltaX / pxPerMinute, 15);
-  const clampedStart = Math.max(
+  const rawMinutes = deltaX / pxPerMinute;
+  const snappedMinutes = snapMinutes(rawMinutes, 15);
+  const rawStartMinutes = Math.max(
     moveState.timelineStart,
-    Math.min(moveState.timelineEnd - moveState.duration, moveState.initialStartTime + deltaMinutes)
+    Math.min(moveState.timelineEnd - moveState.duration, moveState.initialStartTime + rawMinutes)
   );
-  const startMinutes = clampedStart;
+  const startMinutes = Math.max(
+    moveState.timelineStart,
+    Math.min(moveState.timelineEnd - moveState.duration, moveState.initialStartTime + snappedMinutes)
+  );
+  const rawEndMinutes = rawStartMinutes + moveState.duration;
   const endMinutes = startMinutes + moveState.duration;
   if (startMinutes >= endMinutes) return null;
 
@@ -1697,6 +1704,8 @@ function getBoardMovePreview(moveState, clientX, clientY) {
   const roomIndex = normalizeRoomIndex(targetTrack.dataset.boardSlotIndex, moveState.initialRoomIndex);
   return {
     roomIndex,
+    rawStartMinutes,
+    rawEndMinutes,
     startMinutes,
     endMinutes,
     targetTrack
@@ -1711,16 +1720,20 @@ function applyBoardMovePreview(moveState, preview) {
   preview.targetTrack?.closest(".board-lane")?.classList.add("drag-target-room");
 
   const total = moveState.timelineEnd - moveState.timelineStart;
-  const left = ((preview.startMinutes - moveState.timelineStart) / total) * 100;
-  const width = Math.max(((preview.endMinutes - preview.startMinutes) / total) * 100, 8);
+  const left = ((preview.rawStartMinutes - moveState.timelineStart) / total) * 100;
+  const width = Math.max(((preview.rawEndMinutes - preview.rawStartMinutes) / total) * 100, 8);
   const targetRect = (preview.targetTrack || moveState.sourceTrack).getBoundingClientRect();
   const deltaY = targetRect.top - moveState.sourceTrackRect.top;
 
   moveState.bar.style.left = `${left}%`;
   moveState.bar.style.width = `${width}%`;
-  moveState.bar.style.transform = `translateY(${deltaY}px) scale(1.015)`;
+  moveState.bar.style.transform = `translateY(${deltaY}px) scale(1.02)`;
   if (moveState.subLabel) {
-    moveState.subLabel.textContent = formatBoardTimeLabel(minutesToTime(preview.startMinutes), minutesToTime(preview.endMinutes), state.boardDensity !== "comfortable");
+    moveState.subLabel.textContent = formatBoardTimeLabel(
+      minutesToTime(Math.round(preview.rawStartMinutes)),
+      minutesToTime(Math.round(preview.rawEndMinutes)),
+      state.boardDensity !== "comfortable"
+    );
   }
 }
 
