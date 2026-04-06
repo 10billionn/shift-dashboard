@@ -1035,7 +1035,7 @@ function renderBoardInspector(day) {
       <div class="board-inspector-head">
         <div>
           <strong class="therapist-name">${assignment.name}</strong>
-          <p class="field-help">${assignment.shiftLabel} / ${formatDisplayDate(assignment.dateKey)} (${formatWeekday(assignment.dateKey)})</p>
+          <p class="field-help">${assignment.assignedArea} / ${formatDisplayDate(assignment.dateKey)} (${formatWeekday(assignment.dateKey)})</p>
         </div>
         <div class="status-row tight">
           <span class="mini-badge rank">${profile.rank || "G"}</span>
@@ -1343,7 +1343,6 @@ function handleBoardDragStart(event) {
   if (!bar) return;
   boardDragPayload = {
     assignmentId: bar.dataset.boardAssignmentId,
-    shiftType: bar.dataset.boardShiftType,
     slotIndex: Number(bar.dataset.boardSlotIndex)
   };
   event.dataTransfer.effectAllowed = "move";
@@ -1381,7 +1380,6 @@ function handleBoardDrop(event) {
   event.preventDefault();
 
   moveBoardAssignmentWithinShift(boardDragPayload, {
-    shiftType: boardDragPayload.shiftType,
     slotIndex: Number(track.dataset.boardSlotIndex)
   });
 }
@@ -1659,19 +1657,20 @@ function moveAssignmentBetweenSlots(source, target) {
 
 function moveBoardAssignmentWithinShift(source, target) {
   if (!source?.assignmentId) return;
-  if (source.shiftType !== target.shiftType) return;
-  if (source.slotIndex === target.slotIndex) return;
+  const sourcePosition = findAssignmentPosition(state.selectedDate, source.assignmentId);
+  if (!sourcePosition) return;
+  if (sourcePosition.slotIndex === target.slotIndex) return;
 
   const day = state.generatedSchedule[state.selectedDate];
   if (!day) return;
 
-  const key = source.shiftType === "early" ? "earlyAssignments" : "lateAssignments";
-  const slots = createSlotArray(day[key], source.shiftType);
-  const moving = slots[source.slotIndex];
+  const key = sourcePosition.shiftType === "early" ? "earlyAssignments" : "lateAssignments";
+  const slots = createSlotArray(day[key], sourcePosition.shiftType);
+  const moving = slots[sourcePosition.slotIndex];
   if (!moving) return;
 
   const swapped = slots[target.slotIndex] || null;
-  slots[source.slotIndex] = swapped;
+  slots[sourcePosition.slotIndex] = swapped;
   slots[target.slotIndex] = moving;
   day[key] = slots;
 
@@ -1682,8 +1681,8 @@ function moveBoardAssignmentWithinShift(source, target) {
   persistState();
 
   const actionText = swapped
-    ? `${formatSlotLabel(source.shiftType, source.slotIndex)} ↔ ${formatSlotLabel(target.shiftType, target.slotIndex)} を入れ替えました`
-    : `${formatSlotLabel(source.shiftType, source.slotIndex)} → ${formatSlotLabel(target.shiftType, target.slotIndex)} へ移動しました`;
+    ? `${formatRoomMoveLabel(sourcePosition.slotIndex)} ↔ ${formatRoomMoveLabel(target.slotIndex)} を入れ替えました`
+    : `${formatRoomMoveLabel(sourcePosition.slotIndex)} → ${formatRoomMoveLabel(target.slotIndex)} へ移動しました`;
   showToast(actionText, "success");
   renderDashboard();
   renderDistribution();
@@ -1858,6 +1857,10 @@ function formatSlotLabel(shiftType, slotIndex) {
   return `${shiftType === "early" ? "早番" : "遅番"}${slotIndex + 1}`;
 }
 
+function formatRoomMoveLabel(slotIndex) {
+  return getRoomLabel(slotIndex);
+}
+
 function isMobileLikeDevice() {
   return window.matchMedia("(max-width: 768px)").matches || window.matchMedia("(pointer: coarse)").matches;
 }
@@ -1867,9 +1870,9 @@ function openMobileMovePicker(assignmentId) {
   const source = findAssignmentPosition(state.selectedDate, assignmentId);
   if (!assignment || !source) return;
 
-  const raw = window.prompt("移動先を入力してください。例: 早番3 / 遅番2 / e3 / l2", `${assignment.shiftType === "early" ? "遅番" : "早番"}1`);
+  const raw = window.prompt("移動先の部屋番号または部屋名を入力してください。例: 3 / 葛西1", getRoomLabel(source.slotIndex));
   if (!raw) return;
-  const target = parseMoveTarget(raw);
+  const target = parseMoveTarget(raw, source.shiftType);
   if (!target) {
     showToast("移動先の形式を読み取れませんでした。", "error");
     return;
@@ -1877,17 +1880,35 @@ function openMobileMovePicker(assignmentId) {
   moveAssignmentBetweenSlots(source, target);
 }
 
-function parseMoveTarget(value) {
+function parseMoveTarget(value, defaultShiftType = "early") {
   const text = String(value || "").trim().toLowerCase();
   const earlyMatch = text.match(/^(早番|e)\s*(\d)$/);
   const lateMatch = text.match(/^(遅番|l)\s*(\d)$/);
-  const matched = earlyMatch || lateMatch;
-  if (!matched) return null;
-  const slotIndex = Number(matched[2]) - 1;
-  if (slotIndex < 0 || slotIndex >= getRoomCapacity()) return null;
+  if (earlyMatch || lateMatch) {
+    const matched = earlyMatch || lateMatch;
+    const slotIndex = Number(matched[2]) - 1;
+    if (slotIndex < 0 || slotIndex >= getRoomCapacity()) return null;
+    return {
+      shiftType: earlyMatch ? "early" : "late",
+      slotIndex
+    };
+  }
+
+  const numberMatch = text.match(/^(\d{1,2})$/);
+  if (numberMatch) {
+    const slotIndex = Number(numberMatch[1]) - 1;
+    if (slotIndex < 0 || slotIndex >= getRoomCapacity()) return null;
+    return {
+      shiftType: defaultShiftType,
+      slotIndex
+    };
+  }
+
+  const roomIndex = getAppSettings().roomNames.findIndex((roomName) => roomName.toLowerCase() === text);
+  if (roomIndex < 0) return null;
   return {
-    shiftType: earlyMatch ? "early" : "late",
-    slotIndex
+    shiftType: defaultShiftType,
+    slotIndex: roomIndex
   };
 }
 
