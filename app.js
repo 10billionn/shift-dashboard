@@ -656,76 +656,58 @@ function renderWeeklyAnalysis() {
 function renderBoardTimeline(day) {
   const settings = getAppSettings();
   const hourLabels = buildBoardHourLabels(settings.businessStartHour, settings.businessEndHour);
-  const groups = [
-    {
-      key: "early",
-      label: "早番",
-      slots: day.earlyAssignments,
-      filled: countAssignments(day.earlyAssignments),
-      needed: day.requirement?.earlyNeeded || 0
-    },
-    {
-      key: "late",
-      label: "遅番",
-      slots: day.lateAssignments,
-      filled: countAssignments(day.lateAssignments),
-      needed: day.requirement?.lateNeeded || 0
-    }
-  ];
+  const rows = buildBoardRoomRows(day);
 
   return `
     <div class="board-timeline">
       <div class="board-hours">
-        <div class="board-hours-label">時間</div>
+        <div class="board-hours-label">営業時間</div>
         <div class="board-hours-track">
           ${hourLabels.map((label) => `<div class="board-hour-cell">${label}</div>`).join("")}
         </div>
       </div>
-      ${groups.map((group) => renderBoardGroup(group)).join("")}
+      <section class="board-group unified-board-group">
+        <div class="board-group-head">
+          <strong class="board-group-title">部屋ごとの稼働状況</strong>
+          <span class="board-group-meta">${countAssignments(day.earlyAssignments) + countAssignments(day.lateAssignments)}件 / ${rows.length}レーン</span>
+        </div>
+        <div class="board-group-body">
+          ${rows.map((row, index) => renderBoardLaneRow(row, index)).join("")}
+        </div>
+      </section>
     </div>
   `;
 }
 
-function renderBoardGroup(group) {
-  const baseLaneCount = Math.max(getRoomCapacity(), group.slots.length, 2);
-  const visualLaneCount = Math.max(baseLaneCount, group.needed || 0, 2);
-  const lanes = Array.from({ length: visualLaneCount }, (_, index) => {
-    const assignment = group.slots[index] || null;
-    if (assignment) return { type: "assigned", assignment, slotIndex: index };
-    if (index < (group.needed || 0)) return { type: "shortage", assignment: null, slotIndex: index };
-    return { type: "empty", assignment: null, slotIndex: index };
+function buildBoardRoomRows(day) {
+  const rowCount = Math.max(getRoomCapacity(), day.earlyAssignments.length, day.lateAssignments.length, 2);
+  return Array.from({ length: rowCount }, (_, index) => {
+    const assignments = [day.earlyAssignments[index], day.lateAssignments[index]]
+      .filter(Boolean)
+      .sort((left, right) => toMinutes(left.startTime) - toMinutes(right.startTime));
+    return {
+      slotIndex: index,
+      roomLabel: getRoomLabel(index),
+      assignments,
+      type: assignments.length ? "assigned" : "empty"
+    };
   });
-
-  return `
-    <section class="board-group">
-      <div class="board-group-head">
-        <strong class="board-group-title">${group.label}</strong>
-        <span class="board-group-meta">${group.filled}/${baseLaneCount}枠 ・ 必要 ${group.needed || 0}</span>
-      </div>
-      <div class="board-group-body">
-        ${lanes.map((lane, index) => renderBoardLaneRow(group, lane, index)).join("")}
-      </div>
-    </section>
-  `;
 }
 
-function renderBoardLaneRow(group, lane, index) {
-  const roomLabel = getRoomLabel(index);
-  const shortageMarkup = lane.type === "shortage"
-    ? `<div class="board-gap board-gap-shortage">空き｜未配置</div>`
-    : lane.type === "empty"
-      ? `<div class="board-gap board-gap-empty">${roomLabel}</div>`
-      : renderBoardBar(lane.assignment, lane.slotIndex, group.key);
+function renderBoardLaneRow(row, index) {
+  const markup = row.assignments.length
+    ? row.assignments.map((assignment) => renderBoardBar(assignment, row.slotIndex, assignment.shiftType)).join("")
+    : `<div class="board-gap board-gap-empty">空き時間あり</div>`;
 
   return `
     <div class="board-lane">
       <div class="board-lane-head">
-        <strong class="board-lane-title">${roomLabel}</strong>
-        <span class="board-lane-meta">${lane.type === "shortage" ? "不足" : lane.type === "assigned" ? "稼働中" : "待機"}</span>
+        <strong class="board-lane-title">${row.roomLabel}</strong>
+        <span class="board-lane-meta">${row.assignments.length ? row.assignments.map((assignment) => assignment.shiftLabel).join(" / ") : "空き多め"}</span>
       </div>
       <div class="board-track-wrap">
-        <div class="board-track" data-board-shift-type="${group.key}" data-board-slot-index="${lane.slotIndex}">
-          ${shortageMarkup}
+        <div class="board-track" data-board-slot-index="${row.slotIndex}">
+          ${markup}
         </div>
       </div>
     </div>
@@ -1218,7 +1200,6 @@ function handleBoardDragEnd(event) {
 function handleBoardDragOver(event) {
   const track = event.target.closest(".board-track");
   if (!track || !boardDragPayload) return;
-  if (track.dataset.boardShiftType !== boardDragPayload.shiftType) return;
   event.preventDefault();
   document.querySelectorAll(".board-track.drag-over").forEach((item) => {
     if (item !== track) item.classList.remove("drag-over");
@@ -1237,11 +1218,10 @@ function handleBoardDrop(event) {
   if (!track) return;
   track.classList.remove("drag-over");
   if (!boardDragPayload) return;
-  if (track.dataset.boardShiftType !== boardDragPayload.shiftType) return;
   event.preventDefault();
 
   moveBoardAssignmentWithinShift(boardDragPayload, {
-    shiftType: track.dataset.boardShiftType,
+    shiftType: boardDragPayload.shiftType,
     slotIndex: Number(track.dataset.boardSlotIndex)
   });
 }

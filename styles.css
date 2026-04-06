@@ -1227,6 +1227,10 @@ pre {
   gap: 10px;
 }
 
+.unified-board-group {
+  gap: 12px;
+}
+
 .board-group-head {
   display: flex;
   align-items: center;
@@ -1262,6 +1266,7 @@ pre {
 .board-lane-head {
   display: grid;
   gap: 6px;
+  align-content: center;
 }
 
 .board-lane-title {
@@ -1313,6 +1318,14 @@ pre {
     linear-gradient(180deg, #fcfdff 0%, #eef3fa 100%);
   border-color: rgba(46, 107, 203, 0.16);
   box-shadow: inset 0 0 0 1px rgba(46, 107, 203, 0.04);
+}
+
+#dashboardBoardView .board-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(247, 249, 252, 0.18), rgba(247, 249, 252, 0));
+  pointer-events: none;
 }
 
 .board-bar {
