@@ -2276,7 +2276,10 @@ function toAssignment(row, shiftType, dateKey, requirement, acceptedRows) {
 }
 
 function syncSelectedBoardAssignment() {
-  const items = getAssignmentsForDate(state.selectedDate);
+  const items = [
+    ...getAssignmentsForDate(state.selectedDate),
+    ...getCutRowsForDate(state.selectedDate).map((row) => buildBoardAdjustmentAssignment(row)).filter(Boolean)
+  ];
   if (!items.length) {
     state.selectedBoardAssignmentId = "";
     return;
