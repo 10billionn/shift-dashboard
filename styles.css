@@ -82,13 +82,13 @@ pre {
 
 .sidebar {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 24%),
-    linear-gradient(180deg, var(--navy) 0%, var(--navy-strong) 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 22%),
+    linear-gradient(180deg, rgba(17, 36, 63, 0.94) 0%, rgba(10, 23, 48, 0.92) 100%);
   color: #fff;
-  padding: 20px 14px;
+  padding: 16px 12px;
   display: grid;
   align-content: start;
-  gap: 18px;
+  gap: 14px;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -97,7 +97,7 @@ pre {
 .sidebar-brand {
   display: grid;
   gap: 4px;
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 
 .brand-kicker,
@@ -114,7 +114,9 @@ pre {
 }
 
 .sidebar-brand strong {
-  font-size: 1rem;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .sidebar-nav {
@@ -125,14 +127,20 @@ pre {
 .nav-item {
   width: 100%;
   background: transparent;
-  color: rgba(255, 255, 255, 0.74);
+  color: rgba(255, 255, 255, 0.62);
   text-align: left;
-  font-weight: 700;
+  font-weight: 600;
+  padding: 9px 12px;
 }
 
 .nav-item.active {
-  background: rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .main-shell {
@@ -146,8 +154,8 @@ pre {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
-  padding: 8px 14px;
+  gap: 8px;
+  padding: 6px 12px;
   background: rgba(247, 249, 252, 0.92);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid rgba(188, 200, 218, 0.7);
@@ -156,11 +164,11 @@ pre {
 .topbar-main {
   display: flex;
   align-items: start;
-  gap: 10px;
+  gap: 8px;
 }
 
 .topbar h1 {
-  font-size: 1.34rem;
+  font-size: 1.22rem;
   line-height: 1.1;
 }
 
@@ -185,9 +193,9 @@ pre {
 .generation-result-note,
 .copy-status,
 .save-state-notice {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: rgba(102, 117, 138, 0.82);
-  font-size: 0.74rem;
+  font-size: 0.7rem;
 }
 
 .save-state-notice.warning {
@@ -207,13 +215,13 @@ pre {
 }
 
 .content-area {
-  padding: 16px;
+  padding: 12px 14px 14px;
   display: grid;
 }
 
 .view {
   display: none;
-  gap: 14px;
+  gap: 10px;
 }
 
 .view.active {
@@ -234,13 +242,13 @@ pre {
 .import-card,
 .preview-card,
 .stack-block {
-  padding: 15px;
+  padding: 13px;
 }
 
 .hero-panel {
   background: linear-gradient(135deg, rgba(17, 36, 63, 0.98), rgba(39, 71, 119, 0.98));
   color: #fff;
-  padding: 8px 12px;
+  padding: 6px 10px;
   margin-top: -2px;
   margin-bottom: -4px;
 }
@@ -305,7 +313,7 @@ pre {
 }
 
 .selected-date-label {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   font-weight: 700;
   font-size: 0.94rem;
   letter-spacing: 0.01em;
@@ -531,12 +539,12 @@ pre {
 
 #dashboardBoardView.dashboard-view-panel {
   display: block;
-  min-height: 56vh;
+  min-height: 62vh;
   order: 3;
-  margin-top: -4px;
+  margin-top: -8px;
   border-color: rgba(46, 107, 203, 0.22);
   box-shadow: 0 16px 34px rgba(17, 36, 63, 0.09);
-  padding-top: 12px;
+  padding-top: 8px;
 }
 
 #dashboardListView {
@@ -1008,6 +1016,17 @@ pre {
   align-items: center;
 }
 
+#saveScheduleButton.primary-button {
+  background: linear-gradient(135deg, #143662, #0b2140);
+  box-shadow: 0 10px 22px rgba(17, 36, 63, 0.18);
+  font-weight: 800;
+  min-width: 124px;
+}
+
+#saveScheduleButton.primary-button:hover {
+  filter: brightness(1.04);
+}
+
 .card-edit-grid,
 .time-grid,
 .request-edit-grid {
@@ -1206,9 +1225,9 @@ pre {
 
 .board-canvas {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   overflow-x: auto;
-  padding-bottom: 6px;
+  padding-bottom: 4px;
 }
 
 #dashboardBoardView .board-canvas {
