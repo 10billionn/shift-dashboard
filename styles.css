@@ -1395,6 +1395,7 @@ pre {
 }
 
 .weekly-day {
+  position: relative;
   min-height: 128px;
   border: 1px solid rgba(200, 211, 225, 0.72);
   border-radius: 14px;
@@ -1416,9 +1417,25 @@ button.weekly-day {
 }
 
 .weekly-day.active {
-  border-color: rgba(46, 107, 203, 0.28);
-  background: linear-gradient(180deg, rgba(236, 243, 252, 0.98), rgba(246, 250, 255, 0.94));
-  box-shadow: 0 0 0 1px rgba(46, 107, 203, 0.06), 0 10px 20px rgba(17, 36, 63, 0.05);
+  border: 1.5px solid rgba(46, 107, 203, 0.35);
+  background: linear-gradient(180deg, rgba(248, 250, 255, 0.95), rgba(240, 245, 255, 0.9));
+  box-shadow: 0 14px 32px rgba(17, 36, 63, 0.12);
+}
+
+.weekly-day.active::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 12px;
+  right: 12px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(46, 107, 203, 0.75);
+}
+
+.weekly-day.active .weekly-date {
+  font-weight: 700;
+  color: #1a2a44;
 }
 
 .weekly-chart {

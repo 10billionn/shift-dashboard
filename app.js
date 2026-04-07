@@ -751,7 +751,7 @@ function renderWeeklyAnalysisCards() {
         : "tone-base";
     return `
       <button class="weekly-day ${cardTone} ${isActive ? "active" : ""} shortage-${shortageTone} fill-${fillTone}" type="button" data-date-key="${dateKey}">
-        <strong>${formatShortDate(dateKey)}</strong>
+        <strong class="weekly-date">${formatShortDate(dateKey)}</strong>
         <span class="field-label weekly-weekday ${weekdayClass}">${formatWeekday(dateKey)}</span>
         <div class="fill-bar"><span style="width:${Math.min(day.metrics.fillRate, 100)}%"></span></div>
         <span class="field-value weekly-fill-value">充足率 ${day.metrics.fillRate}%</span>
