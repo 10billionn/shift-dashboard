@@ -1547,6 +1547,38 @@ button.weekly-day {
   font-size: 0.94rem;
 }
 
+.weekly-weekday,
+.weekly-chart-weekday {
+  font-weight: 600;
+}
+
+.weekly-day .weekly-weekday {
+  color: rgba(110, 124, 144, 0.78);
+}
+
+.weekly-chart-label strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.weekly-chart-weekday {
+  font-size: 0.66rem;
+  color: rgba(110, 124, 144, 0.78);
+}
+
+.weekday-fri {
+  color: #2e6bcb !important;
+}
+
+.weekday-sat {
+  color: #6b5cff !important;
+}
+
+.weekday-sun {
+  color: #e28ca3 !important;
+}
+
 .weekly-day .field-value {
   justify-content: flex-start;
   background: rgba(248, 250, 253, 0.88);

@@ -741,10 +741,11 @@ function renderWeeklyAnalysisCards() {
     const isActive = dateKey === state.selectedDate;
     const shortageTone = day.metrics.shortage >= 4 ? "danger" : day.metrics.shortage >= 2 ? "warning" : "normal";
     const fillTone = day.metrics.fillRate >= 90 ? "good" : day.metrics.fillRate < 70 ? "weak" : "normal";
+    const weekdayClass = getWeeklyWeekdayClass(dateKey);
     return `
       <button class="weekly-day ${isActive ? "active" : ""} shortage-${shortageTone} fill-${fillTone}" type="button" data-date-key="${dateKey}">
         <strong>${formatShortDate(dateKey)}</strong>
-        <span class="field-label">${formatWeekday(dateKey)}</span>
+        <span class="field-label weekly-weekday ${weekdayClass}">${formatWeekday(dateKey)}</span>
         <div class="fill-bar"><span style="width:${Math.min(day.metrics.fillRate, 100)}%"></span></div>
         <span class="field-value weekly-fill-value">充足率 ${day.metrics.fillRate}%</span>
         <span class="field-value">売上 ${formatCompactYen(day.metrics.salesForecast)}</span>
@@ -803,7 +804,7 @@ function renderWeeklyAnalysisChart() {
       <div class="weekly-chart-labels">
         ${points.map((point) => `
           <button class="weekly-chart-label ${point.dateKey === state.selectedDate ? "active" : ""}" type="button" data-date-key="${point.dateKey}">
-            <strong>${point.label}</strong>
+            <strong>${point.label}<span class="weekly-chart-weekday ${getWeeklyWeekdayClass(point.dateKey)}">${formatWeekday(point.dateKey)}</span></strong>
             <span>不足 ${point.shortage}</span>
           </button>
         `).join("")}
@@ -3520,24 +3521,18 @@ function handleDashboardSectionHandlePointerDown(event) {
   if (!handle) return;
   const section = handle.closest("[data-section-id]");
   if (!section) return;
-  event.preventDefault();
   if (dashboardSectionArmTimer) {
     clearTimeout(dashboardSectionArmTimer);
     dashboardSectionArmTimer = null;
   }
   dashboardSectionArmedId = section.dataset.sectionId;
-  section.draggable = true;
   section.classList.add("dashboard-section-armed");
 }
 
 function handleDashboardSectionDragStart(event) {
-  const container = elements.dashboardSecondarySections;
-  const armedSection = dashboardSectionArmedId
-    ? container?.querySelector(`[data-section-id="${dashboardSectionArmedId}"]`)
-    : null;
-  const eventSection = event.target.closest("[data-section-id]");
-  const section = armedSection || eventSection;
-  if (!section || !section.draggable || dashboardSectionArmedId !== section.dataset.sectionId) {
+  const handle = event.target.closest("[data-section-drag-handle]");
+  const section = handle?.closest("[data-section-id]") || event.target.closest("[data-section-id]");
+  if (!handle || !section || dashboardSectionArmedId !== section.dataset.sectionId) {
     event.preventDefault();
     return;
   }
@@ -3611,9 +3606,6 @@ function cleanupDashboardSectionDrag() {
   }
   elements.dashboardSecondarySections?.querySelectorAll(".dashboard-section-dragging, .dashboard-section-drop-before, .dashboard-section-drop-after, .dashboard-section-armed").forEach((item) => {
     item.classList.remove("dashboard-section-dragging", "dashboard-section-drop-before", "dashboard-section-drop-after", "dashboard-section-armed");
-    if (item.matches("[data-section-id]")) {
-      item.draggable = false;
-    }
   });
   dashboardSectionDragState = null;
   dashboardSectionArmedId = "";
@@ -3710,6 +3702,14 @@ function getWeeklyAnalysisDateKeys() {
 function getWeeklyAnalysisRangeLabel() {
   const keys = getWeeklyAnalysisDateKeys();
   return `${formatSlashDate(keys[0])}〜${formatSlashDate(keys[keys.length - 1])}`;
+}
+
+function getWeeklyWeekdayClass(dateKey) {
+  const dayIndex = new Date(`${dateKey}T00:00:00`).getDay();
+  if (dayIndex === 5) return "weekday-fri";
+  if (dayIndex === 6) return "weekday-sat";
+  if (dayIndex === 0) return "weekday-sun";
+  return "";
 }
 function buildRequestCsv(rows) {
   const header = ["名前", "出勤可能日", "出勤開始時間", "出勤終了時間", "希望エリア", "姫予約有無", "備考"];
