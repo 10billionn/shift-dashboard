@@ -1397,7 +1397,7 @@ function renderBoardInspector(day) {
             <button class="ghost-button" type="button" data-board-action="startLater30">開始 +30分</button>
             <button class="ghost-button" type="button" data-board-action="endEarlier30">終了 -30分</button>
             <button class="ghost-button" type="button" data-board-action="endLater30">終了 +30分</button>
-            <button class="ghost-button danger-button" type="button" data-board-action="moveToAdjustment">調整中へ移動</button>
+            <button class="ghost-button adjustment-button" type="button" data-board-action="moveToAdjustment">調整中へ移動</button>
           </div>
         </div>
       </div>
