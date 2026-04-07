@@ -1300,9 +1300,8 @@ function renderBoardInspector(day) {
   const visualMeta = getAssignmentVisualMeta(assignment, position?.slotIndex ?? 0);
   const isAdjustmentLane = Boolean(assignment.isAdjustmentLane);
   const displayRoomLabel = isAdjustmentLane ? "調整中" : visualMeta.roomLabel;
-  const displayArea = isAdjustmentLane ? (assignment.preferredArea || "未設定") : visualMeta.currentArea;
+  const displayArea = isAdjustmentLane ? "調整中" : visualMeta.currentArea;
   const status = analyzeAssignmentStatus(assignment, profile);
-  const statusTone = status.level === "danger" ? "danger" : status.level === "warning" ? "warning" : "ok";
   const settings = getAppSettings();
   const startMinutes = toMinutes(assignment.startTime);
   const endMinutes = toMinutes(assignment.endTime);
@@ -1351,7 +1350,7 @@ function renderBoardInspector(day) {
         </div>
         <div class="shift-summary-item">
           <span class="field-label">ステータス</span>
-          <span class="field-value ${isAdjustmentLane || hasAreaMismatch ? "mismatch" : ""}">${displayStatusLabel}</span>
+          <span class="field-value ${hasAreaMismatch ? "mismatch" : ""}">${displayStatusLabel}</span>
         </div>
         <div class="shift-summary-item">
           <span class="field-label">姫予約</span>
