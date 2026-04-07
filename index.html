@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-    <link rel="stylesheet" href="styles.css?v=202604080105">
+  <link rel="stylesheet" href="styles.css?v=202604081455">
 </head>
 <body>
   <div class="app-shell">
@@ -63,7 +63,7 @@
           </section>
 
           <div id="dashboardSecondarySections" class="dashboard-secondary-sections">
-          <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-weekly-block dashboard-sortable-section" data-section-id="weeklyAnalysis" draggable="true" open>
+          <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-weekly-block dashboard-sortable-section" data-section-id="weeklyAnalysis" draggable="false" open>
             <summary class="dashboard-collapsible-summary">
               <div>
                 <h2>週間分析</h2>
@@ -77,7 +77,7 @@
             <div id="weeklyAnalysis" class="weekly-analysis dashboard-collapsible-body"></div>
           </details>
 
-          <section id="boardInspector" class="content-panel board-inspector board-inspector-panel dashboard-sortable-section" data-section-id="boardInspector" draggable="true">
+          <section id="boardInspector" class="content-panel board-inspector board-inspector-panel dashboard-sortable-section" data-section-id="boardInspector" draggable="false">
             <div class="subsection-head">
               <div>
                 <h3>選択中のセラピスト</h3>
@@ -91,7 +91,7 @@
             <div id="boardInspectorContent" class="board-inspector-content"></div>
           </section>
 
-          <section class="content-panel dashboard-risk-panel dashboard-sortable-section" data-section-id="riskSummary" draggable="true">
+          <section class="content-panel dashboard-risk-panel dashboard-sortable-section" data-section-id="riskSummary" draggable="false">
             <div class="panel-head">
               <div>
                 <h3>危険度サマリー</h3>
@@ -104,7 +104,7 @@
             <div id="dashboardRiskSummary" class="risk-summary-list"></div>
           </section>
 
-          <div id="dashboardListView" class="dashboard-view-panel active dashboard-sortable-section" data-section-id="roomDetail" draggable="true">
+          <div id="dashboardListView" class="dashboard-view-panel active dashboard-sortable-section" data-section-id="roomDetail" draggable="false">
             <details class="content-panel dashboard-collapsible dashboard-list-collapsible dashboard-secondary-block">
               <summary class="dashboard-collapsible-summary">
                 <div>
@@ -153,7 +153,7 @@
             </details>
           </div>
 
-          <section class="summary-grid dashboard-summary-grid dashboard-sortable-section" data-section-id="summaryGrid" draggable="true">
+          <section class="summary-grid dashboard-summary-grid dashboard-sortable-section" data-section-id="summaryGrid" draggable="false">
             <button class="section-drag-handle section-drag-handle-floating" type="button" data-section-drag-handle aria-label="サマリーを並び替え">⋮⋮</button>
             <article class="summary-card emphasis">
               <p>売上予測</p>
@@ -173,7 +173,7 @@
             </article>
           </section>
 
-          <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-cut-block dashboard-sortable-section" data-section-id="cutBlock" draggable="true">
+          <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-cut-block dashboard-sortable-section" data-section-id="cutBlock" draggable="false">
             <summary class="dashboard-collapsible-summary">
               <div>
                 <h3>今回は見送り</h3>
@@ -409,7 +409,7 @@
 
   <div id="globalToast" class="global-toast" aria-live="polite"></div>
 
-    <script src="data.js?v=202604081420"></script>
-    <script src="app.js?v=202604081420"></script>
+    <script src="data.js?v=202604081455"></script>
+    <script src="app.js?v=202604081455"></script>
 </body>
 </html>

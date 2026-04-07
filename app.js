@@ -220,6 +220,7 @@ function bindEvents() {
   elements.boardInspectorContent.addEventListener("change", handleBoardInspectorChange);
   elements.boardInspectorContent.addEventListener("click", handleBoardInspectorAction);
   elements.weeklyAnalysis.addEventListener("click", handleWeeklyAnalysisClick);
+  elements.dashboardSecondarySections?.addEventListener("mousedown", handleDashboardSectionHandlePointerDown);
   elements.dashboardSecondarySections?.addEventListener("click", handleDashboardSectionHandleClick);
   elements.dashboardSecondarySections?.addEventListener("dragstart", handleDashboardSectionDragStart);
   elements.dashboardSecondarySections?.addEventListener("dragover", handleDashboardSectionDragOver);
@@ -3493,10 +3494,18 @@ function handleDashboardSectionHandleClick(event) {
   event.stopPropagation();
 }
 
+function handleDashboardSectionHandlePointerDown(event) {
+  const handle = event.target.closest("[data-section-drag-handle]");
+  if (!handle) return;
+  const section = handle.closest("[data-section-id]");
+  if (!section) return;
+  section.draggable = true;
+  section.classList.add("dashboard-section-armed");
+}
+
 function handleDashboardSectionDragStart(event) {
   const section = event.target.closest("[data-section-id]");
-  const handle = event.target.closest("[data-section-drag-handle]");
-  if (!section || !handle) {
+  if (!section || !section.draggable) {
     event.preventDefault();
     return;
   }
@@ -3508,28 +3517,36 @@ function handleDashboardSectionDragStart(event) {
 
 function handleDashboardSectionDragOver(event) {
   if (!dashboardSectionDragState) return;
-  const target = event.target.closest("[data-section-id]");
-  if (!target || target.dataset.sectionId === dashboardSectionDragState.sectionId) return;
   event.preventDefault();
+  const container = elements.dashboardSecondarySections;
+  const target = event.target.closest("[data-section-id]");
+  if (!container || !target || target.dataset.sectionId === dashboardSectionDragState.sectionId) return;
   const rect = target.getBoundingClientRect();
   const before = event.clientY < rect.top + (rect.height / 2);
-  elements.dashboardSecondarySections?.querySelectorAll(".dashboard-section-drop-before, .dashboard-section-drop-after").forEach((item) => {
+  container.querySelectorAll(".dashboard-section-drop-before, .dashboard-section-drop-after").forEach((item) => {
     item.classList.remove("dashboard-section-drop-before", "dashboard-section-drop-after");
   });
   target.classList.add(before ? "dashboard-section-drop-before" : "dashboard-section-drop-after");
+
+  const draggingSection = container.querySelector(".dashboard-section-dragging");
+  if (!draggingSection || draggingSection === target) return;
+  const shouldMoveBefore = before ? draggingSection.nextElementSibling !== target : target.nextElementSibling !== draggingSection;
+  if (!shouldMoveBefore) return;
+  if (before) {
+    container.insertBefore(draggingSection, target);
+  } else {
+    container.insertBefore(draggingSection, target.nextElementSibling);
+  }
 }
 
 function handleDashboardSectionDrop(event) {
   if (!dashboardSectionDragState) return;
-  const target = event.target.closest("[data-section-id]");
-  if (!target || target.dataset.sectionId === dashboardSectionDragState.sectionId) return;
   event.preventDefault();
-  const rect = target.getBoundingClientRect();
-  const before = event.clientY < rect.top + (rect.height / 2);
-  const nextOrder = normalizeDashboardSectionOrder(state.dashboardSectionOrder).filter((item) => item !== dashboardSectionDragState.sectionId);
-  const targetIndex = nextOrder.indexOf(target.dataset.sectionId);
-  nextOrder.splice(before ? targetIndex : targetIndex + 1, 0, dashboardSectionDragState.sectionId);
-  state.dashboardSectionOrder = nextOrder;
+  const container = elements.dashboardSecondarySections;
+  if (!container) return;
+  state.dashboardSectionOrder = Array.from(container.children)
+    .map((section) => section.dataset.sectionId)
+    .filter((id) => DASHBOARD_SECTION_IDS.includes(id));
   persistState();
   applyDashboardSectionOrder();
   cleanupDashboardSectionDrag();
@@ -3540,8 +3557,11 @@ function handleDashboardSectionDragEnd() {
 }
 
 function cleanupDashboardSectionDrag() {
-  elements.dashboardSecondarySections?.querySelectorAll(".dashboard-section-dragging, .dashboard-section-drop-before, .dashboard-section-drop-after").forEach((item) => {
-    item.classList.remove("dashboard-section-dragging", "dashboard-section-drop-before", "dashboard-section-drop-after");
+  elements.dashboardSecondarySections?.querySelectorAll(".dashboard-section-dragging, .dashboard-section-drop-before, .dashboard-section-drop-after, .dashboard-section-armed").forEach((item) => {
+    item.classList.remove("dashboard-section-dragging", "dashboard-section-drop-before", "dashboard-section-drop-after", "dashboard-section-armed");
+    if (item.matches("[data-section-id]")) {
+      item.draggable = false;
+    }
   });
   dashboardSectionDragState = null;
 }

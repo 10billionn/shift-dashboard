@@ -843,6 +843,10 @@ pre {
   position: relative;
 }
 
+.dashboard-sortable-section[draggable="false"] {
+  cursor: default;
+}
+
 .dashboard-section-tools {
   display: inline-flex;
   align-items: center;
@@ -869,6 +873,12 @@ pre {
 
 .section-drag-handle:active {
   cursor: grabbing;
+}
+
+.dashboard-section-armed .section-drag-handle {
+  border-color: rgba(46, 107, 203, 0.22);
+  background: rgba(244, 248, 253, 0.96);
+  color: rgba(27, 36, 50, 0.78);
 }
 
 .section-drag-handle-floating {
