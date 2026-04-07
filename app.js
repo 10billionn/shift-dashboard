@@ -1062,7 +1062,7 @@ function buildBoardStackedAssignments(assignments) {
 
 function renderRoomDetailGroups(rows, day = getScheduleDay(state.selectedDate)) {
   if (!rows.length) {
-    return `<div class="empty-state">この日の部屋別データはまだありません。</div>`;
+    return `<div class="empty-state">この日のルームデータはまだありません。</div>`;
   }
 
   const settings = getAppSettings();
@@ -1078,6 +1078,7 @@ function renderRoomDetailGroups(rows, day = getScheduleDay(state.selectedDate)) 
     const occupiedMinutes = occupiedMinutesByRow[index];
     const utilization = Math.max(0, Math.min(100, Math.round((occupiedMinutes / businessMinutes) * 100)));
     const utilizationClass = utilization >= 80 ? "is-strong" : utilization >= 50 ? "is-mid" : "is-weak";
+    const utilizationLabel = utilization >= 80 ? "良好" : utilization >= 50 ? "要調整" : "弱い";
     const salesForecast = totalOccupiedMinutes
       ? Math.round((day.metrics.salesForecast || 0) * (occupiedMinutes / totalOccupiedMinutes))
       : 0;
@@ -1091,7 +1092,7 @@ function renderRoomDetailGroups(rows, day = getScheduleDay(state.selectedDate)) 
           <div>
             <strong class="room-detail-title">${row.roomLabel}</strong>
           </div>
-          <span class="panel-count">${row.assignments.length}件</span>
+          <span class="room-detail-state ${utilizationClass}">${utilizationLabel}</span>
         </div>
         <div class="shift-summary-grid room-detail-summary room-detail-metrics">
           <div class="shift-summary-item">
@@ -1099,15 +1100,15 @@ function renderRoomDetailGroups(rows, day = getScheduleDay(state.selectedDate)) 
             <span class="field-value room-detail-rate ${utilizationClass}">${utilization}%</span>
           </div>
           <div class="shift-summary-item">
-            <span class="field-label">本数</span>
+            <span class="field-label">本数（予測）</span>
             <span class="field-value">${row.assignments.length}件</span>
           </div>
           <div class="shift-summary-item">
-            <span class="field-label">売上</span>
+            <span class="field-label">売上（予測）</span>
             <span class="field-value">${formatYen(salesForecast)}</span>
           </div>
           <div class="shift-summary-item">
-            <span class="field-label">店落ち</span>
+            <span class="field-label">店落ち（予測）</span>
             <span class="field-value">${formatYen(storeForecast)}</span>
           </div>
         </div>
