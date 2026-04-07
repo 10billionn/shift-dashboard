@@ -2439,8 +2439,27 @@ button.weekly-day {
 .board-inspector-head {
   display: flex;
   justify-content: space-between;
-  align-items: start;
+  align-items: center;
   gap: 8px;
+}
+
+.board-inspector-identity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.board-inspector-name-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.board-inspector .therapist-name {
+  font-size: 1.12rem;
+  font-weight: 800;
+  line-height: 1.05;
 }
 
 .board-inspector-grid {
@@ -2601,8 +2620,30 @@ button.weekly-day {
   font-weight: 700;
 }
 
+.board-inspector .mini-badge.rank {
+  min-height: 22px;
+  padding-inline: 8px;
+}
+
+.board-hime-muted {
+  color: rgba(110, 124, 144, 0.82);
+  background: rgba(238, 242, 246, 0.92);
+}
+
+.board-inspector .mini-badge.booked.hime-accent {
+  min-height: 22px;
+  padding-inline: 9px;
+  box-shadow: inset 0 0 0 1px rgba(31, 138, 82, 0.18), 0 1px 4px rgba(31, 138, 82, 0.08);
+}
+
 .board-inspector .field-label {
   font-size: 0.68rem;
+}
+
+.board-inspector .shift-summary-item,
+.board-inspector .field-block,
+.board-inspector-alerts {
+  margin-left: 0;
 }
 
 .board-inspector .field-value.mismatch {

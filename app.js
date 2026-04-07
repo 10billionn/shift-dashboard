@@ -1319,13 +1319,14 @@ function renderBoardInspector(day) {
   return `
     <article class="board-inspector-card">
       <div class="board-inspector-head">
-        <div>
-          <strong class="therapist-name">${assignment.name}</strong>
-          <p class="field-help">${displayRoomLabel} / ${displayArea} / ${formatDisplayDate(assignment.dateKey)} (${formatWeekday(assignment.dateKey)})</p>
+        <div class="board-inspector-identity">
+          <div class="board-inspector-name-row">
+            <strong class="therapist-name">${assignment.name}</strong>
+            <span class="mini-badge rank">${profile.rank || "G"}</span>
+          </div>
         </div>
         <div class="status-row tight">
-          <span class="mini-badge rank">${profile.rank || "G"}</span>
-          <span class="mini-badge ${assignment.himeReservation === "あり" ? "booked hime-accent" : "gray"}">${assignment.himeReservation === "あり" ? "姫あり" : "姫なし"}</span>
+          <span class="mini-badge ${assignment.himeReservation === "あり" ? "booked hime-accent" : "gray board-hime-muted"}">${assignment.himeReservation === "あり" ? "姫あり" : "姫なし"}</span>
           <span class="mini-badge ${status.level === "danger" ? "danger" : status.level === "warning" ? "warning" : "gray"}">${status.label}</span>
         </div>
       </div>
@@ -1369,12 +1370,12 @@ function renderBoardInspector(day) {
 
           <label class="field-block">
             <span class="field-label">開始</span>
-            <input class="time-input ${isInvalidTime ? "board-input-invalid" : ""}" type="time" step="900" value="${assignment.startTime}" data-board-field="startTime">
+            <input class="time-input ${isInvalidTime ? "board-input-invalid" : ""}" type="time" step="1800" value="${assignment.startTime}" data-board-field="startTime">
           </label>
 
           <label class="field-block">
             <span class="field-label">終了</span>
-            <input class="time-input ${isInvalidTime ? "board-input-invalid" : ""}" type="time" step="900" value="${assignment.endTime}" data-board-field="endTime">
+            <input class="time-input ${isInvalidTime ? "board-input-invalid" : ""}" type="time" step="1800" value="${assignment.endTime}" data-board-field="endTime">
           </label>
 
           <label class="field-block">
@@ -1391,15 +1392,6 @@ function renderBoardInspector(day) {
         </div>
 
         <div class="board-quick-actions compact-board-quick-actions">
-          <div class="board-quick-actions-group">
-            <span class="field-label">全体スライド</span>
-            <div class="board-quick-actions-row">
-              <button class="ghost-button" type="button" data-board-action="slideBack30">-30分</button>
-              <button class="ghost-button" type="button" data-board-action="slideForward30">+30分</button>
-              <button class="ghost-button" type="button" data-board-action="slideBack60">-60分</button>
-              <button class="ghost-button" type="button" data-board-action="slideForward60">+60分</button>
-            </div>
-          </div>
           <div class="board-quick-actions-group">
             <span class="field-label">開始 / 終了</span>
             <div class="board-quick-actions-row">
