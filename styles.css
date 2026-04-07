@@ -2589,6 +2589,9 @@ button.weekly-day {
 .board-inspector .subsection-head {
   align-items: center;
   gap: 4px;
+  padding-bottom: 0;
+  border-bottom: none;
+  margin: 0 2px 2px;
 }
 
 .board-inspector .mini-badge {

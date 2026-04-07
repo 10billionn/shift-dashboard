@@ -1415,7 +1415,7 @@ function renderBoardInspector(day) {
         ${(isInvalidTime || assignment.warningArea || overlapInfo.count || status.reasons.length || assignment.generationReasons?.length) ? `
           <div class="board-inspector-alerts">
             <div class="alert-box ${displayStatusTone}">
-              <strong>確認メモ</strong>
+              <strong>チェックポイント</strong>
               <div>${[
                 ...(hasAreaMismatch ? [`希望エリア ${assignment.preferredArea} と現在配置 ${visualMeta.currentArea} が異なります。`] : []),
                 ...status.reasons
@@ -1429,7 +1429,7 @@ function renderBoardInspector(day) {
             ` : ""}
             ${assignment.generationReasons?.length ? `
               <div class="alert-box ok">
-                <strong>生成</strong>
+                <strong>調整が必要</strong>
                 <div>${assignment.generationReasons.map((reason) => `<div>・${reason}</div>`).join("")}</div>
               </div>
             ` : ""}
@@ -2422,7 +2422,7 @@ function toAssignment(row, shiftType, dateKey, requirement, acceptedRows) {
   }
   const candidateCount = acceptedRows.filter((item) => supportsShift(item, shiftType)).length;
   const neededCount = shiftType === "early" ? requirement.earlyNeeded : requirement.lateNeeded;
-  if (candidateCount <= neededCount + 1) reasonTags.push("不足補完");
+  if (candidateCount <= neededCount + 1) reasonTags.push("不足あり");
   return {
     id: row.id,
     dateKey,
@@ -3252,7 +3252,7 @@ function analyzeAssignmentStatus(assignment, profile) {
     return { level: "warning", label: "要確認", reasons: reasons.length ? reasons : ["非対応エリア"] };
   }
 
-  return { level: "normal", label: "正常", reasons: reasons.length ? reasons : ["通常配置"] };
+  return { level: "normal", label: "問題なし", reasons: reasons.length ? reasons : ["問題なし"] };
 }
 
 function supportsShift(row, shiftType) {
