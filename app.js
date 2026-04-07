@@ -1313,8 +1313,11 @@ function renderBoardInspector(day) {
   const hasAreaMismatch = Boolean(assignment.preferredArea)
     && visualMeta.currentArea
     && assignment.preferredArea !== visualMeta.currentArea;
-  const displayStatusLabel = hasAreaMismatch ? "エリア不一致" : status.label;
-  const displayStatusTone = hasAreaMismatch ? "warning" : statusTone;
+  const displayStatusLabel = isAdjustmentLane
+    ? "調整中"
+    : hasAreaMismatch
+      ? "エリア不一致"
+      : "一致";
   const ibMinutes = Number(profile.ibMinutes) > 0 ? Number(profile.ibMinutes) : 0;
 
   return `
@@ -1329,7 +1332,7 @@ function renderBoardInspector(day) {
         </div>
         <div class="status-row tight">
           <span class="mini-badge ${assignment.himeReservation === "あり" ? "booked hime-accent" : "gray board-hime-muted"}">${assignment.himeReservation === "あり" ? "姫あり" : "姫なし"}</span>
-          <span class="mini-badge ${status.level === "danger" ? "danger" : status.level === "warning" ? "warning" : "gray"}">${status.label}</span>
+          <span class="mini-badge ${isAdjustmentLane ? "gray" : hasAreaMismatch ? "warning" : "ok"}">${displayStatusLabel}</span>
         </div>
       </div>
 
@@ -1348,7 +1351,7 @@ function renderBoardInspector(day) {
         </div>
         <div class="shift-summary-item">
           <span class="field-label">ステータス</span>
-          <span class="field-value ${hasAreaMismatch ? "mismatch" : ""}">${displayStatusLabel}</span>
+          <span class="field-value ${isAdjustmentLane || hasAreaMismatch ? "mismatch" : ""}">${displayStatusLabel}</span>
         </div>
         <div class="shift-summary-item">
           <span class="field-label">姫予約</span>
@@ -1399,21 +1402,6 @@ function renderBoardInspector(day) {
           </div>
         </div>
       </div>
-
-      ${(isInvalidTime || assignment.warningArea || overlapInfo.count || status.reasons.length || assignment.generationReasons?.length) ? `
-        <div class="board-inspector-alerts">
-          <div class="alert-box ${displayStatusTone}">
-            <strong>チェックポイント</strong>
-            <div>${[
-              ...(hasAreaMismatch ? [`希望エリアと現在の配置が異なります。`] : []),
-              ...(overlapInfo.count ? [`同室で${overlapInfo.count}件重なっています。`] : []),
-              ...(isInvalidTime ? ["時間の前後関係、または営業時間を確認してください。"] : []),
-              ...(!isInvalidTime && assignment.warningArea ? ["対応エリアを確認してください。"] : []),
-              ...status.reasons.filter((reason) => reason !== "問題なし")
-            ].map((reason) => `<div>・${reason}</div>`).join("")}</div>
-          </div>
-        </div>
-      ` : ""}
     </article>
   `;
 }
