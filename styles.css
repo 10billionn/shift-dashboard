@@ -403,29 +403,43 @@ pre {
 .dashboard-summary-grid .summary-card {
   padding: 10px 11px;
   border-radius: var(--radius-md);
-  background: rgba(248, 250, 253, 0.86);
-  border-color: rgba(200, 211, 225, 0.7);
+  background: #f7f9fc;
+  border: 1px solid #dbe3ee;
+  box-shadow: 0 1px 2px rgba(17, 36, 63, 0.025);
 }
 
 .dashboard-summary-grid .summary-card p {
   margin-bottom: 4px;
   font-size: 0.68rem;
-  color: rgba(102, 117, 138, 0.76);
+  color: #7f8ea3;
 }
 
 .dashboard-summary-grid .summary-card strong {
   font-size: 0.9rem;
   font-weight: 800;
-  color: rgba(23, 34, 48, 0.9);
+  color: #1f2c3d;
 }
 
 .dashboard-summary-grid .summary-card:not(.emphasis) {
   box-shadow: none;
-  background: rgba(248, 250, 253, 0.76);
+  background: #f5f7fb;
 }
 
 .dashboard-summary-grid .summary-card:not(.emphasis) strong {
-  color: rgba(23, 34, 48, 0.78);
+  color: #1f2c3d;
+}
+
+.dashboard-summary-grid .summary-card.emphasis,
+.dashboard-summary-grid .summary-card.ok,
+.dashboard-summary-grid .summary-card.warning {
+  background: #f7f9fc;
+  border-color: #dbe3ee;
+}
+
+.dashboard-summary-grid .summary-card.emphasis strong,
+.dashboard-summary-grid .summary-card.ok strong,
+.dashboard-summary-grid .summary-card.warning strong {
+  color: #1f2c3d;
 }
 
 .risk-summary-list {
