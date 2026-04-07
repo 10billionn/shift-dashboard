@@ -1324,6 +1324,7 @@ function renderBoardInspector(day) {
       ? "status-mismatch"
       : "status-match";
   const himeClass = assignment.himeReservation === "あり" ? "hime-yes" : "hime-no";
+  const preferredAreaClass = assignment.preferredArea ? `area-chip area-${areaClassName(assignment.preferredArea)}` : "";
   const checkPoints = [
     ...(isAdjustmentLane ? ["調整中（未配置）"] : []),
     ...(!isAdjustmentLane && hasAreaMismatch ? ["希望エリアと不一致"] : []),
@@ -1342,7 +1343,7 @@ function renderBoardInspector(day) {
           <div class="board-inspector-meta">
             <div class="board-inspector-meta-item">
               <span class="field-label">希望エリア</span>
-              <span class="field-value">${assignment.preferredArea || "未設定"}</span>
+              <span class="field-value ${preferredAreaClass}">${assignment.preferredArea || "未設定"}</span>
             </div>
             <div class="board-inspector-meta-item">
               <span class="field-label">ステータス</span>
