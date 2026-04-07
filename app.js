@@ -1318,6 +1318,12 @@ function renderBoardInspector(day) {
       ? "エリア不一致"
       : "一致";
   const ibMinutes = Number(profile.ibMinutes) > 0 ? Number(profile.ibMinutes) : 0;
+  const statusClass = isAdjustmentLane
+    ? "status-pending"
+    : hasAreaMismatch
+      ? "status-mismatch"
+      : "status-match";
+  const himeClass = assignment.himeReservation === "あり" ? "hime-yes" : "hime-no";
 
   return `
     <article class="board-inspector-card">
@@ -1330,7 +1336,7 @@ function renderBoardInspector(day) {
           </div>
         </div>
         <div class="status-row tight">
-          <span class="mini-badge ${assignment.himeReservation === "あり" ? "booked hime-accent" : "gray board-hime-muted"}">${assignment.himeReservation === "あり" ? "姫あり" : "姫なし"}</span>
+          <span class="mini-badge ${assignment.himeReservation === "あり" ? "booked hime-accent hime-yes" : "gray board-hime-muted hime-no"}">${assignment.himeReservation === "あり" ? "姫あり" : "姫なし"}</span>
         </div>
       </div>
 
@@ -1349,13 +1355,17 @@ function renderBoardInspector(day) {
         </div>
         <div class="shift-summary-item">
           <span class="field-label">ステータス</span>
-          <span class="field-value ${hasAreaMismatch ? "mismatch" : ""}">${displayStatusLabel}</span>
+          <span class="field-value ${statusClass}">${displayStatusLabel}</span>
+        </div>
+        <div class="shift-summary-item">
+          <span class="field-label">姫予約</span>
+          <span class="field-value ${himeClass}">${assignment.himeReservation === "あり" ? "あり" : "なし"}</span>
         </div>
       </div>
 
       <div class="board-editor-grid compact-board-editor-grid">
         <label class="field-block">
-          <span class="field-label">現在の配置</span>
+          <span class="field-label">現在ルーム</span>
           <select class="select-input" data-board-field="roomIndex">
             ${roomOptions.map((roomName, index) => `<option value="${index}" ${normalizeRoomIndex(assignment.roomIndex, position?.slotIndex ?? 0) === index ? "selected" : ""}>${roomName}</option>`).join("")}
           </select>
@@ -1385,15 +1395,17 @@ function renderBoardInspector(day) {
       </div>
 
       <div class="board-quick-actions compact-board-quick-actions">
-        <div class="board-quick-actions-group">
+        <div class="board-quick-actions-group board-quick-actions-group-main">
           <span class="field-label">開始 / 終了</span>
           <div class="board-quick-actions-row">
             <button class="ghost-button" type="button" data-board-action="startEarlier30">開始 -30分</button>
             <button class="ghost-button" type="button" data-board-action="startLater30">開始 +30分</button>
             <button class="ghost-button" type="button" data-board-action="endEarlier30">終了 -30分</button>
             <button class="ghost-button" type="button" data-board-action="endLater30">終了 +30分</button>
-            <button class="ghost-button adjustment-button" type="button" data-board-action="moveToAdjustment">調整中へ移動</button>
           </div>
+        </div>
+        <div class="board-quick-actions-group board-quick-actions-group-side">
+          <button class="ghost-button adjustment-button" type="button" data-board-action="moveToAdjustment">調整中へ移動</button>
         </div>
       </div>
     </article>

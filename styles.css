@@ -2450,7 +2450,7 @@ button.weekly-day {
 
 .board-inspector-card {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   padding: 8px 14px;
   border: 1px solid rgba(200, 211, 225, 0.3);
   border-radius: var(--radius-md);
@@ -2462,7 +2462,7 @@ button.weekly-day {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .board-inspector-identity {
@@ -2479,7 +2479,7 @@ button.weekly-day {
 }
 
 .board-inspector .therapist-name {
-  font-size: 1.18rem;
+  font-size: 1.22rem;
   font-weight: 800;
   line-height: 1.05;
 }
@@ -2492,7 +2492,7 @@ button.weekly-day {
 
 .compact-board-inspector-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  gap: 8px;
 }
 
 .compact-board-inspector-grid .field-label {
@@ -2500,9 +2500,9 @@ button.weekly-day {
 }
 
 .compact-board-inspector-grid .field-value {
-  min-height: 20px;
-  padding: 1px 8px;
-  font-size: 0.69rem;
+  min-height: 22px;
+  padding: 2px 9px;
+  font-size: 0.71rem;
 }
 
 .board-editor-grid {
@@ -2512,7 +2512,7 @@ button.weekly-day {
 }
 
 .compact-board-editor-grid {
-  gap: 6px;
+  gap: 8px;
 }
 
 .board-editor-grid .field-block.wide {
@@ -2530,12 +2530,19 @@ button.weekly-day {
 }
 
 .compact-board-quick-actions {
-  gap: 4px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
 }
 
 .board-quick-actions-group {
   display: grid;
   gap: 4px;
+}
+
+.board-quick-actions-group-side {
+  align-self: end;
 }
 
 .board-quick-actions-row {
@@ -2575,9 +2582,9 @@ button.weekly-day {
 .board-inspector .mini-badge.ib {
   min-height: 22px;
   padding-inline: 8px;
-  background: rgba(110, 124, 144, 0.12);
-  color: rgba(58, 70, 88, 0.82);
-  box-shadow: inset 0 0 0 1px rgba(110, 124, 144, 0.12);
+  background: rgba(46, 107, 203, 0.1);
+  color: var(--blue);
+  box-shadow: inset 0 0 0 1px rgba(46, 107, 203, 0.12);
 }
 
 .board-hime-muted {
@@ -2589,9 +2596,9 @@ button.weekly-day {
 .board-inspector .mini-badge.booked.hime-accent {
   min-height: 22px;
   padding-inline: 9px;
-  background: rgba(222, 246, 234, 0.96);
-  color: rgba(26, 110, 73, 0.96);
-  box-shadow: inset 0 0 0 1px rgba(31, 138, 82, 0.22), 0 1px 5px rgba(31, 138, 82, 0.1);
+  background: rgba(230, 244, 236, 0.98);
+  color: rgba(23, 120, 78, 0.98);
+  box-shadow: inset 0 0 0 1px rgba(31, 138, 82, 0.24), 0 1px 5px rgba(31, 138, 82, 0.08);
 }
 
 .board-inspector .field-label {
@@ -2620,6 +2627,8 @@ button.weekly-day {
 .board-inspector .text-input {
   padding: 7px 9px;
   border-radius: 10px;
+  border: 1px solid rgba(221, 229, 239, 0.6);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .board-inspector .alert-box {
@@ -2636,6 +2645,36 @@ button.weekly-day {
   background: rgba(201, 152, 25, 0.12);
   color: #8a6410;
   border-color: rgba(201, 152, 25, 0.18);
+}
+
+.board-inspector .field-value.status-match {
+  color: var(--green);
+  background: rgba(230, 244, 236, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(31, 138, 82, 0.14);
+}
+
+.board-inspector .field-value.status-mismatch {
+  color: #9b5d1c;
+  background: rgba(255, 247, 223, 0.86);
+  box-shadow: inset 0 0 0 1px rgba(201, 152, 25, 0.14);
+}
+
+.board-inspector .field-value.status-pending {
+  color: rgba(90, 104, 123, 0.86);
+  background: rgba(238, 242, 246, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(190, 201, 215, 0.28);
+}
+
+.board-inspector .field-value.hime-yes {
+  color: rgba(23, 120, 78, 0.98);
+  background: rgba(230, 244, 236, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(31, 138, 82, 0.14);
+}
+
+.board-inspector .field-value.hime-no {
+  color: rgba(90, 104, 123, 0.82);
+  background: rgba(238, 242, 246, 0.88);
+  box-shadow: inset 0 0 0 1px rgba(190, 201, 215, 0.24);
 }
 
 .board-input-invalid {
