@@ -798,6 +798,7 @@ pre {
   padding: 0;
   overflow: hidden;
   border-radius: var(--radius-lg);
+  transition: box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
 .dashboard-collapsible-summary {
@@ -809,6 +810,14 @@ pre {
   padding: 12px 14px;
   cursor: pointer;
   color: rgba(27, 36, 50, 0.8);
+}
+
+.dashboard-collapsible:not([open]) .dashboard-collapsible-summary {
+  background: rgba(247, 249, 252, 0.74);
+}
+
+.dashboard-collapsible[open] {
+  box-shadow: var(--shadow-sm);
 }
 
 .dashboard-list-collapsible .dashboard-collapsible-summary h3 {
@@ -882,6 +891,34 @@ pre {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.section-collapse-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(188, 200, 218, 0.22);
+  color: rgba(90, 104, 124, 0.82);
+  flex: 0 0 auto;
+}
+
+.section-collapse-indicator::before {
+  content: "▸";
+  font-size: 0.72rem;
+  line-height: 1;
+  transform: translateX(1px);
+}
+
+.dashboard-collapsible[open] .section-collapse-indicator::before {
+  content: "▾";
+  transform: translateY(1px);
+}
+
+.dashboard-collapsible-body {
+  transition: opacity 0.2s ease;
 }
 
 .section-drag-handle {
@@ -1438,17 +1475,6 @@ button.weekly-day {
   border-color: rgba(46, 107, 203, 0.18);
 }
 
-.weekly-day.active {
-  border: 2px solid rgba(46, 107, 203, 0.48);
-  background: linear-gradient(180deg, rgba(246, 249, 255, 0.99), rgba(236, 243, 253, 0.96));
-  box-shadow: 0 15px 32px rgba(17, 36, 63, 0.13);
-}
-
-.weekly-day.active .weekly-date {
-  font-weight: 800;
-  color: #17263d;
-}
-
 .weekly-chart {
   display: grid;
   gap: 6px;
@@ -1552,12 +1578,6 @@ button.weekly-day {
   transform: translateY(-1px);
   border-color: rgba(46, 107, 203, 0.18);
   box-shadow: 0 8px 16px rgba(17, 36, 63, 0.05);
-}
-
-.weekly-chart-label.active {
-  border-color: rgba(46, 107, 203, 0.32);
-  background: rgba(239, 245, 253, 0.98);
-  box-shadow: 0 0 0 1px rgba(46, 107, 203, 0.06);
 }
 
 .weekly-chart-label strong {
