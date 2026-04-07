@@ -1417,27 +1417,13 @@ function renderBoardInspector(day) {
             <div class="alert-box ${displayStatusTone}">
               <strong>チェックポイント</strong>
               <div>${[
-                ...(hasAreaMismatch ? [`希望エリア ${assignment.preferredArea} と現在配置 ${visualMeta.currentArea} が異なります。`] : []),
-                ...status.reasons
+                ...(hasAreaMismatch ? [`希望エリアと現在の配置が異なります。`] : []),
+                ...(overlapInfo.count ? [`同室で${overlapInfo.count}件重なっています。`] : []),
+                ...(isInvalidTime ? ["時間の前後関係、または営業時間を確認してください。"] : []),
+                ...(!isInvalidTime && assignment.warningArea ? ["対応エリアを確認してください。"] : []),
+                ...status.reasons.filter((reason) => reason !== "問題なし")
               ].map((reason) => `<div>・${reason}</div>`).join("")}</div>
             </div>
-            ${overlapInfo.count ? `
-              <div class="alert-box warning">
-                <strong>気になる点</strong>
-                <div>同室で${overlapInfo.count}件重なっています。</div>
-              </div>
-            ` : ""}
-            ${assignment.generationReasons?.length ? `
-              <div class="alert-box ok">
-                <strong>調整が必要</strong>
-                <div>${assignment.generationReasons.map((reason) => `<div>・${reason}</div>`).join("")}</div>
-              </div>
-            ` : ""}
-            ${isInvalidTime
-              ? `<div class="alert-box warning">営業時間外、または開始/終了の前後関係に注意してください。</div>`
-              : assignment.warningArea
-                ? `<div class="alert-box warning">対応可能エリア外のため要確認です。</div>`
-                : ""}
           </div>
         ` : ""}
       </details>
