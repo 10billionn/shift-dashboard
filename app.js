@@ -42,6 +42,7 @@ let boardMovePointer = { x: 0, y: 0 };
 let boardSuppressClickUntil = 0;
 let dashboardSectionDragState = null;
 let dashboardSectionArmedId = "";
+let dashboardSectionArmTimer = null;
 
 const DASHBOARD_SECTION_IDS = ["weeklyAnalysis", "boardInspector", "riskSummary", "roomDetail", "summaryGrid", "cutBlock"];
 
@@ -3501,6 +3502,10 @@ function handleDashboardSectionHandlePointerDown(event) {
   if (!handle) return;
   const section = handle.closest("[data-section-id]");
   if (!section) return;
+  if (dashboardSectionArmTimer) {
+    clearTimeout(dashboardSectionArmTimer);
+    dashboardSectionArmTimer = null;
+  }
   dashboardSectionArmedId = section.dataset.sectionId;
   section.draggable = true;
   section.classList.add("dashboard-section-armed");
@@ -3511,6 +3516,10 @@ function handleDashboardSectionDragStart(event) {
   if (!section || !section.draggable || dashboardSectionArmedId !== section.dataset.sectionId) {
     event.preventDefault();
     return;
+  }
+  if (dashboardSectionArmTimer) {
+    clearTimeout(dashboardSectionArmTimer);
+    dashboardSectionArmTimer = null;
   }
   dashboardSectionDragState = { sectionId: section.dataset.sectionId };
   event.dataTransfer.effectAllowed = "move";
@@ -3561,10 +3570,21 @@ function handleDashboardSectionDragEnd() {
 
 function handleDashboardSectionPointerUp() {
   if (dashboardSectionDragState) return;
-  cleanupDashboardSectionDrag();
+  if (dashboardSectionArmTimer) {
+    clearTimeout(dashboardSectionArmTimer);
+  }
+  dashboardSectionArmTimer = window.setTimeout(() => {
+    if (!dashboardSectionDragState) {
+      cleanupDashboardSectionDrag();
+    }
+  }, 180);
 }
 
 function cleanupDashboardSectionDrag() {
+  if (dashboardSectionArmTimer) {
+    clearTimeout(dashboardSectionArmTimer);
+    dashboardSectionArmTimer = null;
+  }
   elements.dashboardSecondarySections?.querySelectorAll(".dashboard-section-dragging, .dashboard-section-drop-before, .dashboard-section-drop-after, .dashboard-section-armed").forEach((item) => {
     item.classList.remove("dashboard-section-dragging", "dashboard-section-drop-before", "dashboard-section-drop-after", "dashboard-section-armed");
     if (item.matches("[data-section-id]")) {
