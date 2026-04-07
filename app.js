@@ -1060,31 +1060,60 @@ function buildBoardStackedAssignments(assignments) {
   }));
 }
 
-function renderRoomDetailGroups(rows) {
-  const activeRows = rows.filter((row) => row.assignments.length);
-
-  if (!activeRows.length) {
-    return `<div class="empty-state">この日の詳細確認対象はまだありません。</div>`;
+function renderRoomDetailGroups(rows, day = getScheduleDay(state.selectedDate)) {
+  if (!rows.length) {
+    return `<div class="empty-state">この日の部屋別データはまだありません。</div>`;
   }
 
-      return activeRows.map((row) => `
-        <article class="room-detail-card">
-            <div class="room-detail-head">
-              <div>
-                <strong class="room-detail-title">${row.roomLabel}</strong>
-                <p class="room-detail-note">${row.assignments.length}件${row.hasOverlap ? ` / 重複` : ""}</p>
-              </div>
-              <span class="panel-count">${row.assignments.length}件</span>
-            </div>
-      <div class="room-detail-items">
-        ${row.assignments
-          .slice()
-          .sort((left, right) => toMinutes(left.startTime) - toMinutes(right.startTime) || toMinutes(left.endTime) - toMinutes(right.endTime))
-          .map((assignment) => renderRoomDetailItem(assignment))
-          .join("")}
-      </div>
-    </article>
-  `).join("");
+  const settings = getAppSettings();
+  const businessMinutes = Math.max((settings.businessEndHour - settings.businessStartHour) * 60, 1);
+  const occupiedMinutesByRow = rows.map((row) => row.assignments.reduce((total, assignment) => {
+    const start = Math.max(toMinutes(assignment.startTime), settings.businessStartHour * 60);
+    const end = Math.min(toMinutes(assignment.endTime), settings.businessEndHour * 60);
+    return total + Math.max(end - start, 0);
+  }, 0));
+  const totalOccupiedMinutes = occupiedMinutesByRow.reduce((sum, value) => sum + value, 0);
+
+  return rows.map((row, index) => {
+    const occupiedMinutes = occupiedMinutesByRow[index];
+    const utilization = Math.max(0, Math.min(100, Math.round((occupiedMinutes / businessMinutes) * 100)));
+    const utilizationClass = utilization >= 80 ? "is-strong" : utilization >= 50 ? "is-mid" : "is-weak";
+    const salesForecast = totalOccupiedMinutes
+      ? Math.round((day.metrics.salesForecast || 0) * (occupiedMinutes / totalOccupiedMinutes))
+      : 0;
+    const storeForecast = totalOccupiedMinutes
+      ? Math.round((day.metrics.storeForecast || 0) * (occupiedMinutes / totalOccupiedMinutes))
+      : 0;
+
+    return `
+      <article class="room-detail-card ${utilizationClass}">
+        <div class="room-detail-head">
+          <div>
+            <strong class="room-detail-title">${row.roomLabel}</strong>
+          </div>
+          <span class="panel-count">${row.assignments.length}件</span>
+        </div>
+        <div class="shift-summary-grid room-detail-summary room-detail-metrics">
+          <div class="shift-summary-item">
+            <span class="field-label">稼働率</span>
+            <span class="field-value room-detail-rate ${utilizationClass}">${utilization}%</span>
+          </div>
+          <div class="shift-summary-item">
+            <span class="field-label">本数</span>
+            <span class="field-value">${row.assignments.length}件</span>
+          </div>
+          <div class="shift-summary-item">
+            <span class="field-label">売上</span>
+            <span class="field-value">${formatYen(salesForecast)}</span>
+          </div>
+          <div class="shift-summary-item">
+            <span class="field-label">店落ち</span>
+            <span class="field-value">${formatYen(storeForecast)}</span>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
 }
 
 function renderRoomDetailItem(assignment) {
