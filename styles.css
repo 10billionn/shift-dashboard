@@ -591,7 +591,6 @@ pre {
 #dashboardBoardView.dashboard-view-panel {
   display: block;
   min-height: 62vh;
-  order: 3;
   margin-top: -12px;
   border-color: rgba(46, 107, 203, 0.18);
   box-shadow: 0 18px 40px rgba(17, 36, 63, 0.08);
@@ -619,10 +618,6 @@ pre {
 
 #dashboardBoardView .panel-head {
   margin-bottom: 6px;
-}
-
-#dashboardListView {
-  order: 4;
 }
 
 #dashboardListView.dashboard-view-panel {
@@ -797,10 +792,6 @@ pre {
   box-shadow: var(--shadow-xs);
 }
 
-#dashboardListView {
-  order: 7;
-}
-
 .dashboard-list-collapsible .dashboard-collapsible-summary {
   padding: 10px 13px;
 }
@@ -932,16 +923,7 @@ pre {
 }
 
 .dashboard-cut-block {
-  order: 8;
   display: none;
-}
-
-.dashboard-weekly-block {
-  order: 4;
-}
-
-.board-inspector-panel {
-  order: 5;
 }
 
 .dashboard-weekly-block .dashboard-collapsible-body {

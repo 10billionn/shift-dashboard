@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-  <link rel="stylesheet" href="styles.css?v=202604081530">
+  <link rel="stylesheet" href="styles.css?v=202604081545">
 </head>
 <body>
   <div class="app-shell">
@@ -71,7 +71,7 @@
               </div>
               <div class="dashboard-section-tools">
                 <span class="panel-count">週次</span>
-                <button class="section-drag-handle" type="button" data-section-drag-handle aria-label="週間分析を並び替え">⋮⋮</button>
+                <button class="section-drag-handle" type="button" draggable="true" data-section-drag-handle aria-label="週間分析を並び替え">⋮⋮</button>
               </div>
             </summary>
             <div id="weeklyAnalysis" class="weekly-analysis dashboard-collapsible-body"></div>
@@ -85,7 +85,7 @@
               </div>
               <div class="dashboard-section-tools">
                 <p id="boardUpdateStatus" class="copy-status"></p>
-                <button class="section-drag-handle" type="button" data-section-drag-handle aria-label="選択中のセラピストを並び替え">⋮⋮</button>
+                <button class="section-drag-handle" type="button" draggable="true" data-section-drag-handle aria-label="選択中のセラピストを並び替え">⋮⋮</button>
               </div>
             </div>
             <div id="boardInspectorContent" class="board-inspector-content"></div>
@@ -98,7 +98,7 @@
                 <p class="section-note">盤面で気になった点を、ここで補助確認します</p>
               </div>
               <div class="dashboard-section-tools">
-                <button class="section-drag-handle" type="button" data-section-drag-handle aria-label="危険度サマリーを並び替え">⋮⋮</button>
+                <button class="section-drag-handle" type="button" draggable="true" data-section-drag-handle aria-label="危険度サマリーを並び替え">⋮⋮</button>
               </div>
             </div>
             <div id="dashboardRiskSummary" class="risk-summary-list"></div>
@@ -113,7 +113,7 @@
                 </div>
                 <div class="dashboard-section-tools">
                   <span class="panel-count">補助</span>
-                  <button class="section-drag-handle" type="button" data-section-drag-handle aria-label="部屋別詳細を並び替え">⋮⋮</button>
+                  <button class="section-drag-handle" type="button" draggable="true" data-section-drag-handle aria-label="部屋別詳細を並び替え">⋮⋮</button>
                 </div>
               </summary>
               <div class="dashboard-collapsible-body">
@@ -154,7 +154,7 @@
           </div>
 
           <section class="summary-grid dashboard-summary-grid dashboard-sortable-section" data-section-id="summaryGrid" draggable="false">
-            <button class="section-drag-handle section-drag-handle-floating" type="button" data-section-drag-handle aria-label="サマリーを並び替え">⋮⋮</button>
+            <button class="section-drag-handle section-drag-handle-floating" type="button" draggable="true" data-section-drag-handle aria-label="サマリーを並び替え">⋮⋮</button>
             <article class="summary-card emphasis">
               <p>売上予測</p>
               <strong id="salesSummary"></strong>
@@ -181,7 +181,7 @@
               </div>
               <div class="dashboard-section-tools">
                 <span id="cutCount" class="panel-count"></span>
-                <button class="section-drag-handle" type="button" data-section-drag-handle aria-label="今回は見送りを並び替え">⋮⋮</button>
+                <button class="section-drag-handle" type="button" draggable="true" data-section-drag-handle aria-label="今回は見送りを並び替え">⋮⋮</button>
               </div>
             </summary>
             <div id="cutShiftList" class="cut-list dashboard-collapsible-body"></div>
@@ -409,7 +409,7 @@
 
   <div id="globalToast" class="global-toast" aria-live="polite"></div>
 
-    <script src="data.js?v=202604081530"></script>
-    <script src="app.js?v=202604081530"></script>
+    <script src="data.js?v=202604081545"></script>
+    <script src="app.js?v=202604081545"></script>
 </body>
 </html>
