@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-  <link rel="stylesheet" href="styles.css?v=202604082110">
+  <link rel="stylesheet" href="styles.css?v=202604082155">
 </head>
 <body>
   <div class="app-shell">
@@ -76,8 +76,8 @@
             <div id="weeklyAnalysis" class="weekly-analysis dashboard-collapsible-body"></div>
           </details>
 
-          <section id="boardInspector" class="content-panel board-inspector board-inspector-panel dashboard-sortable-section" data-section-id="boardInspector" draggable="false">
-            <div class="subsection-head">
+          <details id="boardInspector" class="content-panel dashboard-collapsible dashboard-secondary-block board-inspector board-inspector-panel dashboard-sortable-section" data-section-id="boardInspector" draggable="false" open>
+            <summary class="dashboard-collapsible-summary">
               <div>
                 <h3>セラピスト詳細</h3>
               </div>
@@ -85,9 +85,9 @@
                 <p id="boardUpdateStatus" class="copy-status"></p>
                 <button class="section-drag-handle" type="button" draggable="true" data-section-drag-handle aria-label="選択中のセラピストを並び替え">⋮⋮</button>
               </div>
-            </div>
-            <div id="boardInspectorContent" class="board-inspector-content"></div>
-          </section>
+            </summary>
+            <div id="boardInspectorContent" class="dashboard-collapsible-body board-inspector-content"></div>
+          </details>
 
           <section class="content-panel dashboard-risk-panel dashboard-sortable-section" data-section-id="riskSummary" draggable="false">
             <div class="panel-head">
@@ -407,7 +407,7 @@
 
   <div id="globalToast" class="global-toast" aria-live="polite"></div>
 
-  <script src="data.js?v=202604082110"></script>
-  <script src="app.js?v=202604082110"></script>
+  <script src="data.js?v=202604082155"></script>
+  <script src="app.js?v=202604082155"></script>
 </body>
 </html>

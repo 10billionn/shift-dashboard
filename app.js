@@ -1354,71 +1354,64 @@ function renderBoardInspector(day) {
         </div>
       </div>
 
-      <details class="board-inspector-fold" ${isInvalidTime || assignment.warningArea || overlapInfo.count || hasAreaMismatch ? "open" : ""}>
-        <summary class="board-inspector-fold-summary">
-          <span class="board-inspector-fold-label board-inspector-fold-label-closed">詳細を開く</span>
-          <span class="board-inspector-fold-label board-inspector-fold-label-open">閉じる</span>
-        </summary>
+      <div class="board-editor-grid compact-board-editor-grid">
+        <label class="field-block">
+          <span class="field-label">現在の配置</span>
+          <select class="select-input" data-board-field="roomIndex">
+            ${roomOptions.map((roomName, index) => `<option value="${index}" ${normalizeRoomIndex(assignment.roomIndex, position?.slotIndex ?? 0) === index ? "selected" : ""}>${roomName}</option>`).join("")}
+          </select>
+        </label>
 
-        <div class="board-editor-grid compact-board-editor-grid">
-          <label class="field-block">
-            <span class="field-label">現在の配置</span>
-            <select class="select-input" data-board-field="roomIndex">
-              ${roomOptions.map((roomName, index) => `<option value="${index}" ${normalizeRoomIndex(assignment.roomIndex, position?.slotIndex ?? 0) === index ? "selected" : ""}>${roomName}</option>`).join("")}
-            </select>
-          </label>
+        <label class="field-block">
+          <span class="field-label">開始</span>
+          <input class="time-input ${isInvalidTime ? "board-input-invalid" : ""}" type="time" step="1800" value="${assignment.startTime}" data-board-field="startTime">
+        </label>
 
-          <label class="field-block">
-            <span class="field-label">開始</span>
-            <input class="time-input ${isInvalidTime ? "board-input-invalid" : ""}" type="time" step="1800" value="${assignment.startTime}" data-board-field="startTime">
-          </label>
+        <label class="field-block">
+          <span class="field-label">終了</span>
+          <input class="time-input ${isInvalidTime ? "board-input-invalid" : ""}" type="time" step="1800" value="${assignment.endTime}" data-board-field="endTime">
+        </label>
 
-          <label class="field-block">
-            <span class="field-label">終了</span>
-            <input class="time-input ${isInvalidTime ? "board-input-invalid" : ""}" type="time" step="1800" value="${assignment.endTime}" data-board-field="endTime">
-          </label>
+        <label class="field-block">
+          <span class="field-label">エリア</span>
+          <select class="select-input" data-board-field="assignedArea">
+            ${availableAreas.map((area) => `<option value="${area}" ${area === assignment.assignedArea ? "selected" : ""}>${area}</option>`).join("")}
+          </select>
+        </label>
 
-          <label class="field-block">
-            <span class="field-label">エリア</span>
-            <select class="select-input" data-board-field="assignedArea">
-              ${availableAreas.map((area) => `<option value="${area}" ${area === assignment.assignedArea ? "selected" : ""}>${area}</option>`).join("")}
-            </select>
-          </label>
+        <label class="field-block wide">
+          <span class="field-label">補足メモ</span>
+          <textarea class="text-input board-note-input" data-board-field="note" rows="2" placeholder="終電 / 店泊 / ヘルプ可 など">${escapeHtml(assignment.note || "")}</textarea>
+        </label>
+      </div>
 
-          <label class="field-block wide">
-            <span class="field-label">補足メモ</span>
-            <textarea class="text-input board-note-input" data-board-field="note" rows="2" placeholder="終電 / 店泊 / ヘルプ可 など">${escapeHtml(assignment.note || "")}</textarea>
-          </label>
-        </div>
-
-        <div class="board-quick-actions compact-board-quick-actions">
-          <div class="board-quick-actions-group">
-            <span class="field-label">開始 / 終了</span>
-            <div class="board-quick-actions-row">
-              <button class="ghost-button" type="button" data-board-action="startEarlier30">開始 -30分</button>
-              <button class="ghost-button" type="button" data-board-action="startLater30">開始 +30分</button>
-              <button class="ghost-button" type="button" data-board-action="endEarlier30">終了 -30分</button>
-              <button class="ghost-button" type="button" data-board-action="endLater30">終了 +30分</button>
-              <button class="ghost-button danger-button" type="button" data-board-action="delete">削除</button>
-            </div>
+      <div class="board-quick-actions compact-board-quick-actions">
+        <div class="board-quick-actions-group">
+          <span class="field-label">開始 / 終了</span>
+          <div class="board-quick-actions-row">
+            <button class="ghost-button" type="button" data-board-action="startEarlier30">開始 -30分</button>
+            <button class="ghost-button" type="button" data-board-action="startLater30">開始 +30分</button>
+            <button class="ghost-button" type="button" data-board-action="endEarlier30">終了 -30分</button>
+            <button class="ghost-button" type="button" data-board-action="endLater30">終了 +30分</button>
+            <button class="ghost-button danger-button" type="button" data-board-action="delete">削除</button>
           </div>
         </div>
+      </div>
 
-        ${(isInvalidTime || assignment.warningArea || overlapInfo.count || status.reasons.length || assignment.generationReasons?.length) ? `
-          <div class="board-inspector-alerts">
-            <div class="alert-box ${displayStatusTone}">
-              <strong>チェックポイント</strong>
-              <div>${[
-                ...(hasAreaMismatch ? [`希望エリアと現在の配置が異なります。`] : []),
-                ...(overlapInfo.count ? [`同室で${overlapInfo.count}件重なっています。`] : []),
-                ...(isInvalidTime ? ["時間の前後関係、または営業時間を確認してください。"] : []),
-                ...(!isInvalidTime && assignment.warningArea ? ["対応エリアを確認してください。"] : []),
-                ...status.reasons.filter((reason) => reason !== "問題なし")
-              ].map((reason) => `<div>・${reason}</div>`).join("")}</div>
-            </div>
+      ${(isInvalidTime || assignment.warningArea || overlapInfo.count || status.reasons.length || assignment.generationReasons?.length) ? `
+        <div class="board-inspector-alerts">
+          <div class="alert-box ${displayStatusTone}">
+            <strong>チェックポイント</strong>
+            <div>${[
+              ...(hasAreaMismatch ? [`希望エリアと現在の配置が異なります。`] : []),
+              ...(overlapInfo.count ? [`同室で${overlapInfo.count}件重なっています。`] : []),
+              ...(isInvalidTime ? ["時間の前後関係、または営業時間を確認してください。"] : []),
+              ...(!isInvalidTime && assignment.warningArea ? ["対応エリアを確認してください。"] : []),
+              ...status.reasons.filter((reason) => reason !== "問題なし")
+            ].map((reason) => `<div>・${reason}</div>`).join("")}</div>
           </div>
-        ` : ""}
-      </details>
+        </div>
+      ` : ""}
     </article>
   `;
 }
