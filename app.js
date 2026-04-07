@@ -3552,10 +3552,8 @@ function handleWeeklyAnalysisClick(event) {
   const card = event.target.closest("[data-date-key]");
   if (!card) return;
   const nextDateKey = normalizeDateKey(card.dataset.dateKey);
-  if (!nextDateKey || nextDateKey === state.selectedDate) return;
-  state.selectedDate = nextDateKey;
-  persistState();
-  renderDashboard();
+  if (!nextDateKey) return;
+  updateSelectedDate(nextDateKey);
 }
 
 function handleDashboardSectionHandleClick(event) {
@@ -3706,13 +3704,17 @@ function moveDate(offset) {
   const currentIndex = state.dateList.indexOf(state.selectedDate);
   const nextIndex = currentIndex + offset;
   if (nextIndex < 0 || nextIndex >= state.dateList.length) return;
-  state.selectedDate = state.dateList[nextIndex];
-  persistState();
-  renderDashboard();
+  updateSelectedDate(state.dateList[nextIndex]);
 }
 
 function jumpToStartDate() {
-  state.selectedDate = samplePrototypeData.settings.startDate;
+  updateSelectedDate(samplePrototypeData.settings.startDate);
+}
+
+function updateSelectedDate(nextDateKey) {
+  const normalized = normalizeDateKey(nextDateKey);
+  if (!normalized || normalized === state.selectedDate) return;
+  state.selectedDate = normalized;
   persistState();
   renderDashboard();
 }
