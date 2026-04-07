@@ -1315,6 +1315,7 @@ function renderBoardInspector(day) {
     && assignment.preferredArea !== visualMeta.currentArea;
   const displayStatusLabel = hasAreaMismatch ? "エリア不一致" : status.label;
   const displayStatusTone = hasAreaMismatch ? "warning" : statusTone;
+  const ibMinutes = Number(profile.ibMinutes) > 0 ? Number(profile.ibMinutes) : 0;
 
   return `
     <article class="board-inspector-card">
@@ -1323,6 +1324,7 @@ function renderBoardInspector(day) {
           <div class="board-inspector-name-row">
             <strong class="therapist-name">${assignment.name}</strong>
             <span class="mini-badge rank">${profile.rank || "G"}</span>
+            ${ibMinutes ? `<span class="mini-badge ib">IB${ibMinutes}</span>` : ""}
           </div>
         </div>
         <div class="status-row tight">
@@ -1381,7 +1383,7 @@ function renderBoardInspector(day) {
 
         <label class="field-block wide">
           <span class="field-label">補足メモ</span>
-          <textarea class="text-input board-note-input" data-board-field="note" rows="2" placeholder="終電 / 店泊 / ヘルプ可 など">${escapeHtml(assignment.note || "")}</textarea>
+          <textarea class="text-input board-note-input" data-board-field="note" rows="2" placeholder="店泊希望 / IB相談可能 / 初回90分のみ など">${escapeHtml(assignment.note || "")}</textarea>
         </label>
       </div>
 
@@ -1393,7 +1395,7 @@ function renderBoardInspector(day) {
             <button class="ghost-button" type="button" data-board-action="startLater30">開始 +30分</button>
             <button class="ghost-button" type="button" data-board-action="endEarlier30">終了 -30分</button>
             <button class="ghost-button" type="button" data-board-action="endLater30">終了 +30分</button>
-            <button class="ghost-button danger-button" type="button" data-board-action="delete">削除</button>
+            <button class="ghost-button danger-button" type="button" data-board-action="moveToAdjustment">調整中へ移動</button>
           </div>
         </div>
       </div>
@@ -2249,8 +2251,8 @@ function handleBoardInspectorAction(event) {
     return;
   }
 
-  if (action === "delete") {
-    removeBoardAssignment(assignment.id);
+  if (action === "moveToAdjustment" || action === "delete") {
+    moveBoardAssignmentToAdjustment(assignment.id);
   }
 }
 
