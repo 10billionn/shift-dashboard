@@ -1331,13 +1331,12 @@ function renderBoardInspector(day) {
         </div>
         <div class="status-row tight">
           <span class="mini-badge ${assignment.himeReservation === "あり" ? "booked hime-accent" : "gray board-hime-muted"}">${assignment.himeReservation === "あり" ? "姫あり" : "姫なし"}</span>
-          <span class="mini-badge ${isAdjustmentLane ? "gray" : hasAreaMismatch ? "warning" : "ok"}">${displayStatusLabel}</span>
         </div>
       </div>
 
       <div class="board-inspector-grid compact-board-inspector-grid">
         <div class="shift-summary-item">
-          <span class="field-label">現在の配置</span>
+          <span class="field-label">現在ルーム</span>
           <span class="field-value">${displayRoomLabel}</span>
         </div>
         <div class="shift-summary-item">
@@ -1346,15 +1345,11 @@ function renderBoardInspector(day) {
         </div>
         <div class="shift-summary-item">
           <span class="field-label">希望エリア</span>
-          <span class="field-value ${hasAreaMismatch ? "mismatch" : ""}">${assignment.preferredArea || "未設定"}${hasAreaMismatch ? "（不一致）" : ""}</span>
+          <span class="field-value">${assignment.preferredArea || "未設定"}</span>
         </div>
         <div class="shift-summary-item">
           <span class="field-label">ステータス</span>
           <span class="field-value ${hasAreaMismatch ? "mismatch" : ""}">${displayStatusLabel}</span>
-        </div>
-        <div class="shift-summary-item">
-          <span class="field-label">姫予約</span>
-          <span class="field-value">${assignment.himeReservation === "あり" ? "あり" : "なし"}</span>
         </div>
       </div>
 
