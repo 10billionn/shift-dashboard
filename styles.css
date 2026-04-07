@@ -1274,15 +1274,16 @@ pre {
 }
 
 .weekly-analysis {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  display: grid;
+  gap: 10px;
 }
 
 .weekly-analysis-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .section-title-sm {
@@ -1293,17 +1294,20 @@ pre {
 
 .weekly-analysis-tabs {
   gap: 6px;
+  justify-self: end;
 }
 
 .weekly-analysis-body-cards {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(118px, 1fr));
   gap: 10px;
+  width: 100%;
 }
 
 .weekly-analysis-body-chart {
   display: grid;
   gap: 10px;
+  width: 100%;
 }
 
 .weekly-day {
@@ -1336,6 +1340,7 @@ button.weekly-day {
 .weekly-chart {
   display: grid;
   gap: 10px;
+  width: 100%;
 }
 
 .weekly-chart-canvas {
@@ -1412,7 +1417,7 @@ button.weekly-day {
 
 .weekly-chart-labels {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(118px, 1fr));
   gap: 8px;
 }
 

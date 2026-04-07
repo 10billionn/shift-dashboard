@@ -680,7 +680,6 @@ function renderCutRows(rows) {
 function renderWeeklyAnalysis() {
   const tabs = `
     <div class="weekly-analysis-head">
-      <strong class="section-title-sm">週間分析</strong>
       <div class="view-tabs weekly-analysis-tabs" role="tablist" aria-label="週間分析表示切替">
         <button class="view-tab ${state.weeklyAnalysisView === "cards" ? "active" : ""}" type="button" data-weekly-view="cards">カード</button>
         <button class="view-tab ${state.weeklyAnalysisView === "chart" ? "active" : ""}" type="button" data-weekly-view="chart">グラフ</button>
