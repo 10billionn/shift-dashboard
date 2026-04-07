@@ -910,6 +910,7 @@ function renderAdjustmentBar(row, index) {
       type="button"
       draggable="true"
       data-board-assignment-id="${row.id}"
+      data-assignment-location="adjustment"
       data-board-slot-index="-1"
       data-board-dropzone="adjustment"
       title="${escapeHtml(`${row.name} / ${row.startTime}-${row.endTime}${area ? ` / 希望 ${area}` : ""}`)}"
@@ -957,6 +958,7 @@ function renderBoardBar(assignment, slotIndex, shiftType, stackMeta = null) {
           draggable="false"
           title="${escapeHtml(barTitle)}"
         data-board-assignment-id="${assignment.id}"
+        data-assignment-location="room"
         data-board-shift-type="${shiftType}"
         data-board-slot-index="${slotIndex}"
         style="left:${left}%; width:${width}%; --board-stack-offset:${(stackMeta?.stackIndex || 0) * 4}px;">
@@ -1814,7 +1816,9 @@ function handleBoardDragStart(event) {
   boardDragPayload = {
     assignmentId: bar.dataset.boardAssignmentId,
     slotIndex: Number(bar.dataset.boardSlotIndex),
-    dropzone: bar.dataset.boardDropzone || "room"
+    dropzone: bar.dataset.boardDropzone || "room",
+    sourceType: bar.dataset.assignmentLocation || ((bar.dataset.boardDropzone || "room") === "adjustment" ? "adjustment" : "room"),
+    sourceDate: state.selectedDate
   };
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData("text/plain", JSON.stringify(boardDragPayload));
@@ -1858,17 +1862,36 @@ function handleBoardDrop(event) {
   if (!track) return;
   track.classList.remove("drag-over");
   track.closest(".board-lane")?.classList.remove("drag-target-room");
-  if (!boardDragPayload) return;
   event.preventDefault();
+  if (!boardDragPayload) {
+    try {
+      boardDragPayload = JSON.parse(event.dataTransfer?.getData("text/plain") || "null");
+    } catch {
+      boardDragPayload = null;
+    }
+  }
+  if (!boardDragPayload) return;
 
-  if (track.dataset.boardDropzone === "adjustment") {
-    moveBoardAssignmentToAdjustment(boardDragPayload.assignmentId);
+  const targetDropzone = track.dataset.boardDropzone || "room";
+  const sourceType = boardDragPayload.sourceType || (boardDragPayload.dropzone === "adjustment" ? "adjustment" : "room");
+
+  if (targetDropzone === "adjustment") {
+    if (sourceType !== "adjustment") {
+      moveBoardAssignmentToAdjustment(boardDragPayload.assignmentId);
+    }
+    boardDragPayload = null;
+    return;
+  }
+
+  if (sourceType === "adjustment") {
+    restoreBoardAssignmentFromAdjustment(boardDragPayload.assignmentId, Number(track.dataset.boardSlotIndex));
     boardDragPayload = null;
     return;
   }
 
   moveBoardAssignmentWithinShift(boardDragPayload, {
-    slotIndex: Number(track.dataset.boardSlotIndex)
+    slotIndex: Number(track.dataset.boardSlotIndex),
+    dropzone: targetDropzone
   });
   boardDragPayload = null;
 }
@@ -2085,6 +2108,19 @@ function commitBoardMove(assignmentId, roomIndex, startMinutes, endMinutes) {
     window.setTimeout(() => settledTrack?.classList.remove("drop-settle"), 140);
   });
   renderLinkedViewsAfterBoardEdit();
+}
+
+function restoreBoardAssignmentFromAdjustment(assignmentId, roomIndex) {
+  const row = state.generationRows.find((item) => item.id === assignmentId && ["cut", "hold"].includes(item.status));
+  const adjustmentAssignment = buildBoardAdjustmentAssignment(row);
+  if (!adjustmentAssignment) return;
+  commitBoardMove(
+    assignmentId,
+    roomIndex,
+    toMinutes(adjustmentAssignment.startTime),
+    toMinutes(adjustmentAssignment.endTime)
+  );
+  showToast(`${adjustmentAssignment.name}を盤面に戻しました。`, "success");
 }
 
 function handleBoardInspectorChange(event) {
