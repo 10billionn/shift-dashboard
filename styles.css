@@ -1308,6 +1308,7 @@ pre {
   display: grid;
   gap: 8px;
   width: 100%;
+  justify-items: center;
 }
 
 .weekly-day {
@@ -1339,13 +1340,16 @@ button.weekly-day {
 
 .weekly-chart {
   display: grid;
-  gap: 8px;
-  width: 100%;
+  gap: 6px;
+  width: min(100%, 940px);
+  margin: 0 auto;
 }
 
 .weekly-chart-canvas {
   position: relative;
   height: 78px;
+  width: 100%;
+  max-width: 940px;
   border: 1px solid rgba(200, 211, 225, 0.68);
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 253, 0.94));
@@ -1419,6 +1423,8 @@ button.weekly-day {
   display: grid;
   grid-template-columns: repeat(7, minmax(118px, 1fr));
   gap: 8px;
+  width: 100%;
+  max-width: 940px;
 }
 
 .weekly-chart-label {
