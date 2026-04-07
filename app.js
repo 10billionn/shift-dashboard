@@ -734,11 +734,14 @@ function renderWeeklyAnalysisChart() {
   const chartMin = Math.max(0, minSales - padding);
   const chartMax = maxSales + padding;
   const chartRange = Math.max(chartMax - chartMin, 1);
-  const width = 100;
+  const pointSpacing = 54;
+  const sidePadding = 20;
+  const width = sidePadding * 2 + (pointSpacing * Math.max(points.length - 1, 0));
   const height = 44;
-  const stepX = points.length === 1 ? 0 : width / (points.length - 1);
+  const canvasHeight = 78;
+  const chartDisplayWidth = Math.round((width / height) * canvasHeight);
   const plotted = points.map((point, index) => {
-    const x = points.length === 1 ? width / 2 : index * stepX;
+    const x = points.length === 1 ? width / 2 : sidePadding + (index * pointSpacing);
     const usableHeight = height - 8;
     const y = 4 + usableHeight - (((point.salesForecast - chartMin) / chartRange) * usableHeight);
     return { ...point, x, y };
@@ -746,22 +749,13 @@ function renderWeeklyAnalysisChart() {
   const path = plotted.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ");
 
   return `
-    <div class="weekly-chart">
+    <div class="weekly-chart" style="--weekly-chart-width:${chartDisplayWidth}px;">
       <div class="weekly-chart-canvas">
-        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="weekly-chart-svg" aria-hidden="true">
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" class="weekly-chart-svg" aria-hidden="true">
           <path class="weekly-chart-area" d="${path} L ${width} ${height} L 0 ${height} Z"></path>
           <path class="weekly-chart-line" d="${path}"></path>
           ${plotted.map((point) => `<circle class="weekly-chart-node ${point.dateKey === state.selectedDate ? "active" : ""}" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="${point.dateKey === state.selectedDate ? 2.5 : 2.1}"></circle>`).join("")}
         </svg>
-        ${plotted.map((point) => `
-          <button
-            class="weekly-chart-hit ${point.dateKey === state.selectedDate ? "active" : ""}"
-            type="button"
-            data-date-key="${point.dateKey}"
-            style="left: calc(${point.x}% - 18px); top: calc(${(point.y / height) * 100}% - 18px);"
-            title="${escapeHtml(`${point.label} / 売上 ${formatCompactYen(point.salesForecast)} / 不足 ${point.shortage}枠 / 充足率 ${point.fillRate}%`)}">
-          </button>
-        `).join("")}
       </div>
       <div class="weekly-chart-labels">
         ${points.map((point) => `
