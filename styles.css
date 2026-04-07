@@ -448,6 +448,33 @@ pre {
   color: #1f2c3d;
 }
 
+.dashboard-summary-grid .summary-card.kpi-hot {
+  background: rgba(220, 80, 80, 0.15);
+  border-color: rgba(220, 80, 80, 0.18);
+}
+
+.dashboard-summary-grid .summary-card.kpi-warm {
+  background: rgba(240, 180, 60, 0.12);
+  border-color: rgba(220, 177, 84, 0.18);
+}
+
+.dashboard-summary-grid .summary-card.kpi-cool {
+  background: rgba(100, 140, 200, 0.08);
+  border-color: rgba(120, 154, 206, 0.18);
+}
+
+.dashboard-summary-grid .summary-card.kpi-hot strong {
+  color: #c05050;
+}
+
+.dashboard-summary-grid .summary-card.kpi-warm strong {
+  color: #c68a2b;
+}
+
+.dashboard-summary-grid .summary-card.kpi-cool strong {
+  color: #4a6fa5;
+}
+
 .risk-summary-list {
   display: block;
 }

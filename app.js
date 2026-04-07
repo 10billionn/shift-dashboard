@@ -475,6 +475,7 @@ function renderDashboard() {
   elements.storeSummary.textContent = formatYen(day.metrics.storeForecast);
   elements.shortageSummary.textContent = `${displayShortage}枠`;
   elements.fillSummary.textContent = `${displayFillRate}%`;
+  updateDashboardKpiCards(day);
   elements.dashboardRiskSummary.innerHTML = renderTodayInsight();
   elements.earlyShiftList.innerHTML = renderShiftSlots(day.earlyAssignments, "早番", earlySlotTotal);
   elements.lateShiftList.innerHTML = renderShiftSlots(day.lateAssignments, "遅番", lateSlotTotal);
@@ -494,6 +495,32 @@ function renderBoardWorkspace(day = getScheduleDay(state.selectedDate), boardRow
   elements.dashboardBoardCanvas.innerHTML = renderBoardTimeline(day, boardRows, cutRows);
   elements.boardInspectorContent.innerHTML = renderBoardInspector(day);
   renderBoardDensityState();
+}
+
+function updateDashboardKpiCards(day) {
+  const salesValues = state.dateList.map((dateKey) => getScheduleDay(dateKey).metrics.salesForecast || 0);
+  const storeValues = state.dateList.map((dateKey) => getScheduleDay(dateKey).metrics.storeForecast || 0);
+  const maxSales = Math.max(...salesValues, 0);
+  const maxStore = Math.max(...storeValues, 0);
+
+  setKpiCardTone(elements.salesSummary?.closest(".summary-card"), getRelativeKpiTone(day.metrics.salesForecast || 0, maxSales));
+  setKpiCardTone(elements.storeSummary?.closest(".summary-card"), getRelativeKpiTone(day.metrics.storeForecast || 0, maxStore));
+  setKpiCardTone(elements.fillSummary?.closest(".summary-card"), day.metrics.fillRate >= 85 ? "kpi-hot" : day.metrics.fillRate >= 60 ? "kpi-warm" : "kpi-cool");
+  setKpiCardTone(elements.shortageSummary?.closest(".summary-card"), day.metrics.shortage <= 0 ? "kpi-hot" : day.metrics.shortage <= 2 ? "kpi-warm" : "kpi-cool");
+}
+
+function getRelativeKpiTone(value, maxValue) {
+  if (maxValue <= 0 || value <= 0) return "kpi-cool";
+  const ratio = value / maxValue;
+  if (ratio >= 0.72) return "kpi-hot";
+  if (ratio >= 0.4) return "kpi-warm";
+  return "kpi-cool";
+}
+
+function setKpiCardTone(card, toneClass) {
+  if (!card) return;
+  card.classList.remove("kpi-hot", "kpi-warm", "kpi-cool");
+  card.classList.add(toneClass);
 }
 
 function renderBoardDensityState() {
@@ -750,7 +777,7 @@ function renderWeeklyAnalysisCards() {
         ? "tone-mid"
         : "tone-base";
     return `
-      <button class="weekly-day ${cardTone} ${isActive ? "active" : ""} shortage-${shortageTone} fill-${fillTone}" type="button" data-date-key="${dateKey}">
+      <button class="weekly-day ${cardTone} shortage-${shortageTone} fill-${fillTone}" type="button" data-date-key="${dateKey}">
         <strong class="weekly-date">${formatShortDate(dateKey)}</strong>
         <span class="field-label weekly-weekday ${weekdayClass}">${formatWeekday(dateKey)}</span>
         <div class="fill-bar"><span style="width:${Math.min(day.metrics.fillRate, 100)}%"></span></div>
@@ -810,7 +837,7 @@ function renderWeeklyAnalysisChart() {
       </div>
       <div class="weekly-chart-labels">
         ${points.map((point) => `
-          <button class="weekly-chart-label ${point.dateKey === state.selectedDate ? "active" : ""}" type="button" data-date-key="${point.dateKey}">
+          <button class="weekly-chart-label" type="button" data-date-key="${point.dateKey}">
             <strong>${point.label}<span class="weekly-chart-weekday ${getWeeklyWeekdayClass(point.dateKey)}">${formatWeekday(point.dateKey)}</span></strong>
             <span>不足 ${point.shortage}</span>
           </button>
