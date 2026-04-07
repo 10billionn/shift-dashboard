@@ -41,6 +41,7 @@ let boardMoveFrameId = null;
 let boardMovePointer = { x: 0, y: 0 };
 let boardSuppressClickUntil = 0;
 let dashboardSectionDragState = null;
+let dashboardSectionArmedId = "";
 
 const DASHBOARD_SECTION_IDS = ["weeklyAnalysis", "boardInspector", "riskSummary", "roomDetail", "summaryGrid", "cutBlock"];
 
@@ -220,12 +221,13 @@ function bindEvents() {
   elements.boardInspectorContent.addEventListener("change", handleBoardInspectorChange);
   elements.boardInspectorContent.addEventListener("click", handleBoardInspectorAction);
   elements.weeklyAnalysis.addEventListener("click", handleWeeklyAnalysisClick);
-  elements.dashboardSecondarySections?.addEventListener("mousedown", handleDashboardSectionHandlePointerDown);
+  elements.dashboardSecondarySections?.addEventListener("pointerdown", handleDashboardSectionHandlePointerDown);
   elements.dashboardSecondarySections?.addEventListener("click", handleDashboardSectionHandleClick);
   elements.dashboardSecondarySections?.addEventListener("dragstart", handleDashboardSectionDragStart);
   elements.dashboardSecondarySections?.addEventListener("dragover", handleDashboardSectionDragOver);
   elements.dashboardSecondarySections?.addEventListener("drop", handleDashboardSectionDrop);
   elements.dashboardSecondarySections?.addEventListener("dragend", handleDashboardSectionDragEnd);
+  window.addEventListener("pointerup", handleDashboardSectionPointerUp);
   window.addEventListener("mousemove", handleBoardPointerMove);
   window.addEventListener("mouseup", handleBoardPointerEnd);
 
@@ -3499,13 +3501,14 @@ function handleDashboardSectionHandlePointerDown(event) {
   if (!handle) return;
   const section = handle.closest("[data-section-id]");
   if (!section) return;
+  dashboardSectionArmedId = section.dataset.sectionId;
   section.draggable = true;
   section.classList.add("dashboard-section-armed");
 }
 
 function handleDashboardSectionDragStart(event) {
   const section = event.target.closest("[data-section-id]");
-  if (!section || !section.draggable) {
+  if (!section || !section.draggable || dashboardSectionArmedId !== section.dataset.sectionId) {
     event.preventDefault();
     return;
   }
@@ -3556,6 +3559,11 @@ function handleDashboardSectionDragEnd() {
   cleanupDashboardSectionDrag();
 }
 
+function handleDashboardSectionPointerUp() {
+  if (dashboardSectionDragState) return;
+  cleanupDashboardSectionDrag();
+}
+
 function cleanupDashboardSectionDrag() {
   elements.dashboardSecondarySections?.querySelectorAll(".dashboard-section-dragging, .dashboard-section-drop-before, .dashboard-section-drop-after, .dashboard-section-armed").forEach((item) => {
     item.classList.remove("dashboard-section-dragging", "dashboard-section-drop-before", "dashboard-section-drop-after", "dashboard-section-armed");
@@ -3564,6 +3572,7 @@ function cleanupDashboardSectionDrag() {
     }
   });
   dashboardSectionDragState = null;
+  dashboardSectionArmedId = "";
 }
 
 function findScheduledAssignmentById(id) {

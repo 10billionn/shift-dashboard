@@ -863,6 +863,9 @@ pre {
   font-size: 0.78rem;
   line-height: 1;
   cursor: grab;
+  user-select: none;
+  -webkit-user-drag: none;
+  touch-action: none;
 }
 
 .section-drag-handle:hover {
