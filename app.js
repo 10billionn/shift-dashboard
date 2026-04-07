@@ -17,6 +17,7 @@
   selectedDistributionAssignmentId: "",
   distributionViewMode: "date",
   distributionFormat: "line",
+  weeklyAnalysisView: "cards",
   copiedDistributionIds: [],
   distributionPendingOnly: false,
   selectedBoardAssignmentId: "",
@@ -323,6 +324,7 @@ function hydrateState(saved) {
   state.distributionViewMode = ["date", "therapist"].includes(saved.distributionViewMode) ? saved.distributionViewMode : "date";
   state.appSettings = saved.appSettings ? restoreAppSettings(saved.appSettings) : cloneAppSettings(samplePrototypeData.settings);
   state.distributionFormat = ["line", "simple"].includes(saved.distributionFormat) ? saved.distributionFormat : "line";
+  state.weeklyAnalysisView = saved.weeklyAnalysisView === "chart" ? "chart" : "cards";
   state.copiedDistributionIds = Array.isArray(saved.copiedDistributionIds) ? saved.copiedDistributionIds : [];
   state.distributionPendingOnly = Boolean(saved.distributionPendingOnly);
   state.selectedBoardAssignmentId = saved.selectedBoardAssignmentId || "";
@@ -676,6 +678,22 @@ function renderCutRows(rows) {
 }
 
 function renderWeeklyAnalysis() {
+  const tabs = `
+    <div class="weekly-analysis-head">
+      <strong class="section-title-sm">週間分析</strong>
+      <div class="view-tabs weekly-analysis-tabs" role="tablist" aria-label="週間分析表示切替">
+        <button class="view-tab ${state.weeklyAnalysisView === "cards" ? "active" : ""}" type="button" data-weekly-view="cards">カード</button>
+        <button class="view-tab ${state.weeklyAnalysisView === "chart" ? "active" : ""}" type="button" data-weekly-view="chart">グラフ</button>
+      </div>
+    </div>
+  `;
+  const body = state.weeklyAnalysisView === "chart"
+    ? renderWeeklyAnalysisChart()
+    : renderWeeklyAnalysisCards();
+  return `${tabs}<div class="weekly-analysis-body weekly-analysis-body-${state.weeklyAnalysisView}">${body}</div>`;
+}
+
+function renderWeeklyAnalysisCards() {
   return state.dateList.map((dateKey) => {
     const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
     const isActive = dateKey === state.selectedDate;
@@ -692,6 +710,62 @@ function renderWeeklyAnalysis() {
       </button>
     `;
   }).join("");
+}
+
+function renderWeeklyAnalysisChart() {
+  const points = state.dateList.map((dateKey) => {
+    const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
+    return {
+      dateKey,
+      label: formatShortDate(dateKey),
+      salesForecast: day.metrics.salesForecast || 0,
+      shortage: day.metrics.shortage || 0,
+      fillRate: day.metrics.fillRate || 0
+    };
+  });
+  if (!points.length) {
+    return `<div class="empty-state compact-empty-state">週間データがありません。</div>`;
+  }
+
+  const maxSales = Math.max(...points.map((point) => point.salesForecast), 1);
+  const width = 100;
+  const height = 64;
+  const stepX = points.length === 1 ? 0 : width / (points.length - 1);
+  const plotted = points.map((point, index) => {
+    const x = points.length === 1 ? width / 2 : index * stepX;
+    const y = height - ((point.salesForecast / maxSales) * (height - 10)) - 5;
+    return { ...point, x, y };
+  });
+  const path = plotted.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ");
+
+  return `
+    <div class="weekly-chart">
+      <div class="weekly-chart-canvas">
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="weekly-chart-svg" aria-hidden="true">
+          <path class="weekly-chart-area" d="${path} L ${width} ${height} L 0 ${height} Z"></path>
+          <path class="weekly-chart-line" d="${path}"></path>
+          ${plotted.map((point) => `<circle class="weekly-chart-node ${point.dateKey === state.selectedDate ? "active" : ""}" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="${point.dateKey === state.selectedDate ? 2.5 : 2.1}"></circle>`).join("")}
+        </svg>
+        ${plotted.map((point) => `
+          <button
+            class="weekly-chart-hit ${point.dateKey === state.selectedDate ? "active" : ""}"
+            type="button"
+            data-date-key="${point.dateKey}"
+            style="left: calc(${point.x}% - 18px); top: calc(${(point.y / height) * 100}% - 18px);"
+            title="${escapeHtml(`${point.label} / 売上 ${formatCompactYen(point.salesForecast)} / 不足 ${point.shortage}枠 / 充足率 ${point.fillRate}%`)}">
+          </button>
+        `).join("")}
+      </div>
+      <div class="weekly-chart-labels">
+        ${points.map((point) => `
+          <button class="weekly-chart-label ${point.dateKey === state.selectedDate ? "active" : ""}" type="button" data-date-key="${point.dateKey}">
+            <strong>${point.label}</strong>
+            <span>不足 ${point.shortage}</span>
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
 }
 
 function renderBoardTimeline(day, rows = buildBoardRoomRows(day), cutRows = getCutRowsForDate(day.dateKey)) {
@@ -3329,6 +3403,16 @@ async function copyDistributionMessage() {
 }
 
 function handleWeeklyAnalysisClick(event) {
+  const viewButton = event.target.closest("[data-weekly-view]");
+  if (viewButton) {
+    const nextView = viewButton.dataset.weeklyView === "chart" ? "chart" : "cards";
+    if (nextView !== state.weeklyAnalysisView) {
+      state.weeklyAnalysisView = nextView;
+      persistState();
+      renderDashboard();
+    }
+    return;
+  }
   const card = event.target.closest("[data-date-key]");
   if (!card) return;
   const nextDateKey = normalizeDateKey(card.dataset.dateKey);
@@ -3696,6 +3780,7 @@ function persistState() {
       activeShiftTab: state.activeShiftTab,
       distributionViewMode: state.distributionViewMode,
       distributionFormat: state.distributionFormat,
+      weeklyAnalysisView: state.weeklyAnalysisView,
       copiedDistributionIds: state.copiedDistributionIds,
       distributionPendingOnly: state.distributionPendingOnly,
       selectedBoardAssignmentId: state.selectedBoardAssignmentId,
