@@ -2372,7 +2372,7 @@ button.weekly-day {
   padding-top: 0;
   border-top: none;
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .room-detail-list {
@@ -2423,17 +2423,17 @@ button.weekly-day {
 
 .board-inspector-content {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .board-inspector-card {
   display: grid;
-  gap: 7px;
-  padding: 8px 10px;
-  border: 1px solid rgba(200, 211, 225, 0.38);
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid rgba(200, 211, 225, 0.3);
   border-radius: var(--radius-md);
-  background: rgba(250, 252, 253, 0.72);
-  box-shadow: 0 2px 8px rgba(17, 36, 63, 0.025);
+  background: rgba(251, 252, 253, 0.66);
+  box-shadow: 0 1px 6px rgba(17, 36, 63, 0.02);
 }
 
 .board-inspector-head {
@@ -2451,7 +2451,7 @@ button.weekly-day {
 
 .compact-board-inspector-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
+  gap: 5px;
 }
 
 .compact-board-inspector-grid .field-label {
@@ -2459,7 +2459,7 @@ button.weekly-day {
 }
 
 .compact-board-inspector-grid .field-value {
-  min-height: 21px;
+  min-height: 20px;
   padding: 1px 8px;
   font-size: 0.69rem;
 }
@@ -2471,7 +2471,7 @@ button.weekly-day {
 }
 
 .compact-board-editor-grid {
-  gap: 7px;
+  gap: 6px;
 }
 
 .board-editor-grid .field-block.wide {
@@ -2479,7 +2479,7 @@ button.weekly-day {
 }
 
 .board-note-input {
-  min-height: 54px;
+  min-height: 44px;
   resize: vertical;
 }
 
@@ -2489,12 +2489,12 @@ button.weekly-day {
 }
 
 .compact-board-quick-actions {
-  gap: 6px;
+  gap: 4px;
 }
 
 .board-quick-actions-group {
   display: grid;
-  gap: 5px;
+  gap: 4px;
 }
 
 .board-quick-actions-row {
@@ -2511,10 +2511,10 @@ button.weekly-day {
 
 .board-inspector-fold {
   display: grid;
-  gap: 7px;
+  gap: 6px;
   margin-top: 1px;
-  border-top: 1px solid rgba(200, 211, 225, 0.36);
-  padding-top: 6px;
+  border-top: 1px solid rgba(200, 211, 225, 0.28);
+  padding-top: 5px;
 }
 
 .board-inspector-fold-summary {
@@ -2527,8 +2527,8 @@ button.weekly-day {
   align-items: center;
   gap: 8px;
   width: fit-content;
-  min-height: 28px;
-  padding: 4px 10px;
+  min-height: 26px;
+  padding: 3px 10px;
   border-radius: 999px;
   background: rgba(20, 30, 50, 0.045);
   border: 1px solid rgba(20, 30, 50, 0.05);
@@ -2544,6 +2544,18 @@ button.weekly-day {
   font-size: 0.58rem;
   opacity: 0.64;
   transition: transform 0.14s ease, opacity 0.14s ease;
+}
+
+.board-inspector-fold-label-open {
+  display: none;
+}
+
+.board-inspector-fold[open] .board-inspector-fold-label-open {
+  display: inline;
+}
+
+.board-inspector-fold[open] .board-inspector-fold-label-closed {
+  display: none;
 }
 
 .board-inspector-fold:hover .board-inspector-fold-summary {
@@ -2566,7 +2578,7 @@ button.weekly-day {
 
 .board-inspector-alerts {
   display: grid;
-  gap: 6px;
+  gap: 5px;
 }
 
 .compact-empty-state {
@@ -2576,13 +2588,7 @@ button.weekly-day {
 
 .board-inspector .subsection-head {
   align-items: center;
-  gap: 6px;
-}
-
-.board-inspector .subsection-head .section-note {
-  margin-top: 1px;
-  font-size: 0.66rem;
-  color: rgba(110, 124, 144, 0.62);
+  gap: 4px;
 }
 
 .board-inspector .mini-badge {

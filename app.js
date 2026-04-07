@@ -1290,7 +1290,7 @@ function renderRequestRows() {
 function renderBoardInspector(day) {
   const assignment = findAssignmentById(state.selectedBoardAssignmentId);
   if (!assignment || assignment.dateKey !== day.dateKey) {
-    return `<div class="empty-state compact-empty-state">バーを選ぶと、ここで配置と時間だけを素早く確認・調整できます。</div>`;
+    return `<div class="empty-state compact-empty-state">盤面のバーを選ぶと、ここにセラピスト詳細が表示されます。</div>`;
   }
 
   const profile = samplePrototypeData.therapistProfiles[assignment.name] || { rank: "G", areas: [] };
@@ -1332,7 +1332,7 @@ function renderBoardInspector(day) {
 
       <div class="board-inspector-grid compact-board-inspector-grid">
         <div class="shift-summary-item">
-          <span class="field-label">配置</span>
+          <span class="field-label">現在の配置</span>
           <span class="field-value">${displayRoomLabel}</span>
         </div>
         <div class="shift-summary-item">
@@ -1340,25 +1340,28 @@ function renderBoardInspector(day) {
           <span class="field-value">${displayArea}</span>
         </div>
         <div class="shift-summary-item">
-          <span class="field-label">希望</span>
+          <span class="field-label">希望エリア</span>
           <span class="field-value ${hasAreaMismatch ? "mismatch" : ""}">${assignment.preferredArea || "未設定"}${hasAreaMismatch ? "（不一致）" : ""}</span>
         </div>
         <div class="shift-summary-item">
-          <span class="field-label">状態</span>
+          <span class="field-label">ステータス</span>
           <span class="field-value ${hasAreaMismatch ? "mismatch" : ""}">${displayStatusLabel}</span>
         </div>
         <div class="shift-summary-item">
-          <span class="field-label">姫</span>
+          <span class="field-label">姫予約</span>
           <span class="field-value">${assignment.himeReservation === "あり" ? "あり" : "なし"}</span>
         </div>
       </div>
 
       <details class="board-inspector-fold" ${isInvalidTime || assignment.warningArea || overlapInfo.count || hasAreaMismatch ? "open" : ""}>
-        <summary class="board-inspector-fold-summary">調整・判断</summary>
+        <summary class="board-inspector-fold-summary">
+          <span class="board-inspector-fold-label board-inspector-fold-label-closed">詳細を開く</span>
+          <span class="board-inspector-fold-label board-inspector-fold-label-open">閉じる</span>
+        </summary>
 
         <div class="board-editor-grid compact-board-editor-grid">
           <label class="field-block">
-            <span class="field-label">部屋</span>
+            <span class="field-label">現在の配置</span>
             <select class="select-input" data-board-field="roomIndex">
               ${roomOptions.map((roomName, index) => `<option value="${index}" ${normalizeRoomIndex(assignment.roomIndex, position?.slotIndex ?? 0) === index ? "selected" : ""}>${roomName}</option>`).join("")}
             </select>
@@ -1382,7 +1385,7 @@ function renderBoardInspector(day) {
           </label>
 
           <label class="field-block wide">
-            <span class="field-label">メモ</span>
+            <span class="field-label">補足メモ</span>
             <textarea class="text-input board-note-input" data-board-field="note" rows="2" placeholder="終電 / 店泊 / ヘルプ可 など">${escapeHtml(assignment.note || "")}</textarea>
           </label>
         </div>
@@ -1412,7 +1415,7 @@ function renderBoardInspector(day) {
         ${(isInvalidTime || assignment.warningArea || overlapInfo.count || status.reasons.length || assignment.generationReasons?.length) ? `
           <div class="board-inspector-alerts">
             <div class="alert-box ${displayStatusTone}">
-              <strong>判断</strong>
+              <strong>確認メモ</strong>
               <div>${[
                 ...(hasAreaMismatch ? [`希望エリア ${assignment.preferredArea} と現在配置 ${visualMeta.currentArea} が異なります。`] : []),
                 ...status.reasons
@@ -1420,7 +1423,7 @@ function renderBoardInspector(day) {
             </div>
             ${overlapInfo.count ? `
               <div class="alert-box warning">
-                <strong>重複</strong>
+                <strong>気になる点</strong>
                 <div>同室で${overlapInfo.count}件重なっています。</div>
               </div>
             ` : ""}
