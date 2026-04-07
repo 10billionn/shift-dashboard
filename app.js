@@ -1356,15 +1356,6 @@ function renderBoardInspector(day) {
         </div>
       </div>
 
-      ${checkPoints.length ? `
-        <div class="board-inspector-alerts">
-          <div class="alert-box neutral compact-checkpoints">
-            <strong>チェックポイント</strong>
-            <div>${checkPoints.slice(0, 2).map((point) => `<div>・${point}</div>`).join("")}</div>
-          </div>
-        </div>
-      ` : ""}
-
       <div class="board-editor-grid compact-board-editor-grid">
         <label class="field-block">
           <span class="field-label">現在ルーム</span>
@@ -1383,18 +1374,20 @@ function renderBoardInspector(day) {
           <input class="time-input ${isInvalidTime ? "board-input-invalid" : ""}" type="time" step="1800" value="${assignment.endTime}" data-board-field="endTime">
         </label>
 
-        <label class="field-block">
-          <span class="field-label">エリア</span>
-          <select class="select-input" data-board-field="assignedArea">
-            ${availableAreas.map((area) => `<option value="${area}" ${area === assignment.assignedArea ? "selected" : ""}>${area}</option>`).join("")}
-          </select>
-        </label>
-
         <label class="field-block wide">
           <span class="field-label">補足メモ</span>
           <textarea class="text-input board-note-input" data-board-field="note" rows="2" placeholder="店泊希望 / IB相談可能 / 初回90分のみ など">${escapeHtml(assignment.note || "")}</textarea>
         </label>
       </div>
+
+      ${checkPoints.length ? `
+        <div class="board-inspector-alerts">
+          <div class="alert-box neutral compact-checkpoints">
+            <strong>チェックポイント</strong>
+            <div>${checkPoints.slice(0, 2).map((point) => `<div>・${point}</div>`).join("")}</div>
+          </div>
+        </div>
+      ` : ""}
 
       <div class="board-quick-actions compact-board-quick-actions">
         <div class="board-quick-actions-group board-quick-actions-group-main">

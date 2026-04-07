@@ -2510,6 +2510,7 @@ button.weekly-day {
 }
 
 .compact-board-editor-grid {
+  grid-template-columns: 1.2fr 0.9fr 0.9fr;
   gap: 8px;
 }
 
