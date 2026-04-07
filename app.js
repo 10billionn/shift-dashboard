@@ -3514,31 +3514,34 @@ function handleDashboardSectionHandleClick(event) {
   if (!event.target.closest("[data-section-drag-handle]")) return;
   event.preventDefault();
   event.stopPropagation();
+  if (!dashboardSectionDragState) {
+    cleanupDashboardSectionDrag();
+  }
 }
 
 function handleDashboardSectionHandlePointerDown(event) {
   const handle = event.target.closest("[data-section-drag-handle]");
-  if (!handle) return;
+  if (!handle) {
+    if (!dashboardSectionDragState && dashboardSectionArmedId) {
+      cleanupDashboardSectionDrag();
+    }
+    return;
+  }
   const section = handle.closest("[data-section-id]");
   if (!section) return;
-  if (dashboardSectionArmTimer) {
-    clearTimeout(dashboardSectionArmTimer);
-    dashboardSectionArmTimer = null;
-  }
+  cleanupDashboardSectionDrag();
   dashboardSectionArmedId = section.dataset.sectionId;
   section.classList.add("dashboard-section-armed");
+  section.draggable = true;
 }
 
 function handleDashboardSectionDragStart(event) {
-  const handle = event.target.closest("[data-section-drag-handle]");
-  const section = handle?.closest("[data-section-id]") || event.target.closest("[data-section-id]");
-  if (!handle || !section || dashboardSectionArmedId !== section.dataset.sectionId) {
+  const container = elements.dashboardSecondarySections;
+  const section = event.target.closest("[data-section-id]")
+    || (dashboardSectionArmedId ? container?.querySelector(`[data-section-id="${dashboardSectionArmedId}"]`) : null);
+  if (!section || dashboardSectionArmedId !== section.dataset.sectionId) {
     event.preventDefault();
     return;
-  }
-  if (dashboardSectionArmTimer) {
-    clearTimeout(dashboardSectionArmTimer);
-    dashboardSectionArmTimer = null;
   }
   dashboardSectionDragState = { sectionId: section.dataset.sectionId };
   event.dataTransfer.effectAllowed = "move";
@@ -3549,6 +3552,7 @@ function handleDashboardSectionDragStart(event) {
 function handleDashboardSectionDragOver(event) {
   if (!dashboardSectionDragState) return;
   event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
   const container = elements.dashboardSecondarySections;
   const target = event.target.closest("[data-section-id]");
   if (!container || !target || target.dataset.sectionId === dashboardSectionDragState.sectionId) return;
@@ -3588,15 +3592,7 @@ function handleDashboardSectionDragEnd() {
 }
 
 function handleDashboardSectionPointerUp() {
-  if (dashboardSectionDragState) return;
-  if (dashboardSectionArmTimer) {
-    clearTimeout(dashboardSectionArmTimer);
-  }
-  dashboardSectionArmTimer = window.setTimeout(() => {
-    if (!dashboardSectionDragState) {
-      cleanupDashboardSectionDrag();
-    }
-  }, 180);
+  return;
 }
 
 function cleanupDashboardSectionDrag() {
