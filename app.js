@@ -726,13 +726,21 @@ function renderWeeklyAnalysisChart() {
     return `<div class="empty-state compact-empty-state">週間データがありません。</div>`;
   }
 
-  const maxSales = Math.max(...points.map((point) => point.salesForecast), 1);
+  const salesValues = points.map((point) => point.salesForecast);
+  const minSales = Math.min(...salesValues);
+  const maxSales = Math.max(...salesValues, 1);
+  const range = Math.max(maxSales - minSales, Math.max(maxSales * 0.08, 1));
+  const padding = Math.max(range * 0.18, maxSales * 0.03, 1);
+  const chartMin = Math.max(0, minSales - padding);
+  const chartMax = maxSales + padding;
+  const chartRange = Math.max(chartMax - chartMin, 1);
   const width = 100;
-  const height = 64;
+  const height = 44;
   const stepX = points.length === 1 ? 0 : width / (points.length - 1);
   const plotted = points.map((point, index) => {
     const x = points.length === 1 ? width / 2 : index * stepX;
-    const y = height - ((point.salesForecast / maxSales) * (height - 10)) - 5;
+    const usableHeight = height - 8;
+    const y = 4 + usableHeight - (((point.salesForecast - chartMin) / chartRange) * usableHeight);
     return { ...point, x, y };
   });
   const path = plotted.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ");
