@@ -18,6 +18,7 @@
   distributionViewMode: "date",
   distributionFormat: "line",
   weeklyAnalysisView: "cards",
+  weekOffset: 0,
   dashboardSectionOrder: ["weeklyAnalysis", "boardInspector", "riskSummary", "roomDetail", "summaryGrid", "cutBlock"],
   copiedDistributionIds: [],
   distributionPendingOnly: false,
@@ -339,6 +340,7 @@ function hydrateState(saved) {
   state.appSettings = saved.appSettings ? restoreAppSettings(saved.appSettings) : cloneAppSettings(samplePrototypeData.settings);
   state.distributionFormat = ["line", "simple"].includes(saved.distributionFormat) ? saved.distributionFormat : "line";
   state.weeklyAnalysisView = saved.weeklyAnalysisView === "chart" ? "chart" : "cards";
+  state.weekOffset = Number.isInteger(saved.weekOffset) ? saved.weekOffset : 0;
   state.dashboardSectionOrder = normalizeDashboardSectionOrder(saved.dashboardSectionOrder);
   state.copiedDistributionIds = Array.isArray(saved.copiedDistributionIds) ? saved.copiedDistributionIds : [];
   state.distributionPendingOnly = Boolean(saved.distributionPendingOnly);
@@ -373,6 +375,7 @@ function loadSampleState() {
   state.appSettings = cloneAppSettings(samplePrototypeData.settings);
   state.distributionViewMode = "date";
   state.distributionFormat = "line";
+  state.weekOffset = 0;
   state.dashboardSectionOrder = normalizeDashboardSectionOrder();
   state.copiedDistributionIds = [];
   state.distributionPendingOnly = false;
@@ -710,6 +713,7 @@ function renderCutRows(rows) {
 }
 
 function renderWeeklyAnalysis() {
+  const rangeLabel = getWeeklyAnalysisRangeLabel();
   const tabs = `
     <div class="weekly-analysis-head">
       <div class="view-tabs weekly-analysis-tabs" role="tablist" aria-label="週間分析表示切替">
@@ -721,11 +725,18 @@ function renderWeeklyAnalysis() {
   const body = state.weeklyAnalysisView === "chart"
     ? renderWeeklyAnalysisChart()
     : renderWeeklyAnalysisCards();
-  return `${tabs}<div class="weekly-analysis-body weekly-analysis-body-${state.weeklyAnalysisView}">${body}</div>`;
+  const footer = `
+    <div class="weekly-analysis-nav">
+      <button class="ghost-button weekly-nav-button" type="button" data-week-nav="-1">← 前週</button>
+      <div class="weekly-range-label">${rangeLabel}</div>
+      <button class="ghost-button weekly-nav-button" type="button" data-week-nav="1">来週 →</button>
+    </div>
+  `;
+  return `${tabs}<div class="weekly-analysis-body weekly-analysis-body-${state.weeklyAnalysisView}">${body}</div>${footer}`;
 }
 
 function renderWeeklyAnalysisCards() {
-  return state.dateList.map((dateKey) => {
+  return getWeeklyAnalysisDateKeys().map((dateKey) => {
     const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
     const isActive = dateKey === state.selectedDate;
     const shortageTone = day.metrics.shortage >= 4 ? "danger" : day.metrics.shortage >= 2 ? "warning" : "normal";
@@ -744,7 +755,7 @@ function renderWeeklyAnalysisCards() {
 }
 
 function renderWeeklyAnalysisChart() {
-  const points = state.dateList.map((dateKey) => {
+  const points = getWeeklyAnalysisDateKeys().map((dateKey) => {
     const day = state.generatedSchedule[dateKey] || emptyDay(dateKey);
     return {
       dateKey,
@@ -766,11 +777,11 @@ function renderWeeklyAnalysisChart() {
   const chartMin = Math.max(0, minSales - padding);
   const chartMax = maxSales + padding;
   const chartRange = Math.max(chartMax - chartMin, 1);
-  const pointSpacing = 54;
+  const pointSpacing = 34;
   const sidePadding = 20;
   const width = sidePadding * 2 + (pointSpacing * Math.max(points.length - 1, 0));
-  const height = 44;
-  const canvasHeight = 78;
+  const height = 60;
+  const canvasHeight = 102;
   const chartDisplayWidth = Math.round((width / height) * canvasHeight);
   const plotted = points.map((point, index) => {
     const x = points.length === 1 ? width / 2 : sidePadding + (index * pointSpacing);
@@ -3482,6 +3493,13 @@ function handleWeeklyAnalysisClick(event) {
     }
     return;
   }
+  const navButton = event.target.closest("[data-week-nav]");
+  if (navButton) {
+    state.weekOffset += Number(navButton.dataset.weekNav) || 0;
+    persistState();
+    renderDashboard();
+    return;
+  }
   const card = event.target.closest("[data-date-key]");
   if (!card) return;
   const nextDateKey = normalizeDateKey(card.dataset.dateKey);
@@ -3502,6 +3520,7 @@ function handleDashboardSectionHandlePointerDown(event) {
   if (!handle) return;
   const section = handle.closest("[data-section-id]");
   if (!section) return;
+  event.preventDefault();
   if (dashboardSectionArmTimer) {
     clearTimeout(dashboardSectionArmTimer);
     dashboardSectionArmTimer = null;
@@ -3512,7 +3531,12 @@ function handleDashboardSectionHandlePointerDown(event) {
 }
 
 function handleDashboardSectionDragStart(event) {
-  const section = event.target.closest("[data-section-id]");
+  const container = elements.dashboardSecondarySections;
+  const armedSection = dashboardSectionArmedId
+    ? container?.querySelector(`[data-section-id="${dashboardSectionArmedId}"]`)
+    : null;
+  const eventSection = event.target.closest("[data-section-id]");
+  const section = armedSection || eventSection;
   if (!section || !section.draggable || dashboardSectionArmedId !== section.dataset.sectionId) {
     event.preventDefault();
     return;
@@ -3670,6 +3694,22 @@ function buildDateList() {
     current.setDate(current.getDate() + index);
     return formatDate(current);
   });
+}
+
+function addDaysToDateKey(dateKey, offsetDays) {
+  const date = new Date(`${dateKey}T00:00:00`);
+  date.setDate(date.getDate() + offsetDays);
+  return formatDate(date);
+}
+
+function getWeeklyAnalysisDateKeys() {
+  const startDateKey = addDaysToDateKey(state.selectedDate, state.weekOffset * 7);
+  return Array.from({ length: 14 }, (_, index) => addDaysToDateKey(startDateKey, index));
+}
+
+function getWeeklyAnalysisRangeLabel() {
+  const keys = getWeeklyAnalysisDateKeys();
+  return `${formatSlashDate(keys[0])}〜${formatSlashDate(keys[keys.length - 1])}`;
 }
 function buildRequestCsv(rows) {
   const header = ["名前", "出勤可能日", "出勤開始時間", "出勤終了時間", "希望エリア", "姫予約有無", "備考"];
@@ -3954,6 +3994,7 @@ function persistState() {
     distributionViewMode: state.distributionViewMode,
     distributionFormat: state.distributionFormat,
     weeklyAnalysisView: state.weeklyAnalysisView,
+    weekOffset: state.weekOffset,
     dashboardSectionOrder: state.dashboardSectionOrder,
     copiedDistributionIds: state.copiedDistributionIds,
       distributionPendingOnly: state.distributionPendingOnly,
