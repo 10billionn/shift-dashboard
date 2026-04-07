@@ -1324,6 +1324,11 @@ function renderBoardInspector(day) {
       ? "status-mismatch"
       : "status-match";
   const himeClass = assignment.himeReservation === "あり" ? "hime-yes" : "hime-no";
+  const checkPoints = [
+    ...(isAdjustmentLane ? ["調整中（未配置）"] : []),
+    ...(!isAdjustmentLane && hasAreaMismatch ? ["希望エリアと不一致"] : []),
+    ...(assignment.himeReservation === "あり" ? ["姫ありのため優先配置"] : []),
+  ];
 
   return `
     <article class="board-inspector-card">
@@ -1334,34 +1339,31 @@ function renderBoardInspector(day) {
             <span class="mini-badge rank">${profile.rank || "G"}</span>
             ${ibMinutes ? `<span class="mini-badge ib">IB${ibMinutes}</span>` : ""}
           </div>
-        </div>
-        <div class="status-row tight">
-          <span class="mini-badge ${assignment.himeReservation === "あり" ? "booked hime-accent hime-yes" : "gray board-hime-muted hime-no"}">${assignment.himeReservation === "あり" ? "姫あり" : "姫なし"}</span>
+          <div class="board-inspector-meta">
+            <div class="board-inspector-meta-item">
+              <span class="field-label">希望エリア</span>
+              <span class="field-value">${assignment.preferredArea || "未設定"}</span>
+            </div>
+            <div class="board-inspector-meta-item">
+              <span class="field-label">ステータス</span>
+              <span class="field-value ${statusClass}">${displayStatusLabel}</span>
+            </div>
+            <div class="board-inspector-meta-item">
+              <span class="field-label">姫予約</span>
+              <span class="field-value ${himeClass}">${assignment.himeReservation === "あり" ? "あり" : "なし"}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="board-inspector-grid compact-board-inspector-grid">
-        <div class="shift-summary-item">
-          <span class="field-label">現在ルーム</span>
-          <span class="field-value">${displayRoomLabel}</span>
+      ${checkPoints.length ? `
+        <div class="board-inspector-alerts">
+          <div class="alert-box neutral compact-checkpoints">
+            <strong>チェックポイント</strong>
+            <div>${checkPoints.slice(0, 2).map((point) => `<div>・${point}</div>`).join("")}</div>
+          </div>
         </div>
-        <div class="shift-summary-item">
-          <span class="field-label">エリア</span>
-          <span class="field-value">${displayArea}</span>
-        </div>
-        <div class="shift-summary-item">
-          <span class="field-label">希望エリア</span>
-          <span class="field-value">${assignment.preferredArea || "未設定"}</span>
-        </div>
-        <div class="shift-summary-item">
-          <span class="field-label">ステータス</span>
-          <span class="field-value ${statusClass}">${displayStatusLabel}</span>
-        </div>
-        <div class="shift-summary-item">
-          <span class="field-label">姫予約</span>
-          <span class="field-value ${himeClass}">${assignment.himeReservation === "あり" ? "あり" : "なし"}</span>
-        </div>
-      </div>
+      ` : ""}
 
       <div class="board-editor-grid compact-board-editor-grid">
         <label class="field-block">
