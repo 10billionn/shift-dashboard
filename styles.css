@@ -834,6 +834,76 @@ pre {
   box-shadow: var(--shadow-xs);
 }
 
+.dashboard-secondary-sections {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-sortable-section {
+  position: relative;
+}
+
+.dashboard-section-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-drag-handle {
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(200, 211, 225, 0.58);
+  background: rgba(255, 255, 255, 0.72);
+  color: rgba(110, 124, 144, 0.9);
+  font-size: 0.78rem;
+  line-height: 1;
+  cursor: grab;
+}
+
+.section-drag-handle:hover {
+  background: rgba(248, 250, 253, 0.95);
+  border-color: rgba(46, 107, 203, 0.18);
+  color: rgba(27, 36, 50, 0.72);
+}
+
+.section-drag-handle:active {
+  cursor: grabbing;
+}
+
+.section-drag-handle-floating {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+}
+
+.dashboard-section-dragging {
+  opacity: 0.72;
+  transform: translateY(-2px);
+  box-shadow: 0 14px 24px rgba(17, 36, 63, 0.1);
+}
+
+.dashboard-section-drop-before::before,
+.dashboard-section-drop-after::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(46, 107, 203, 0.32);
+  pointer-events: none;
+}
+
+.dashboard-section-drop-before::before {
+  top: -8px;
+}
+
+.dashboard-section-drop-after::after {
+  bottom: -8px;
+}
+
 .dashboard-secondary-block .dashboard-collapsible-summary h2,
 .dashboard-secondary-block .dashboard-collapsible-summary h3 {
   font-size: 0.9rem;

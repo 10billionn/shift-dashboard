@@ -18,6 +18,7 @@
   distributionViewMode: "date",
   distributionFormat: "line",
   weeklyAnalysisView: "cards",
+  dashboardSectionOrder: ["weeklyAnalysis", "boardInspector", "riskSummary", "roomDetail", "summaryGrid", "cutBlock"],
   copiedDistributionIds: [],
   distributionPendingOnly: false,
   selectedBoardAssignmentId: "",
@@ -39,6 +40,9 @@ let boardMoveState = null;
 let boardMoveFrameId = null;
 let boardMovePointer = { x: 0, y: 0 };
 let boardSuppressClickUntil = 0;
+let dashboardSectionDragState = null;
+
+const DASHBOARD_SECTION_IDS = ["weeklyAnalysis", "boardInspector", "riskSummary", "roomDetail", "summaryGrid", "cutBlock"];
 
 const viewMeta = {
   dashboard: {
@@ -97,6 +101,7 @@ const elements = {
   fillSummary: document.querySelector("#fillSummary"),
   dashboardRiskSummary: document.querySelector("#dashboardRiskSummary"),
   weeklyAnalysis: document.querySelector("#weeklyAnalysis"),
+  dashboardSecondarySections: document.querySelector("#dashboardSecondarySections"),
   requestCsvInput: document.querySelector("#requestCsvInput"),
   requestCsvText: document.querySelector("#requestCsvText"),
   historyCsvInput: document.querySelector("#historyCsvInput"),
@@ -215,6 +220,11 @@ function bindEvents() {
   elements.boardInspectorContent.addEventListener("change", handleBoardInspectorChange);
   elements.boardInspectorContent.addEventListener("click", handleBoardInspectorAction);
   elements.weeklyAnalysis.addEventListener("click", handleWeeklyAnalysisClick);
+  elements.dashboardSecondarySections?.addEventListener("click", handleDashboardSectionHandleClick);
+  elements.dashboardSecondarySections?.addEventListener("dragstart", handleDashboardSectionDragStart);
+  elements.dashboardSecondarySections?.addEventListener("dragover", handleDashboardSectionDragOver);
+  elements.dashboardSecondarySections?.addEventListener("drop", handleDashboardSectionDrop);
+  elements.dashboardSecondarySections?.addEventListener("dragend", handleDashboardSectionDragEnd);
   window.addEventListener("mousemove", handleBoardPointerMove);
   window.addEventListener("mouseup", handleBoardPointerEnd);
 
@@ -325,6 +335,7 @@ function hydrateState(saved) {
   state.appSettings = saved.appSettings ? restoreAppSettings(saved.appSettings) : cloneAppSettings(samplePrototypeData.settings);
   state.distributionFormat = ["line", "simple"].includes(saved.distributionFormat) ? saved.distributionFormat : "line";
   state.weeklyAnalysisView = saved.weeklyAnalysisView === "chart" ? "chart" : "cards";
+  state.dashboardSectionOrder = normalizeDashboardSectionOrder(saved.dashboardSectionOrder);
   state.copiedDistributionIds = Array.isArray(saved.copiedDistributionIds) ? saved.copiedDistributionIds : [];
   state.distributionPendingOnly = Boolean(saved.distributionPendingOnly);
   state.selectedBoardAssignmentId = saved.selectedBoardAssignmentId || "";
@@ -358,6 +369,7 @@ function loadSampleState() {
   state.appSettings = cloneAppSettings(samplePrototypeData.settings);
   state.distributionViewMode = "date";
   state.distributionFormat = "line";
+  state.dashboardSectionOrder = normalizeDashboardSectionOrder();
   state.copiedDistributionIds = [];
   state.distributionPendingOnly = false;
   state.selectedBoardAssignmentId = "";
@@ -374,6 +386,21 @@ function loadSampleState() {
 function syncCsvTextsFromState() {
   elements.requestCsvText.value = buildRequestCsv(state.generationRows);
   elements.historyCsvText.value = buildHistoryCsv(state.historyRows);
+}
+
+function normalizeDashboardSectionOrder(order = []) {
+  const requested = Array.isArray(order) ? order.filter((item) => DASHBOARD_SECTION_IDS.includes(item)) : [];
+  return [...requested, ...DASHBOARD_SECTION_IDS.filter((item) => !requested.includes(item))];
+}
+
+function applyDashboardSectionOrder() {
+  const container = elements.dashboardSecondarySections;
+  if (!container) return;
+  state.dashboardSectionOrder = normalizeDashboardSectionOrder(state.dashboardSectionOrder);
+  state.dashboardSectionOrder.forEach((sectionId) => {
+    const section = container.querySelector(`[data-section-id="${sectionId}"]`);
+    if (section) container.appendChild(section);
+  });
 }
 
 function renderAppView() {
@@ -447,6 +474,7 @@ function renderDashboard() {
   elements.cutShiftList.innerHTML = renderCutRows(cutRows);
   renderBoardWorkspace(day, boardRows, cutRows);
   elements.weeklyAnalysis.innerHTML = renderWeeklyAnalysis();
+  applyDashboardSectionOrder();
 
   updateDayButtons();
   renderDashboardViewState();
@@ -3459,6 +3487,65 @@ function handleWeeklyAnalysisClick(event) {
   renderDashboard();
 }
 
+function handleDashboardSectionHandleClick(event) {
+  if (!event.target.closest("[data-section-drag-handle]")) return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function handleDashboardSectionDragStart(event) {
+  const section = event.target.closest("[data-section-id]");
+  const handle = event.target.closest("[data-section-drag-handle]");
+  if (!section || !handle) {
+    event.preventDefault();
+    return;
+  }
+  dashboardSectionDragState = { sectionId: section.dataset.sectionId };
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", section.dataset.sectionId);
+  section.classList.add("dashboard-section-dragging");
+}
+
+function handleDashboardSectionDragOver(event) {
+  if (!dashboardSectionDragState) return;
+  const target = event.target.closest("[data-section-id]");
+  if (!target || target.dataset.sectionId === dashboardSectionDragState.sectionId) return;
+  event.preventDefault();
+  const rect = target.getBoundingClientRect();
+  const before = event.clientY < rect.top + (rect.height / 2);
+  elements.dashboardSecondarySections?.querySelectorAll(".dashboard-section-drop-before, .dashboard-section-drop-after").forEach((item) => {
+    item.classList.remove("dashboard-section-drop-before", "dashboard-section-drop-after");
+  });
+  target.classList.add(before ? "dashboard-section-drop-before" : "dashboard-section-drop-after");
+}
+
+function handleDashboardSectionDrop(event) {
+  if (!dashboardSectionDragState) return;
+  const target = event.target.closest("[data-section-id]");
+  if (!target || target.dataset.sectionId === dashboardSectionDragState.sectionId) return;
+  event.preventDefault();
+  const rect = target.getBoundingClientRect();
+  const before = event.clientY < rect.top + (rect.height / 2);
+  const nextOrder = normalizeDashboardSectionOrder(state.dashboardSectionOrder).filter((item) => item !== dashboardSectionDragState.sectionId);
+  const targetIndex = nextOrder.indexOf(target.dataset.sectionId);
+  nextOrder.splice(before ? targetIndex : targetIndex + 1, 0, dashboardSectionDragState.sectionId);
+  state.dashboardSectionOrder = nextOrder;
+  persistState();
+  applyDashboardSectionOrder();
+  cleanupDashboardSectionDrag();
+}
+
+function handleDashboardSectionDragEnd() {
+  cleanupDashboardSectionDrag();
+}
+
+function cleanupDashboardSectionDrag() {
+  elements.dashboardSecondarySections?.querySelectorAll(".dashboard-section-dragging, .dashboard-section-drop-before, .dashboard-section-drop-after").forEach((item) => {
+    item.classList.remove("dashboard-section-dragging", "dashboard-section-drop-before", "dashboard-section-drop-after");
+  });
+  dashboardSectionDragState = null;
+}
+
 function findScheduledAssignmentById(id) {
   if (!id) return null;
   return Object.values(state.generatedSchedule)
@@ -3815,10 +3902,11 @@ function persistState() {
       activeDashboardView: state.activeDashboardView,
       boardDensity: state.boardDensity,
       activeShiftTab: state.activeShiftTab,
-      distributionViewMode: state.distributionViewMode,
-      distributionFormat: state.distributionFormat,
-      weeklyAnalysisView: state.weeklyAnalysisView,
-      copiedDistributionIds: state.copiedDistributionIds,
+    distributionViewMode: state.distributionViewMode,
+    distributionFormat: state.distributionFormat,
+    weeklyAnalysisView: state.weeklyAnalysisView,
+    dashboardSectionOrder: state.dashboardSectionOrder,
+    copiedDistributionIds: state.copiedDistributionIds,
       distributionPendingOnly: state.distributionPendingOnly,
       selectedBoardAssignmentId: state.selectedBoardAssignmentId,
       hasUnsavedChanges: state.hasUnsavedChanges,

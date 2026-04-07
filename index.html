@@ -62,46 +62,59 @@
             <div id="dashboardBoardCanvas" class="board-canvas"></div>
           </section>
 
-          <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-weekly-block" open>
+          <div id="dashboardSecondarySections" class="dashboard-secondary-sections">
+          <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-weekly-block dashboard-sortable-section" data-section-id="weeklyAnalysis" draggable="true" open>
             <summary class="dashboard-collapsible-summary">
               <div>
                 <h2>週間分析</h2>
                 <p class="section-note">日付カードを押すと、その日の盤面へ切り替わります</p>
               </div>
-              <span class="panel-count">週次</span>
+              <div class="dashboard-section-tools">
+                <span class="panel-count">週次</span>
+                <button class="section-drag-handle" type="button" data-section-drag-handle aria-label="週間分析を並び替え">⋮⋮</button>
+              </div>
             </summary>
             <div id="weeklyAnalysis" class="weekly-analysis dashboard-collapsible-body"></div>
           </details>
 
-          <section id="boardInspector" class="content-panel board-inspector board-inspector-panel">
+          <section id="boardInspector" class="content-panel board-inspector board-inspector-panel dashboard-sortable-section" data-section-id="boardInspector" draggable="true">
             <div class="subsection-head">
               <div>
                 <h3>選択中のセラピスト</h3>
                 <p class="section-note">セラピスト情報を確認し、必要な時だけ調整を開きます</p>
               </div>
-              <p id="boardUpdateStatus" class="copy-status"></p>
+              <div class="dashboard-section-tools">
+                <p id="boardUpdateStatus" class="copy-status"></p>
+                <button class="section-drag-handle" type="button" data-section-drag-handle aria-label="選択中のセラピストを並び替え">⋮⋮</button>
+              </div>
             </div>
             <div id="boardInspectorContent" class="board-inspector-content"></div>
           </section>
 
-          <section class="content-panel dashboard-risk-panel">
+          <section class="content-panel dashboard-risk-panel dashboard-sortable-section" data-section-id="riskSummary" draggable="true">
             <div class="panel-head">
               <div>
                 <h3>危険度サマリー</h3>
                 <p class="section-note">盤面で気になった点を、ここで補助確認します</p>
               </div>
+              <div class="dashboard-section-tools">
+                <button class="section-drag-handle" type="button" data-section-drag-handle aria-label="危険度サマリーを並び替え">⋮⋮</button>
+              </div>
             </div>
             <div id="dashboardRiskSummary" class="risk-summary-list"></div>
           </section>
 
-          <div id="dashboardListView" class="dashboard-view-panel active">
+          <div id="dashboardListView" class="dashboard-view-panel active dashboard-sortable-section" data-section-id="roomDetail" draggable="true">
             <details class="content-panel dashboard-collapsible dashboard-list-collapsible dashboard-secondary-block">
               <summary class="dashboard-collapsible-summary">
                 <div>
                   <h3>部屋別詳細</h3>
                   <p class="section-note">盤面と同じ部屋順で、仮置き後の実態を時間順に補助確認します</p>
                 </div>
-                <span class="panel-count">補助</span>
+                <div class="dashboard-section-tools">
+                  <span class="panel-count">補助</span>
+                  <button class="section-drag-handle" type="button" data-section-drag-handle aria-label="部屋別詳細を並び替え">⋮⋮</button>
+                </div>
               </summary>
               <div class="dashboard-collapsible-body">
                 <div id="roomDetailList" class="room-detail-list"></div>
@@ -140,7 +153,8 @@
             </details>
           </div>
 
-          <section class="summary-grid dashboard-summary-grid">
+          <section class="summary-grid dashboard-summary-grid dashboard-sortable-section" data-section-id="summaryGrid" draggable="true">
+            <button class="section-drag-handle section-drag-handle-floating" type="button" data-section-drag-handle aria-label="サマリーを並び替え">⋮⋮</button>
             <article class="summary-card emphasis">
               <p>売上予測</p>
               <strong id="salesSummary"></strong>
@@ -159,16 +173,20 @@
             </article>
           </section>
 
-          <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-cut-block">
+          <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-cut-block dashboard-sortable-section" data-section-id="cutBlock" draggable="true">
             <summary class="dashboard-collapsible-summary">
               <div>
                 <h3>今回は見送り</h3>
                 <p class="section-note">希望はあったが今回は枠に入れていない人</p>
               </div>
-              <span id="cutCount" class="panel-count"></span>
+              <div class="dashboard-section-tools">
+                <span id="cutCount" class="panel-count"></span>
+                <button class="section-drag-handle" type="button" data-section-drag-handle aria-label="今回は見送りを並び替え">⋮⋮</button>
+              </div>
             </summary>
             <div id="cutShiftList" class="cut-list dashboard-collapsible-body"></div>
           </details>
+          </div>
         </section>
 
         <section class="view" data-view-panel="generation">
@@ -391,7 +409,7 @@
 
   <div id="globalToast" class="global-toast" aria-live="polite"></div>
 
-    <script src="data.js?v=202604081245"></script>
-    <script src="app.js?v=202604081245"></script>
+    <script src="data.js?v=202604081420"></script>
+    <script src="app.js?v=202604081420"></script>
 </body>
 </html>
