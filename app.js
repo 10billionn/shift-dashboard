@@ -1067,24 +1067,29 @@ function renderRoomDetailGroups(rows, day = getScheduleDay(state.selectedDate)) 
 
   const settings = getAppSettings();
   const businessMinutes = Math.max((settings.businessEndHour - settings.businessStartHour) * 60, 1);
-  const occupiedMinutesByRow = rows.map((row) => row.assignments.reduce((total, assignment) => {
-    const start = Math.max(toMinutes(assignment.startTime), settings.businessStartHour * 60);
-    const end = Math.min(toMinutes(assignment.endTime), settings.businessEndHour * 60);
-    return total + Math.max(end - start, 0);
-  }, 0));
+  const occupiedMinutesByRow = rows.map((row) => getOccupiedMinutesForRoom(row.assignments, settings));
   const totalOccupiedMinutes = occupiedMinutesByRow.reduce((sum, value) => sum + value, 0);
+  const salesByRow = occupiedMinutesByRow.map((occupiedMinutes) => totalOccupiedMinutes
+    ? Math.round((day.metrics.salesForecast || 0) * (occupiedMinutes / totalOccupiedMinutes))
+    : 0);
+  const storeByRow = occupiedMinutesByRow.map((occupiedMinutes) => totalOccupiedMinutes
+    ? Math.round((day.metrics.storeForecast || 0) * (occupiedMinutes / totalOccupiedMinutes))
+    : 0);
+  const countValues = rows.map((row) => row.assignments.length);
+  const maxCount = Math.max(...countValues, 0);
+  const maxSales = Math.max(...salesByRow, 0);
+  const maxStore = Math.max(...storeByRow, 0);
 
   return rows.map((row, index) => {
     const occupiedMinutes = occupiedMinutesByRow[index];
     const utilization = Math.max(0, Math.min(100, Math.round((occupiedMinutes / businessMinutes) * 100)));
     const utilizationClass = utilization >= 80 ? "is-strong" : utilization >= 50 ? "is-mid" : "is-weak";
     const utilizationLabel = utilization >= 80 ? "良好" : utilization >= 50 ? "要調整" : "弱い";
-    const salesForecast = totalOccupiedMinutes
-      ? Math.round((day.metrics.salesForecast || 0) * (occupiedMinutes / totalOccupiedMinutes))
-      : 0;
-    const storeForecast = totalOccupiedMinutes
-      ? Math.round((day.metrics.storeForecast || 0) * (occupiedMinutes / totalOccupiedMinutes))
-      : 0;
+    const salesForecast = salesByRow[index];
+    const storeForecast = storeByRow[index];
+    const countClass = getRoomMetricTone(row.assignments.length, maxCount, { lowToMid: 0.4, midToHigh: 0.75 });
+    const salesClass = getRoomMetricTone(salesForecast, maxSales, { lowToMid: 0.45, midToHigh: 0.78 });
+    const storeClass = getRoomMetricTone(storeForecast, maxStore, { lowToMid: 0.35, midToHigh: 0.68 });
 
     return `
       <article class="room-detail-card ${utilizationClass}">
@@ -1101,20 +1106,60 @@ function renderRoomDetailGroups(rows, day = getScheduleDay(state.selectedDate)) 
           </div>
           <div class="shift-summary-item">
             <span class="field-label">本数（予測）</span>
-            <span class="field-value">${row.assignments.length}件</span>
+            <span class="field-value room-detail-metric ${countClass}">${row.assignments.length}件</span>
           </div>
           <div class="shift-summary-item">
             <span class="field-label">売上（予測）</span>
-            <span class="field-value">${formatYen(salesForecast)}</span>
+            <span class="field-value room-detail-metric ${salesClass}">${formatYen(salesForecast)}</span>
           </div>
           <div class="shift-summary-item">
             <span class="field-label">店落ち（予測）</span>
-            <span class="field-value">${formatYen(storeForecast)}</span>
+            <span class="field-value room-detail-metric ${storeClass}">${formatYen(storeForecast)}</span>
           </div>
         </div>
       </article>
     `;
   }).join("");
+}
+
+function getOccupiedMinutesForRoom(assignments, settings = getAppSettings()) {
+  const startBoundary = settings.businessStartHour * 60;
+  const endBoundary = settings.businessEndHour * 60;
+  const ranges = assignments
+    .map((assignment) => ({
+      start: Math.max(toMinutes(assignment.startTime), startBoundary),
+      end: Math.min(toMinutes(assignment.endTime), endBoundary)
+    }))
+    .filter((range) => range.end > range.start)
+    .sort((left, right) => left.start - right.start);
+
+  if (!ranges.length) return 0;
+
+  let total = 0;
+  let currentStart = ranges[0].start;
+  let currentEnd = ranges[0].end;
+
+  for (let index = 1; index < ranges.length; index += 1) {
+    const range = ranges[index];
+    if (range.start <= currentEnd) {
+      currentEnd = Math.max(currentEnd, range.end);
+      continue;
+    }
+    total += currentEnd - currentStart;
+    currentStart = range.start;
+    currentEnd = range.end;
+  }
+
+  total += currentEnd - currentStart;
+  return total;
+}
+
+function getRoomMetricTone(value, maxValue, thresholds = { lowToMid: 0.4, midToHigh: 0.75 }) {
+  if (value <= 0 || maxValue <= 0) return "metric-low";
+  const ratio = value / maxValue;
+  if (ratio >= thresholds.midToHigh) return "metric-high";
+  if (ratio >= thresholds.lowToMid) return "metric-mid";
+  return "metric-low";
 }
 
 function renderRoomDetailItem(assignment) {

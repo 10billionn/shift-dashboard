@@ -2487,6 +2487,36 @@ button.weekly-day {
   min-height: 28px;
 }
 
+.room-detail-metric.metric-high {
+  color: #2f7c57;
+  background: rgba(234, 248, 239, 0.76);
+  box-shadow: inset 0 0 0 1px rgba(31, 138, 82, 0.08);
+}
+
+.room-detail-metric.metric-mid {
+  color: rgba(78, 92, 114, 0.88);
+  background: rgba(120, 130, 150, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(120, 130, 150, 0.08);
+}
+
+.room-detail-metric.metric-low {
+  color: rgba(110, 124, 144, 0.88);
+  background: rgba(200, 200, 200, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(200, 200, 200, 0.08);
+}
+
+.room-detail-summary .shift-summary-item:nth-child(4) .room-detail-metric.metric-high {
+  color: #2f7c57;
+  background: rgba(234, 248, 239, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(31, 138, 82, 0.1);
+}
+
+.room-detail-summary .shift-summary-item:nth-child(4) .room-detail-metric.metric-mid {
+  color: #9b6b18;
+  background: rgba(255, 247, 223, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(201, 152, 25, 0.08);
+}
+
 .room-detail-rate.is-strong {
   color: #2f7c57;
   background: rgba(234, 248, 239, 0.76);
