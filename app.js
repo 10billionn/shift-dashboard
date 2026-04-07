@@ -475,7 +475,7 @@ function renderDashboard() {
   elements.storeSummary.textContent = formatYen(day.metrics.storeForecast);
   elements.shortageSummary.textContent = `${displayShortage}枠`;
   elements.fillSummary.textContent = `${displayFillRate}%`;
-  elements.dashboardRiskSummary.innerHTML = renderDashboardRiskSummary();
+  elements.dashboardRiskSummary.innerHTML = renderTodayInsight();
   elements.earlyShiftList.innerHTML = renderShiftSlots(day.earlyAssignments, "早番", earlySlotTotal);
   elements.lateShiftList.innerHTML = renderShiftSlots(day.lateAssignments, "遅番", lateSlotTotal);
   elements.cutShiftList.innerHTML = renderCutRows(cutRows);
@@ -3170,14 +3170,14 @@ function getCutRowsForDate(dateKey) {
     .sort((left, right) => left.name.localeCompare(right.name, "ja"));
 }
 
-function renderDashboardRiskSummary() {
-  const summary = buildDashboardRiskSummary();
-  return summary.map((item) => `
-    <article class="risk-summary-inline-item ${item.level}">
-      <strong>${item.title}</strong>
-      <span>${item.value}</span>
+function renderTodayInsight() {
+  const message = buildTodayInsight();
+  return `
+    <article class="today-insight-card">
+      <span class="today-insight-icon" aria-hidden="true">💡</span>
+      <p class="today-insight-text">${escapeHtml(message)}</p>
     </article>
-  `).join('<span class="risk-summary-separator">/</span>');
+  `;
 }
 
 function buildDashboardRiskSummary() {
@@ -3209,6 +3209,51 @@ function buildDashboardRiskSummary() {
     { title: "姫予約リスク", value: `${himeRiskCount}件`, detail: formatNamePreview(himeRiskNames), level: himeRiskCount ? "danger" : "ok" },
     { title: "要確認配置", value: `${warningCount}件`, detail: formatNamePreview(warningNames), level: warningCount ? "warning" : "ok" }
   ];
+}
+
+function buildTodayInsight() {
+  const day = getScheduleDay(state.selectedDate);
+  const assignments = [...day.earlyAssignments, ...day.lateAssignments].filter(Boolean);
+  const rows = buildBoardRoomRows(day);
+  const profiles = samplePrototypeData.therapistProfiles || {};
+
+  const firstShift = assignments.find((assignment) => {
+    const note = String(profiles[assignment.name]?.note || assignment.note || "");
+    return /初出勤/.test(note);
+  });
+  if (firstShift) {
+    return `${firstShift.name}在籍中。今日はフォロー厚めで回しましょう`;
+  }
+
+  const himeAssignments = assignments.filter((assignment) => assignment.himeReservation === "あり");
+  if (himeAssignments.length) {
+    const priorityName = himeAssignments[0]?.name;
+    return priorityName
+      ? `${priorityName}の姫予約あり。優先配置を維持しましょう`
+      : `姫予約が${himeAssignments.length}件あります。優先配置を維持しましょう`;
+  }
+
+  const weakestRoom = rows
+    .map((row) => ({
+      row,
+      occupiedMinutes: getOccupiedMinutesForRoom(row.assignments)
+    }))
+    .sort((left, right) => left.occupiedMinutes - right.occupiedMinutes)[0];
+  if (weakestRoom && weakestRoom.occupiedMinutes < 9 * 60) {
+    return `${weakestRoom.row.roomLabel}が弱めです。1枠追加を検討しましょう`;
+  }
+
+  const mismatch = assignments.find((assignment) => assignment.warningArea);
+  if (mismatch) {
+    return `${mismatch.name}は希望エリアと不一致です。配置を見直しましょう`;
+  }
+
+  const highIb = assignments.find((assignment) => Number(profiles[assignment.name]?.ibMinutes) >= 30);
+  if (highIb) {
+    return `${highIb.name}はIB対応強めです。需要が高い枠を優先しましょう`;
+  }
+
+  return "今日は盤面バランス良好です。強い配置を維持しましょう";
 }
 
 function buildPriorityFixes() {
