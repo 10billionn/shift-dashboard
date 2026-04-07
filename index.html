@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-  <link rel="stylesheet" href="styles.css?v=202604091545">
+  <link rel="stylesheet" href="styles.css?v=202604091620">
 </head>
 <body>
   <div class="app-shell">
@@ -91,17 +91,18 @@
             <div id="boardInspectorContent" class="dashboard-collapsible-body board-inspector-content"></div>
           </details>
 
-          <section class="content-panel dashboard-risk-panel dashboard-sortable-section" data-section-id="riskSummary" draggable="false">
-            <div class="panel-head">
+          <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-risk-panel dashboard-sortable-section" data-section-id="riskSummary" draggable="false">
+            <summary class="dashboard-collapsible-summary">
               <div>
                 <h3>今日のひとこと</h3>
               </div>
               <div class="dashboard-section-tools">
+                <span class="section-collapse-indicator" aria-hidden="true"></span>
                 <button class="section-drag-handle" type="button" draggable="true" data-section-drag-handle aria-label="今日のひとことを並び替え">⋮⋮</button>
               </div>
-            </div>
-            <div id="dashboardRiskSummary" class="risk-summary-list"></div>
-          </section>
+            </summary>
+            <div id="dashboardRiskSummary" class="risk-summary-list dashboard-collapsible-body"></div>
+          </details>
 
           <div id="dashboardListView" class="dashboard-view-panel active dashboard-sortable-section" data-section-id="roomDetail" draggable="false">
             <details class="content-panel dashboard-collapsible dashboard-list-collapsible dashboard-secondary-block">
@@ -398,7 +399,7 @@
 
   <div id="globalToast" class="global-toast" aria-live="polite"></div>
 
-  <script src="data.js?v=202604091545"></script>
-  <script src="app.js?v=202604091545"></script>
+  <script src="data.js?v=202604091620"></script>
+  <script src="app.js?v=202604091620"></script>
 </body>
 </html>
