@@ -175,9 +175,17 @@ function initialize() {
   state.dateList = buildDateList();
   const savedState = loadPersistedState();
   hydrateState(savedState);
+  state.selectedDate = resolveSelectedDate(state.selectedDate);
+  state.selectedDistributionDate = resolveSelectedDate(state.selectedDistributionDate || state.selectedDate);
 
   bindEvents();
   syncCsvTextsFromState();
+  updateAutosaveStatus("保存済み", "saved");
+  console.debug("[dashboard:init]", {
+    selectedDate: state.selectedDate,
+    scheduleDataLength: Object.keys(state.generatedSchedule || {}).length,
+    filteredDataLength: countAssignments(getScheduleDay(state.selectedDate).earlyAssignments) + countAssignments(getScheduleDay(state.selectedDate).lateAssignments)
+  });
   if (hasRenderableGeneratedSchedule()) {
     recomputeAllScheduleState();
     state.generationSummary = summarizeGeneration();
@@ -192,6 +200,10 @@ function initialize() {
 }
 
 function bindEvents() {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushPersistedState();
+  });
+
   elements.menuToggle.addEventListener("click", () => {
     state.mobileMenuOpen = !state.mobileMenuOpen;
     elements.sidebar.classList.toggle("open", state.mobileMenuOpen);
@@ -206,6 +218,10 @@ function bindEvents() {
     renderCurrentView();
   });
   elements.saveScheduleButton.addEventListener("click", saveManualScheduleChanges);
+  elements.createBackupButton?.addEventListener("click", () => createBackupSnapshot("手動バックアップ"));
+  elements.exportBackupButton?.addEventListener("click", exportCurrentStateAsJson);
+  elements.importBackupButton?.addEventListener("click", () => elements.importBackupInput?.click());
+  elements.importBackupInput?.addEventListener("change", handleBackupImport);
 
   elements.prevDayButton.addEventListener("click", () => moveDate(-1));
   elements.todayButton.addEventListener("click", jumpToStartDate);
@@ -356,8 +372,10 @@ function bindEvents() {
 
   elements.copyAllMessagesButton.addEventListener("click", copyAllDistributionMessages);
   elements.copyMessageButton.addEventListener("click", copyDistributionMessage);
+  elements.backupSnapshotList?.addEventListener("click", handleBackupSnapshotListClick);
 
   window.addEventListener("beforeunload", (event) => {
+    flushPersistedState();
     if (!state.hasUnsavedChanges) return;
     event.preventDefault();
     event.returnValue = "";
@@ -370,8 +388,8 @@ function hydrateState(saved) {
     return;
   }
 
-  state.selectedDate = normalizeDateKey(saved.selectedDate) || samplePrototypeData.settings.startDate;
-  state.selectedDistributionDate = normalizeDateKey(saved.selectedDistributionDate) || state.selectedDate;
+  state.selectedDate = resolveSelectedDate(saved.selectedDate);
+  state.selectedDistributionDate = resolveSelectedDate(saved.selectedDistributionDate || saved.selectedDate);
   state.activeAppView = saved.activeAppView || "dashboard";
   state.activeDashboardView = saved.activeDashboardView || "board";
   state.boardDensity = saved.boardDensity === "comfortable" ? "comfortable" : "compact";
@@ -409,8 +427,8 @@ function hydrateState(saved) {
 }
 
 function loadSampleState() {
-  state.selectedDate = samplePrototypeData.settings.startDate;
-  state.selectedDistributionDate = samplePrototypeData.settings.startDate;
+  state.selectedDate = resolveSelectedDate(getTodayDateString());
+  state.selectedDistributionDate = state.selectedDate;
   state.activeAppView = "dashboard";
   state.activeDashboardView = "board";
   state.boardDensity = "compact";
@@ -495,9 +513,15 @@ function renderSettings() {
   elements.settingsStoreRate.value = settings.storeRate;
   elements.settingsAreas.value = settings.areas.join("\n");
   elements.settingsRoomNames.value = settings.roomNames.join("\n");
+  renderBackupPanel();
 }
 
 function renderDashboard() {
+  const activeDateKey = resolveSelectedDate(state.selectedDate);
+  if (activeDateKey !== state.selectedDate) {
+    state.selectedDate = activeDateKey;
+    state.selectedDistributionDate = resolveSelectedDate(state.selectedDistributionDate || activeDateKey);
+  }
   if (!hasRenderableGeneratedSchedule() && state.generationRows.length) {
     state.generatedSchedule = buildGeneratedSchedule();
     recomputeAllScheduleState();
@@ -505,12 +529,12 @@ function renderDashboard() {
     recomputeAllScheduleState();
   }
 
-  const day = getScheduleDay(state.selectedDate);
+  const day = getScheduleDay(activeDateKey);
   const boardRows = buildBoardRoomRows(day);
-  const requirement = findRequirement(state.selectedDate);
-  const cutRows = getCutRowsForDate(state.selectedDate);
-  const earlySlotTotal = getShiftSlotTotal(state.selectedDate, "early");
-  const lateSlotTotal = getShiftSlotTotal(state.selectedDate, "late");
+  const requirement = findRequirement(activeDateKey);
+  const cutRows = getCutRowsForDate(activeDateKey);
+  const earlySlotTotal = getShiftSlotTotal(activeDateKey, "early");
+  const lateSlotTotal = getShiftSlotTotal(activeDateKey, "late");
   const earlyFilled = countAssignments(day.earlyAssignments);
   const lateFilled = countAssignments(day.lateAssignments);
   const displayNeeded = (requirement.earlyNeeded || 0) + (requirement.lateNeeded || 0);
@@ -518,9 +542,15 @@ function renderDashboard() {
   const displayShortage = Math.max(displayNeeded - displayFilled, 0);
   const displayFillRate = displayNeeded ? Math.round((displayFilled / displayNeeded) * 100) : 100;
 
-  elements.selectedDateLabel.textContent = `${formatDisplayDate(state.selectedDate)} (${formatWeekday(state.selectedDate)})`;
+  console.debug("[dashboard:render]", {
+    selectedDate: activeDateKey,
+    scheduleDataLength: Object.keys(state.generatedSchedule || {}).length,
+    filteredDataLength: countAssignments(day.earlyAssignments) + countAssignments(day.lateAssignments)
+  });
+
+  elements.selectedDateLabel.textContent = `${formatDisplayDate(activeDateKey)} (${formatWeekday(activeDateKey)})`;
   if (elements.selectedDatePicker) {
-    elements.selectedDatePicker.value = state.selectedDate;
+    elements.selectedDatePicker.value = activeDateKey;
     elements.selectedDatePicker.min = state.dateList[0] || "";
     elements.selectedDatePicker.max = state.dateList[state.dateList.length - 1] || "";
   }
@@ -2594,6 +2624,7 @@ function applyRequestCsv() {
   requestCsvDraftText = "";
   markGenerationDirty();
   persistState();
+  createBackupSnapshot("CSV読込後", { silent: true });
   renderGeneration();
 }
 
@@ -2617,6 +2648,7 @@ function runGeneration(note) {
   elements.generationResultNote.textContent = note;
   syncSelectedDistributionAssignment();
   persistState();
+  createBackupSnapshot("自動生成後", { silent: true });
   renderCurrentView();
 }
 
@@ -3108,6 +3140,7 @@ function saveManualScheduleChanges() {
   state.updatedBoardAssignmentId = "";
   state.editingAreaAssignmentId = "";
   persistState();
+  createBackupSnapshot("手動調整後", { silent: true });
   renderSaveState();
   showToast("シフトをローカル保存しました。", "success");
   renderCurrentView();
@@ -4013,7 +4046,7 @@ function moveDate(offset) {
 }
 
 function jumpToStartDate() {
-  updateSelectedDate(samplePrototypeData.settings.startDate);
+  updateSelectedDate(resolveSelectedDate(getTodayDateString()));
 }
 
 function openSelectedDatePicker() {
@@ -4027,7 +4060,7 @@ function openSelectedDatePicker() {
 }
 
 function updateSelectedDate(nextDateKey) {
-  const normalized = normalizeDateKey(nextDateKey);
+  const normalized = resolveSelectedDate(nextDateKey);
   if (!normalized || normalized === state.selectedDate) return;
   state.selectedDate = normalized;
   persistState();
@@ -4035,7 +4068,7 @@ function updateSelectedDate(nextDateKey) {
 }
 
 function updateDayButtons() {
-  const currentIndex = state.dateList.indexOf(state.selectedDate);
+  const currentIndex = state.dateList.indexOf(resolveSelectedDate(state.selectedDate));
   elements.prevDayButton.disabled = currentIndex <= 0;
   elements.nextDayButton.disabled = currentIndex >= state.dateList.length - 1;
 }
@@ -4053,6 +4086,18 @@ function addDaysToDateKey(dateKey, offsetDays) {
   const date = new Date(`${dateKey}T00:00:00`);
   date.setDate(date.getDate() + offsetDays);
   return formatDate(date);
+}
+
+function getTodayDateString() {
+  return formatDate(new Date());
+}
+
+function resolveSelectedDate(value) {
+  const text = sanitizeText(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text) && state.dateList.includes(text)) return text;
+  const today = getTodayDateString();
+  if (state.dateList.includes(today)) return today;
+  return state.dateList[0] || samplePrototypeData.settings.startDate;
 }
 
 function getWeeklyAnalysisDateKeys() {
@@ -4408,6 +4453,44 @@ function hasPersistedState() {
   }
 }
 
+function createPersistableState() {
+  return {
+    selectedDate: state.selectedDate,
+    selectedDistributionDate: state.selectedDistributionDate,
+    activeAppView: state.activeAppView,
+    activeDashboardView: state.activeDashboardView,
+    boardDensity: state.boardDensity,
+    activeShiftTab: state.activeShiftTab,
+    distributionViewMode: state.distributionViewMode,
+    distributionFormat: state.distributionFormat,
+    weeklyAnalysisView: state.weeklyAnalysisView,
+    weekOffset: state.weekOffset,
+    dashboardSectionOrder: state.dashboardSectionOrder,
+    copiedDistributionIds: state.copiedDistributionIds,
+    generationSentTargets: state.generationSentTargets,
+    distributionPendingOnly: state.distributionPendingOnly,
+    selectedBoardAssignmentId: state.selectedBoardAssignmentId,
+    hasUnsavedChanges: state.hasUnsavedChanges,
+    hasManualAdjustments: state.hasManualAdjustments,
+    generationRows: state.generationRows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      dateKey: row.dateKey,
+      startTime: row.startTime,
+      endTime: row.endTime,
+      preferredAreas: getPreferredAreas(row),
+      preferredArea: row.preferredArea,
+      himeReservation: row.himeReservation,
+      note: row.note,
+      status: row.status
+    })),
+    requirements: state.requirements,
+    historyRows: state.historyRows,
+    appSettings: state.appSettings,
+    generatedSchedule: state.generatedSchedule
+  };
+}
+
 function loadPersistedState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -4417,46 +4500,35 @@ function loadPersistedState() {
   }
 }
 
-function persistState() {
+function updateAutosaveStatus(label, tone = "saved") {
+  autosaveStateLabel = label;
+  autosaveStateTone = tone;
+  if (elements.backupAutosaveStatus) {
+    elements.backupAutosaveStatus.textContent = label;
+    elements.backupAutosaveStatus.className = `backup-status-pill ${tone}`;
+  }
+}
+
+function flushPersistedState() {
+  if (persistStateTimer) {
+    clearTimeout(persistStateTimer);
+    persistStateTimer = null;
+  }
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      selectedDate: state.selectedDate,
-      selectedDistributionDate: state.selectedDistributionDate,
-      activeAppView: state.activeAppView,
-      activeDashboardView: state.activeDashboardView,
-      boardDensity: state.boardDensity,
-      activeShiftTab: state.activeShiftTab,
-    distributionViewMode: state.distributionViewMode,
-    distributionFormat: state.distributionFormat,
-      weeklyAnalysisView: state.weeklyAnalysisView,
-      weekOffset: state.weekOffset,
-      dashboardSectionOrder: state.dashboardSectionOrder,
-      copiedDistributionIds: state.copiedDistributionIds,
-      generationSentTargets: state.generationSentTargets,
-      distributionPendingOnly: state.distributionPendingOnly,
-      selectedBoardAssignmentId: state.selectedBoardAssignmentId,
-      hasUnsavedChanges: state.hasUnsavedChanges,
-      hasManualAdjustments: state.hasManualAdjustments,
-      generationRows: state.generationRows.map((row) => ({
-        id: row.id,
-        name: row.name,
-        dateKey: row.dateKey,
-        startTime: row.startTime,
-        endTime: row.endTime,
-        preferredAreas: getPreferredAreas(row),
-        preferredArea: row.preferredArea,
-        himeReservation: row.himeReservation,
-        note: row.note,
-        status: row.status
-      })),
-      requirements: state.requirements,
-      historyRows: state.historyRows,
-      appSettings: state.appSettings,
-      generatedSchedule: state.generatedSchedule
-    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(createPersistableState()));
+    updateAutosaveStatus("保存済み", "saved");
   } catch (error) {
     // localStorage is optional
   }
+}
+
+function persistState() {
+  updateAutosaveStatus("自動保存中", "saving");
+  if (persistStateTimer) clearTimeout(persistStateTimer);
+  persistStateTimer = setTimeout(() => {
+    flushPersistedState();
+    renderBackupPanel();
+  }, 280);
 }
 
 function clearPersistedState() {
@@ -4464,6 +4536,151 @@ function clearPersistedState() {
     localStorage.removeItem(STORAGE_KEY);
   } catch (error) {
     // ignore
+  }
+}
+
+function loadBackupSnapshots() {
+  try {
+    const raw = localStorage.getItem(SNAPSHOT_STORAGE_KEY);
+    const snapshots = raw ? JSON.parse(raw) : [];
+    return Array.isArray(snapshots) ? snapshots : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveBackupSnapshots(snapshots) {
+  try {
+    localStorage.setItem(SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshots.slice(0, 12)));
+  } catch (error) {
+    // localStorage is optional
+  }
+}
+
+function createBackupEnvelope(label = "バックアップ") {
+  return {
+    id: `backup-${Date.now()}`,
+    version: SNAPSHOT_SCHEMA_VERSION,
+    label,
+    savedAt: new Date().toISOString(),
+    state: createPersistableState(),
+    data: {
+      activeTab: state.activeAppView,
+      therapists: samplePrototypeData.therapistProfiles,
+      rooms: getAppSettings().roomNames,
+      shiftRequests: state.generationRows,
+      therapistMetrics: samplePrototypeData.therapistProfiles,
+      roomMetrics: state.generatedSchedule,
+      demandMetrics: state.historyRows,
+      placements: state.generatedSchedule,
+      manualAdjustments: {
+        hasUnsavedChanges: state.hasUnsavedChanges,
+        hasManualAdjustments: state.hasManualAdjustments
+      },
+      validationResults: {
+        errors: state.generationErrors,
+        warnings: state.generationWarnings
+      },
+      settings: state.appSettings,
+      notes: state.generationRows.map((row) => ({ id: row.id, note: row.note || "" }))
+    }
+  };
+}
+
+function createBackupSnapshot(label, options = {}) {
+  flushPersistedState();
+  const snapshots = loadBackupSnapshots();
+  const snapshot = createBackupEnvelope(label);
+  saveBackupSnapshots([snapshot, ...snapshots.filter((item) => item.id !== snapshot.id)]);
+  renderBackupPanel();
+  if (!options.silent) showToast("バックアップを作成しました。", "success");
+}
+
+function renderBackupPanel() {
+  updateAutosaveStatus(autosaveStateLabel, autosaveStateTone);
+  if (!elements.backupSnapshotList) return;
+  const snapshots = loadBackupSnapshots();
+  elements.backupSnapshotList.innerHTML = snapshots.length
+    ? snapshots.map((snapshot) => `
+        <article class="backup-snapshot-item">
+          <div>
+            <strong>${escapeHtml(snapshot.label || "バックアップ")}</strong>
+            <div class="field-help">${formatBackupTime(snapshot.savedAt)}</div>
+          </div>
+          <div class="backup-snapshot-actions">
+            <button class="ghost-button" type="button" data-backup-action="restore" data-backup-id="${snapshot.id}">復元</button>
+            <button class="ghost-button" type="button" data-backup-action="delete" data-backup-id="${snapshot.id}">削除</button>
+          </div>
+        </article>
+      `).join("")
+    : `<div class="field-help">復元可能なバックアップはまだありません。</div>`;
+}
+
+function formatBackupTime(value) {
+  try {
+    return new Date(value).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch (error) {
+    return "";
+  }
+}
+
+function restoreBackupEnvelope(envelope, note = "バックアップを復元しました。") {
+  if (!envelope?.state) return;
+  hydrateState(envelope.state);
+  syncCsvTextsFromState();
+  if (hasRenderableGeneratedSchedule()) {
+    recomputeAllScheduleState();
+    state.generationSummary = summarizeGeneration();
+    syncSelectedBoardAssignment();
+    syncSelectedDistributionAssignment();
+    elements.generationResultNote.textContent = note;
+    flushPersistedState();
+    renderAppView();
+  } else {
+    runGeneration(note);
+    flushPersistedState();
+  }
+}
+
+function handleBackupSnapshotListClick(event) {
+  const button = event.target.closest("[data-backup-action][data-backup-id]");
+  if (!button) return;
+  const snapshots = loadBackupSnapshots();
+  const snapshot = snapshots.find((item) => item.id === button.dataset.backupId);
+  if (!snapshot) return;
+  if (button.dataset.backupAction === "restore") {
+    restoreBackupEnvelope(snapshot, `${snapshot.label || "バックアップ"}を復元しました。`);
+    showToast("バックアップを復元しました。", "success");
+    return;
+  }
+  saveBackupSnapshots(snapshots.filter((item) => item.id !== snapshot.id));
+  renderBackupPanel();
+}
+
+function exportCurrentStateAsJson() {
+  flushPersistedState();
+  const payload = createBackupEnvelope("JSONエクスポート");
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `shift-backup-${state.selectedDate || formatDate(new Date())}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function handleBackupImport(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    const text = await readFileText(file);
+    const parsed = JSON.parse(text);
+    restoreBackupEnvelope(parsed, "JSONから復元しました。");
+    showToast("JSONバックアップを読み込みました。", "success");
+  } catch (error) {
+    showToast("JSONバックアップの読み込みに失敗しました。", "error");
+  } finally {
+    if (elements.importBackupInput) elements.importBackupInput.value = "";
   }
 }
 

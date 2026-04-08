@@ -1618,6 +1618,63 @@ pre {
   min-height: 120px;
 }
 
+.backup-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.backup-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  background: rgba(238, 242, 246, 0.95);
+  color: rgba(90, 104, 123, 0.86);
+}
+
+.backup-status-pill.saving {
+  background: rgba(255, 247, 223, 0.92);
+  color: #9b5d1c;
+}
+
+.backup-status-pill.saved {
+  background: rgba(230, 244, 236, 0.92);
+  color: rgba(23, 120, 78, 0.96);
+}
+
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.backup-snapshot-list {
+  display: grid;
+  gap: 8px;
+}
+
+.backup-snapshot-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(221, 229, 239, 0.82);
+  border-radius: 12px;
+  background: rgba(248, 250, 253, 0.78);
+}
+
+.backup-snapshot-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .request-edit-grid {
   padding-top: 10px;
   border-top: 1px solid var(--line);
