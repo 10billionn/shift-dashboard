@@ -16,7 +16,7 @@
       <nav class="sidebar-nav" id="sidebarNav">
         <button class="nav-item active" type="button" data-view="dashboard">ダッシュボード</button>
         <button class="nav-item" type="button" data-view="generation">シフト作成</button>
-        <button class="nav-item" type="button" data-view="distribution">シフト配布</button>
+        <button class="nav-item" type="button" data-view="distribution">シフト回収・配布</button>
         <button class="nav-item" type="button" data-view="settings">設定</button>
       </nav>
       <div class="sidebar-actions">
@@ -308,21 +308,27 @@
           <section class="content-panel">
             <div class="panel-head">
               <div>
-                <h2>シフト配布</h2>
-                <p class="section-note">確定シフトを個別に確認してワンクリックでコピーします</p>
+                <h2>シフト回収・配布</h2>
+                <p class="section-note">提出依頼と確定シフト送信を個別に整えます</p>
               </div>
             </div>
             <div class="distribution-layout">
               <section class="stack-block">
-                <label class="field-label" for="distributionDateSelect">日付選択</label>
-                <select id="distributionDateSelect" class="select-input"></select>
-                <div id="distributionViewModeTabs" class="view-tabs">
-                  <button class="view-tab active" type="button" data-distribution-view="date">日付別</button>
-                  <button class="view-tab" type="button" data-distribution-view="therapist">セラピスト別</button>
+                <div hidden>
+                  <label class="field-label" for="distributionDateSelect">日付選択</label>
+                  <select id="distributionDateSelect" class="select-input"></select>
                 </div>
+                <div id="distributionViewModeTabs" class="view-tabs">
+                  <button class="view-tab active" type="button" data-distribution-view="collect">回収</button>
+                  <button class="view-tab" type="button" data-distribution-view="distribute">配布</button>
+                </div>
+                <label id="distributionRequestDeadlineField" class="field-block">
+                  <span class="field-label">締切日</span>
+                  <input id="distributionRequestDeadlineInput" type="date">
+                </label>
                 <label class="filter-check">
                   <input id="distributionPendingOnly" type="checkbox">
-                  <span>未配布のみ表示</span>
+                  <span id="distributionPendingOnlyLabel">未提出のみ表示</span>
                 </label>
                 <div id="distributionStatusSummary" class="status-row"></div>
               </section>
@@ -333,15 +339,16 @@
                 <article class="preview-card">
                   <div class="panel-head">
                     <div>
-                      <h3>個別シフト表示</h3>
+                      <h3 id="distributionPreviewTitle">送信文面</h3>
                       <label class="field-label inline-select-label" for="distributionFormatSelect">文面形式</label>
                       <select id="distributionFormatSelect" class="select-input compact-select">
                         <option value="line">LINE用フォーマット</option>
-                        <option value="simple">シンプル版</option>
+                        <option value="simple">短文</option>
+                        <option value="polite">丁寧め</option>
                       </select>
                     </div>
                     <div class="action-row">
-                      <button id="copyAllMessagesButton" class="ghost-button" type="button">当日分をまとめてコピー</button>
+                      <button id="copyAllMessagesButton" class="ghost-button" type="button">全員分コピー</button>
                       <button id="copyMessageButton" class="primary-button" type="button">コピー</button>
                     </div>
                   </div>
@@ -463,6 +470,6 @@
   </div>
 
   <script src="data.js?v=202604090120"></script>
-  <script src="app.js?v=202604090205"></script>
+  <script src="app.js?v=202604091930"></script>
 </body>
 </html>

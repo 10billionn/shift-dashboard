@@ -20,8 +20,9 @@
   generationSummary: null,
   selectedDistributionDate: "",
   selectedDistributionAssignmentId: "",
-  distributionViewMode: "date",
+  distributionViewMode: "distribute",
   distributionFormat: "line",
+  distributionRequestDeadline: "",
   weeklyAnalysisView: "cards",
   weekOffset: 0,
   dashboardSectionOrder: ["weeklyAnalysis", "boardInspector", "riskSummary", "roomDetail", "summaryGrid", "cutBlock"],
@@ -68,8 +69,8 @@ const viewMeta = {
     subtitle: "CSV読込、抜け漏れ確認、採用判断、生成までをまとめます。"
   },
   distribution: {
-    title: "シフト配布",
-    subtitle: "確定シフトを個別文面にしてすぐ配布できます。"
+    title: "シフト回収・配布",
+    subtitle: "提出依頼と確定シフト送信を個別に整えます。"
   },
   settings: {
     title: "設定",
@@ -155,10 +156,14 @@ const elements = {
   demandMetricsCsvInput: document.querySelector("#demandMetricsCsvInput"),
   distributionDateSelect: document.querySelector("#distributionDateSelect"),
   distributionViewModeTabs: document.querySelector("#distributionViewModeTabs"),
+  distributionRequestDeadlineField: document.querySelector("#distributionRequestDeadlineField"),
+  distributionRequestDeadlineInput: document.querySelector("#distributionRequestDeadlineInput"),
   distributionPendingOnly: document.querySelector("#distributionPendingOnly"),
+  distributionPendingOnlyLabel: document.querySelector("#distributionPendingOnlyLabel"),
   distributionStatusSummary: document.querySelector("#distributionStatusSummary"),
   distributionList: document.querySelector("#distributionList"),
   distributionPreview: document.querySelector("#distributionPreview"),
+  distributionPreviewTitle: document.querySelector("#distributionPreviewTitle"),
   distributionFormatSelect: document.querySelector("#distributionFormatSelect"),
   copyAllMessagesButton: document.querySelector("#copyAllMessagesButton"),
   copyMessageButton: document.querySelector("#copyMessageButton"),
@@ -383,10 +388,18 @@ function bindEvents() {
   elements.distributionViewModeTabs.querySelectorAll(".view-tab").forEach((button) => {
     button.addEventListener("click", () => {
       state.distributionViewMode = button.dataset.distributionView;
+      if (state.distributionViewMode === "collect" && !state.distributionRequestDeadline) {
+        state.distributionRequestDeadline = addDaysToDateKey(state.selectedDate, 2);
+      }
       syncSelectedDistributionAssignment();
       persistState();
       renderDistribution();
     });
+  });
+  elements.distributionRequestDeadlineInput?.addEventListener("change", () => {
+    state.distributionRequestDeadline = resolveSelectedDate(elements.distributionRequestDeadlineInput.value || state.selectedDate);
+    persistState();
+    renderDistribution();
   });
   elements.distributionPendingOnly.addEventListener("change", () => {
     state.distributionPendingOnly = elements.distributionPendingOnly.checked;
@@ -432,9 +445,12 @@ function hydrateState(saved) {
   state.activeDashboardView = saved.activeDashboardView || "board";
   state.boardDensity = saved.boardDensity === "comfortable" ? "comfortable" : "compact";
   state.activeShiftTab = saved.activeShiftTab || "early";
-  state.distributionViewMode = ["date", "therapist"].includes(saved.distributionViewMode) ? saved.distributionViewMode : "date";
+  state.distributionViewMode = ["collect", "distribute"].includes(saved.distributionViewMode)
+    ? saved.distributionViewMode
+    : "distribute";
   state.appSettings = saved.appSettings ? restoreAppSettings(saved.appSettings) : cloneAppSettings(samplePrototypeData.settings);
-  state.distributionFormat = ["line", "simple"].includes(saved.distributionFormat) ? saved.distributionFormat : "line";
+  state.distributionFormat = ["line", "simple", "polite"].includes(saved.distributionFormat) ? saved.distributionFormat : "line";
+  state.distributionRequestDeadline = resolveSelectedDate(saved.distributionRequestDeadline || addDaysToDateKey(state.selectedDate, 2));
   state.weeklyAnalysisView = saved.weeklyAnalysisView === "chart" ? "chart" : "cards";
   state.weekOffset = Number.isInteger(saved.weekOffset) ? saved.weekOffset : 0;
   state.dashboardSectionOrder = normalizeDashboardSectionOrder(saved.dashboardSectionOrder);
@@ -475,8 +491,9 @@ function loadSampleState() {
   state.boardDensity = "compact";
   state.activeShiftTab = "early";
   state.appSettings = cloneAppSettings(samplePrototypeData.settings);
-  state.distributionViewMode = "date";
+  state.distributionViewMode = "distribute";
   state.distributionFormat = "line";
+  state.distributionRequestDeadline = addDaysToDateKey(state.selectedDate, 2);
   state.weekOffset = 0;
   state.dashboardSectionOrder = normalizeDashboardSectionOrder();
   state.copiedDistributionIds = [];
@@ -712,24 +729,38 @@ function renderGeneration() {
 }
 
 function renderDistribution() {
+  const isCollectMode = state.distributionViewMode === "collect";
+  setDistributionFormatOptions(isCollectMode ? "collect" : "distribute");
   elements.distributionFormatSelect.value = state.distributionFormat;
   elements.distributionPendingOnly.checked = state.distributionPendingOnly;
   elements.distributionViewModeTabs.querySelectorAll(".view-tab").forEach((button) => {
     button.classList.toggle("active", button.dataset.distributionView === state.distributionViewMode);
   });
+  if (elements.distributionRequestDeadlineField) {
+    elements.distributionRequestDeadlineField.hidden = !isCollectMode;
+  }
+  if (elements.distributionRequestDeadlineInput) {
+    elements.distributionRequestDeadlineInput.value = state.distributionRequestDeadline || addDaysToDateKey(state.selectedDate, 2);
+  }
+  if (elements.distributionPendingOnlyLabel) {
+    elements.distributionPendingOnlyLabel.textContent = isCollectMode ? "未提出のみ表示" : "未配布のみ表示";
+  }
+  if (elements.distributionPreviewTitle) {
+    elements.distributionPreviewTitle.textContent = isCollectMode ? "回収メッセージ" : "配布メッセージ";
+  }
   elements.distributionDateSelect.innerHTML = state.dateList
     .map((dateKey) => `<option value="${dateKey}" ${dateKey === state.selectedDistributionDate ? "selected" : ""}>${formatDisplayDate(dateKey)} (${formatWeekday(dateKey)})</option>`)
     .join("");
-  elements.distributionDateSelect.disabled = state.distributionViewMode === "therapist";
+  elements.distributionDateSelect.disabled = true;
 
   const allItems = getDistributionItems();
   const copiedCount = countCopiedDistributionItems(allItems);
   const pendingCount = Math.max(allItems.length - copiedCount, 0);
   elements.distributionStatusSummary.innerHTML = `
-    <span class="legend-chip empty">未配布 ${pendingCount}件</span>
-    <span class="legend-chip booked">配布済み ${copiedCount}件</span>
-    <span class="legend-chip warning">${state.distributionViewMode === "date" ? "日付別" : "セラピスト別"}</span>
-    <span class="legend-chip normal">${state.distributionFormat === "line" ? "LINE用" : "シンプル"}</span>
+    <span class="legend-chip empty">${isCollectMode ? "未提出" : "未配布"} ${pendingCount}件</span>
+    <span class="legend-chip booked">${isCollectMode ? "提出済み" : "配布済み"} ${copiedCount}件</span>
+    <span class="legend-chip warning">${isCollectMode ? "回収" : "配布"}</span>
+    <span class="legend-chip normal">${getDistributionFormatLabel(state.distributionFormat)}</span>
   `;
   const items = state.distributionPendingOnly
     ? allItems.filter((item) => !isDistributionItemCopied(item))
@@ -737,8 +768,8 @@ function renderDistribution() {
   syncSelectedDistributionAssignment();
 
   if (!items.length) {
-    elements.distributionList.innerHTML = `<div class="empty-state">${allItems.length && state.distributionPendingOnly ? "未配布の対象はありません。" : state.distributionViewMode === "date" ? "この日の確定シフトはまだありません。" : "配布対象のセラピストがいません。"}</div>`;
-    elements.distributionPreview.textContent = "シフトを生成するとここに個別文言が出ます。";
+    elements.distributionList.innerHTML = `<div class="empty-state">${allItems.length && state.distributionPendingOnly ? `${isCollectMode ? "未提出" : "未配布"}の対象はありません。` : isCollectMode ? "送信対象のセラピストがいません。" : "配布対象のセラピストがいません。"}</div>`;
+    elements.distributionPreview.textContent = isCollectMode ? "回収モードで対象を選ぶと、ここに送信文面が出ます。" : "シフトを生成するとここに個別文言が出ます。";
     elements.copyStatus.textContent = "";
     elements.copyAllMessagesButton.disabled = true;
     return;
@@ -748,7 +779,7 @@ function renderDistribution() {
   elements.distributionList.innerHTML = items.map((item) => renderDistributionItem(item)).join("");
   const selected = items.find((item) => item.id === state.selectedDistributionAssignmentId) || items[0];
   elements.distributionPreview.textContent = buildDistributionMessage(selected);
-  elements.copyStatus.textContent = `${getDistributionItemLabel(selected)} の${state.distributionFormat === "line" ? "LINE用" : "シンプル"}文面を表示中`;
+  elements.copyStatus.textContent = `${getDistributionItemLabel(selected)} の${getDistributionFormatLabel(state.distributionFormat)}文面を表示中`;
   elements.copyStatus.className = "copy-status";
 }
 
@@ -1882,7 +1913,8 @@ function renderRequirements() {
 
 function renderDistributionItem(item) {
   const copied = isDistributionItemCopied(item);
-  const isTherapistMode = state.distributionViewMode === "therapist" && item.assignments;
+  const isCollectMode = state.distributionViewMode === "collect";
+  const isTherapistMode = state.distributionViewMode === "distribute" && item.assignments;
   const hasPartialPending = isTherapistMode
     && item.assignments.some((assignment) => state.copiedDistributionIds.includes(assignment.id))
     && item.assignments.some((assignment) => !state.copiedDistributionIds.includes(assignment.id));
@@ -1891,15 +1923,30 @@ function renderDistributionItem(item) {
       <div class="distribution-item-top">
         <div>
           <strong>${item.name}</strong>
-          <div class="field-help">${isTherapistMode ? `${item.assignments.length}件のシフト` : `${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})`}</div>
+          <div class="field-help">${isCollectMode ? (item.submitted ? "希望提出済み" : "今週の回収対象") : isTherapistMode ? `${item.assignments.length}件のシフト` : `${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})`}</div>
         </div>
         <div class="status-row tight">
-          ${isTherapistMode ? `<span class="mini-badge rank">まとめ</span>` : `<span class="shift-chip ${item.shiftType}">${item.shiftLabel}</span>`}
-          <span class="mini-badge rank">${state.distributionFormat === "line" ? "LINE" : "簡易"}</span>
-          ${copied ? `<span class="mini-badge booked">配布済み</span>` : `<span class="mini-badge pink">${hasPartialPending ? "一部未配布" : "未配布"}</span>`}
+          ${isCollectMode ? `<span class="mini-badge rank">回収</span>` : isTherapistMode ? `<span class="mini-badge rank">個別</span>` : `<span class="shift-chip ${item.shiftType}">${item.shiftLabel}</span>`}
+          <span class="mini-badge rank">${getDistributionFormatShortLabel(state.distributionFormat)}</span>
+          ${copied ? `<span class="mini-badge booked">${isCollectMode ? "提出依頼済み" : "配布済み"}</span>` : `<span class="mini-badge pink">${isCollectMode ? "未提出" : hasPartialPending ? "一部未配布" : "未配布"}</span>`}
         </div>
       </div>
-      ${isTherapistMode ? `
+      ${isCollectMode ? `
+        <div class="distribution-summary-grid">
+          <div class="distribution-summary-item">
+            <span class="field-label">締切</span>
+            <span class="field-value">${state.distributionRequestDeadline ? `${formatSlashDate(state.distributionRequestDeadline)}(${formatWeekday(state.distributionRequestDeadline)})` : "未設定"}</span>
+          </div>
+          <div class="distribution-summary-item">
+            <span class="field-label">状態</span>
+            <span class="field-value">${item.submitted ? "提出済み" : "未提出"}</span>
+          </div>
+          <div class="distribution-summary-item">
+            <span class="field-label">送信</span>
+            <span class="field-value">${copied ? "コピー済み" : "未送信"}</span>
+          </div>
+        </div>
+      ` : isTherapistMode ? `
         <div class="distribution-summary-item">
           <span class="field-label">予定</span>
           <div class="field-value distribution-therapist-lines">${item.assignments.slice(0, 3).map((assignment) => `・${formatSlashDate(assignment.dateKey)} ${assignment.shiftLabel} ${assignment.assignedArea}`).join("<br>")}${item.assignments.length > 3 ? `<br>他${item.assignments.length - 3}件` : ""}</div>
@@ -3909,8 +3956,15 @@ function getAssignmentsGroupedByTherapist() {
 }
 
 function getDistributionItems() {
-  if (state.distributionViewMode === "date") {
-    return getAssignmentsForDate(state.selectedDistributionDate);
+  if (state.distributionViewMode === "collect") {
+    const submittedNames = new Set(state.generationRows.map((row) => row.name));
+    return state.generationSentTargets
+      .map((name) => ({
+        id: `request:${name}`,
+        name,
+        submitted: submittedNames.has(name)
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name, "ja"));
   }
 
   return Object.entries(getAssignmentsGroupedByTherapist())
@@ -3936,7 +3990,7 @@ function countCopiedDistributionItems(items) {
 }
 
 function getDistributionItemLabel(item) {
-  return state.distributionViewMode === "therapist" && item.assignments ? `${item.name}さん` : item.name;
+  return item.assignments || state.distributionViewMode === "collect" ? `${item.name}さん` : item.name;
 }
 
 function getScheduleDay(dateKey) {
@@ -3991,8 +4045,52 @@ function syncSelectedDistributionAssignment() {
   }
 }
 
+function setDistributionFormatOptions(mode) {
+  const options = mode === "collect"
+    ? [
+      { value: "line", label: "LINE用フォーマット" },
+      { value: "simple", label: "短文" },
+      { value: "polite", label: "丁寧め" }
+    ]
+    : [
+      { value: "line", label: "LINE用フォーマット" },
+      { value: "simple", label: "短文" }
+    ];
+  const current = state.distributionFormat;
+  elements.distributionFormatSelect.innerHTML = options
+    .map((option) => `<option value="${option.value}">${option.label}</option>`)
+    .join("");
+  if (!options.some((option) => option.value === current)) {
+    state.distributionFormat = options[0].value;
+  }
+}
+
+function getDistributionFormatLabel(format) {
+  if (format === "polite") return "丁寧め";
+  if (format === "simple") return "短文";
+  return "LINE用";
+}
+
+function getDistributionFormatShortLabel(format) {
+  if (format === "polite") return "丁寧";
+  if (format === "simple") return "短文";
+  return "LINE";
+}
+
 function buildDistributionMessage(item) {
-  if (state.distributionViewMode === "therapist" && item.assignments) {
+  if (state.distributionViewMode === "collect") {
+    const deadlineLabel = state.distributionRequestDeadline
+      ? `${formatSlashDate(state.distributionRequestDeadline)}(${formatWeekday(state.distributionRequestDeadline)})`
+      : "今週中";
+    if (state.distributionFormat === "polite") {
+      return `${item.name}さん\n来週分の出勤希望提出のご連絡です。\n${deadlineLabel}までにご返信をお願いします。\nこのまま返信で送ってください。`;
+    }
+    if (state.distributionFormat === "simple") {
+      return `${item.name}さん\n来週分の出勤希望を${deadlineLabel}までに返信お願いします。`;
+    }
+    return `【出勤希望提出のお願い】\n${item.name}さん\n来週分の出勤希望を${deadlineLabel}までにご返信ください。\nこのまま返信で送ってください。`;
+  }
+  if (item.assignments) {
     const lines = item.assignments
       .slice()
       .sort((left, right) => left.dateKey.localeCompare(right.dateKey) || left.startTime.localeCompare(right.startTime))
@@ -4020,7 +4118,9 @@ async function copyAllDistributionMessages() {
     state.copiedDistributionIds = [...new Set([...state.copiedDistributionIds, ...items.flatMap((item) => getDistributionItemAssignmentIds(item))])];
     persistState();
     renderDistribution();
-    elements.copyStatus.textContent = state.distributionViewMode === "date" ? `${formatSlashDate(state.selectedDistributionDate)}分をまとめてコピーしました。` : "セラピスト別文面をまとめてコピーしました。";
+    elements.copyStatus.textContent = state.distributionViewMode === "collect"
+      ? "提出依頼をまとめてコピーしました。"
+      : "配布メッセージをまとめてコピーしました。";
     elements.copyStatus.className = "copy-status success";
   } catch (error) {
     elements.copyStatus.textContent = "まとめコピーに失敗しました。";
@@ -4645,6 +4745,7 @@ function createPersistableState() {
     activeShiftTab: state.activeShiftTab,
     distributionViewMode: state.distributionViewMode,
     distributionFormat: state.distributionFormat,
+    distributionRequestDeadline: state.distributionRequestDeadline,
     weeklyAnalysisView: state.weeklyAnalysisView,
     weekOffset: state.weekOffset,
     dashboardSectionOrder: state.dashboardSectionOrder,
