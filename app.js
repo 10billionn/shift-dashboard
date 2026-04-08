@@ -775,11 +775,12 @@ function renderGeneration() {
   renderGenerationForm();
   elements.generateScheduleButton.disabled = state.generationErrors.length > 0;
   if (elements.generationDecisionSummary) {
+    const submittedCount = Math.max(state.generationSentTargets.length - missingTherapists.length, 0);
     elements.generationDecisionSummary.innerHTML = `
-      <span class="legend-chip normal">送信対象 ${state.generationSentTargets.length}名</span>
-      <span class="legend-chip normal">読込 ${state.generationRows.length}件</span>
+      <span class="legend-chip normal">提出対象 ${state.generationSentTargets.length}名</span>
       <span class="legend-chip ${missingTherapists.length ? "warning" : "normal"}">未提出 ${missingTherapists.length}名</span>
-      <span class="legend-chip ${reviewRows.length ? "warning" : "normal"}">要確認 ${new Set(reviewRows.map((row) => row.name)).size}名</span>
+      <span class="legend-chip normal">提出済 ${submittedCount}名</span>
+      <span class="legend-chip normal">読込件数 ${state.generationRows.length}件</span>
     `;
   }
   if (elements.generationDecisionDataCards) {
