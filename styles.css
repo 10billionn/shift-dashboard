@@ -1386,6 +1386,7 @@ pre {
 
 .generation-import-card-primary {
   background: rgba(252, 253, 255, 0.92);
+  gap: 10px;
 }
 
 .generation-import-card {
@@ -1400,7 +1401,7 @@ pre {
 }
 
 .generation-textarea {
-  min-height: 132px;
+  min-height: 104px;
 }
 
 .generation-summary-grid {
@@ -1469,18 +1470,23 @@ pre {
 
 .csv-example {
   display: grid;
-  gap: 6px;
-  padding: 10px 12px;
-  border: 1px dashed var(--line-strong);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.7);
+  gap: 4px;
+  padding: 7px 10px;
+  border: 1px dashed rgba(193, 205, 223, 0.75);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.48);
 }
 
 .csv-example code {
   font-family: Consolas, monospace;
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   color: var(--navy);
   word-break: break-all;
+}
+
+.csv-example strong {
+  font-size: 0.72rem;
+  color: rgba(110, 124, 144, 0.86);
 }
 
 .operational-settings-grid {
@@ -1560,6 +1566,15 @@ pre {
 
 .generation-action-row {
   align-items: center;
+}
+
+.generation-stage-input .action-row {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.generation-stage-input input[type="file"] {
+  margin-bottom: 2px;
 }
 
 .generation-stage-action .primary-button {
