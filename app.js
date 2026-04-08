@@ -1396,24 +1396,26 @@ function renderBoardInspector(day) {
   }
 
   const profile = samplePrototypeData.therapistProfiles[assignment.name] || { rank: "G", areas: [] };
-  const availableAreas = getAppSettings().areas;
   const roomOptions = getAppSettings().roomNames;
   const position = findAssignmentPosition(day.dateKey, assignment.id);
   const visualMeta = getAssignmentVisualMeta(assignment, position?.slotIndex ?? 0);
-  const isAdjustmentLane = Boolean(assignment.isAdjustmentLane);
-  const displayRoomLabel = isAdjustmentLane ? "調整中" : visualMeta.roomLabel;
-  const displayArea = isAdjustmentLane ? "調整中" : visualMeta.currentArea;
-  const status = analyzeAssignmentStatus(assignment, profile);
+  const row = state.generationRows.find((item) => item.id === assignment.id);
+  const isAdjustmentLane = !position && Boolean(row && ["cut", "hold"].includes(row.status));
+  const currentArea = isAdjustmentLane
+    ? ""
+    : getRoomMeta(
+      normalizeRoomIndex(assignment.roomIndex, position?.slotIndex ?? 0),
+      assignment.assignedArea || assignment.preferredArea
+    ).area || visualMeta.currentArea;
   const settings = getAppSettings();
   const startMinutes = toMinutes(assignment.startTime);
   const endMinutes = toMinutes(assignment.endTime);
   const isInvalidTime = startMinutes >= endMinutes
     || startMinutes < settings.businessStartHour * 60
     || endMinutes > settings.businessEndHour * 60;
-  const overlapInfo = getAssignmentOverlapInfo(day.dateKey, assignment.id);
   const hasAreaMismatch = Boolean(assignment.preferredArea)
-    && visualMeta.currentArea
-    && assignment.preferredArea !== visualMeta.currentArea;
+    && currentArea
+    && assignment.preferredArea !== currentArea;
   const displayStatusLabel = isAdjustmentLane
     ? "調整中"
     : hasAreaMismatch
@@ -2642,17 +2644,21 @@ function removeBoardAssignment(assignmentId) {
 }
 
 function moveBoardAssignmentToAdjustment(assignmentId, startMinutes = null, endMinutes = null) {
-  const position = findAssignmentPosition(state.selectedDate, assignmentId);
-  if (!position) return;
-  const day = state.generatedSchedule[state.selectedDate];
-  if (!day) return;
-  const key = position.shiftType === "early" ? "earlyAssignments" : "lateAssignments";
-  const slots = createSlotArray(day[key], position.shiftType);
-  const assignment = slots[position.slotIndex];
-  slots[position.slotIndex] = null;
-  day[key] = slots;
-
   const row = state.generationRows.find((item) => item.id === assignmentId);
+  const position = findAssignmentPosition(state.selectedDate, assignmentId);
+  const day = state.generatedSchedule[state.selectedDate];
+  let assignment = null;
+
+  if (position && day) {
+    const key = position.shiftType === "early" ? "earlyAssignments" : "lateAssignments";
+    const slots = createSlotArray(day[key], position.shiftType);
+    assignment = slots[position.slotIndex];
+    slots[position.slotIndex] = null;
+    day[key] = slots;
+  } else if (!row || !["cut", "hold"].includes(row.status)) {
+    return;
+  }
+
   if (row) {
     row.status = "hold";
     if (startMinutes !== null) row.startTime = minutesToTime(startMinutes);
@@ -2665,8 +2671,13 @@ function moveBoardAssignmentToAdjustment(assignmentId, startMinutes = null, endM
   markManualScheduleDirty();
   recomputeScheduleStateForDates([state.selectedDate]);
   persistState();
-  flashBoardUpdateStatus("調整中へ移動しました。", "warning");
-  showToast(`${assignment?.name || "セラピスト"}を調整中へ移動しました。`, "warning");
+  flashBoardUpdateStatus(position ? "調整中へ移動しました。" : "調整中の時間を更新しました。", "warning");
+  showToast(
+    position
+      ? `${assignment?.name || "セラピスト"}を調整中へ移動しました。`
+      : `${row?.name || "セラピスト"}の調整中時間を更新しました。`,
+    "warning"
+  );
   renderBoardWorkspace();
   renderLinkedViewsAfterBoardEdit();
 }
