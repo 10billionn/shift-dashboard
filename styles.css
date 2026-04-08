@@ -1387,12 +1387,21 @@ pre {
 .generation-import-card-primary {
   background: rgba(252, 253, 255, 0.92);
   gap: 10px;
+  padding: 12px 14px;
 }
 
 .generation-import-card {
   background: rgba(250, 252, 255, 0.78);
   border-color: rgba(215, 224, 236, 0.76);
   box-shadow: none;
+}
+
+.generation-import-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .generation-import-head {
@@ -1573,8 +1582,12 @@ pre {
   gap: 8px;
 }
 
+.generation-import-actions {
+  justify-content: flex-end;
+}
+
 .generation-stage-input input[type="file"] {
-  margin-bottom: 2px;
+  margin: 0;
 }
 
 .generation-manual-card,
@@ -3451,6 +3464,10 @@ button.weekly-day {
 
   .generation-manual-grid {
     grid-template-columns: 1fr;
+  }
+
+  .generation-import-inline {
+    align-items: stretch;
   }
 
   .shift-card-top,
