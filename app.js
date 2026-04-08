@@ -450,7 +450,11 @@ function hydrateState(saved) {
     ? saved.distributionViewMode
     : "distribute";
   state.appSettings = saved.appSettings ? restoreAppSettings(saved.appSettings) : cloneAppSettings(samplePrototypeData.settings);
-  state.distributionFormat = ["line", "simple", "polite"].includes(saved.distributionFormat) ? saved.distributionFormat : "line";
+  state.distributionFormat = ["line", "custom"].includes(saved.distributionFormat)
+    ? saved.distributionFormat
+    : saved.distributionFormat === "simple" || saved.distributionFormat === "polite"
+      ? "custom"
+      : "line";
   state.distributionRequestDeadline = resolveSelectedDate(saved.distributionRequestDeadline || addDaysToDateKey(state.selectedDate, 2));
   state.weeklyAnalysisView = saved.weeklyAnalysisView === "chart" ? "chart" : "cards";
   state.weekOffset = Number.isInteger(saved.weekOffset) ? saved.weekOffset : 0;
@@ -782,6 +786,8 @@ function renderDistribution() {
   elements.distributionList.innerHTML = items.map((item) => renderDistributionItem(item)).join("");
   const selected = items.find((item) => item.id === state.selectedDistributionAssignmentId) || items[0];
   elements.distributionPreview.textContent = buildDistributionMessage(selected);
+  elements.distributionPreview.contentEditable = state.distributionFormat === "custom" ? "true" : "false";
+  elements.distributionPreview.spellcheck = false;
   elements.copyStatus.textContent = `${getDistributionItemLabel(selected)} の${getDistributionFormatLabel(state.distributionFormat)}文面を表示中`;
   elements.copyStatus.className = "copy-status";
 }
@@ -1945,10 +1951,6 @@ function renderDistributionItem(item) {
           <div class="distribution-summary-item">
             <span class="field-label">配布状態</span>
             <span class="field-value">${copied ? "配布済み" : "未配布"}</span>
-          </div>
-          <div class="distribution-summary-item">
-            <span class="field-label">送信情報</span>
-            <span class="field-value">${copied ? "コピー済み" : "未送信"}</span>
           </div>
         </div>
       ` : isTherapistMode ? `
@@ -4051,16 +4053,10 @@ function syncSelectedDistributionAssignment() {
 }
 
 function setDistributionFormatOptions(mode) {
-  const options = mode === "collect"
-    ? [
-      { value: "line", label: "LINE用フォーマット" },
-      { value: "simple", label: "短文" },
-      { value: "polite", label: "丁寧め" }
-    ]
-    : [
-      { value: "line", label: "LINE用フォーマット" },
-      { value: "simple", label: "短文" }
-    ];
+  const options = [
+    { value: "line", label: "LINE用" },
+    { value: "custom", label: "カスタム" }
+  ];
   const current = state.distributionFormat;
   elements.distributionFormatSelect.innerHTML = options
     .map((option) => `<option value="${option.value}">${option.label}</option>`)
@@ -4071,14 +4067,12 @@ function setDistributionFormatOptions(mode) {
 }
 
 function getDistributionFormatLabel(format) {
-  if (format === "polite") return "丁寧め";
-  if (format === "simple") return "短文";
+  if (format === "custom") return "カスタム";
   return "LINE用";
 }
 
 function getDistributionFormatShortLabel(format) {
-  if (format === "polite") return "丁寧";
-  if (format === "simple") return "短文";
+  if (format === "custom") return "カスタム";
   return "LINE";
 }
 
@@ -4087,12 +4081,6 @@ function buildDistributionMessage(item) {
     const deadlineLabel = state.distributionRequestDeadline
       ? `${formatSlashDate(state.distributionRequestDeadline)}(${formatWeekday(state.distributionRequestDeadline)})`
       : "今週中";
-    if (state.distributionFormat === "polite") {
-      return `${item.name}さん\n来週分の出勤希望提出のご連絡です。\n${deadlineLabel}までにご返信をお願いします。\nこのまま返信で送ってください。`;
-    }
-    if (state.distributionFormat === "simple") {
-      return `${item.name}さん\n来週分の出勤希望を${deadlineLabel}までに返信お願いします。`;
-    }
     return `【出勤希望提出のお願い】\n${item.name}さん\n来週分の出勤希望を${deadlineLabel}までにご返信ください。\nこのまま返信で送ってください。`;
   }
   if (item.assignments) {
@@ -4100,15 +4088,9 @@ function buildDistributionMessage(item) {
       .slice()
       .sort((left, right) => left.dateKey.localeCompare(right.dateKey) || left.startTime.localeCompare(right.startTime))
       .map((assignment) => `${formatSlashDate(assignment.dateKey)}(${formatWeekday(assignment.dateKey)}) ${assignment.shiftLabel} ${assignment.assignedArea} ${assignment.startTime}-${normalizeDistributionEnd(assignment.endTime)}`);
-    if (state.distributionFormat === "simple") {
-      return `${item.name}さん\n今週のシフトです。\n${lines.join("\n")}\nよろしくお願いします。`;
-    }
     return `【今週のシフト】\n${item.name}さん\n${lines.join("\n")}\n\nよろしくお願いします。`;
   }
   const reservationLabel = item.himeReservation === "あり" ? "あり" : "なし";
-  if (state.distributionFormat === "simple") {
-    return `${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})\nエリア：${item.assignedArea}\n時間：${item.startTime}-${normalizeDistributionEnd(item.endTime)}\n姫予約：${reservationLabel}\nよろしくお願いします。`;
-  }
   return `【${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)}) 本日のシフト】\nエリア：${item.assignedArea}\n時間：${item.startTime}-${normalizeDistributionEnd(item.endTime)}\n姫予約：${reservationLabel}\n\nよろしくお願いします。`;
 }
 
@@ -4134,7 +4116,7 @@ async function copyAllDistributionMessages() {
 }
 
 async function copyDistributionMessage() {
-  const text = elements.distributionPreview.textContent;
+  const text = elements.distributionPreview.innerText.trim();
   if (!text) return;
 
   const selected = getDistributionItems()
