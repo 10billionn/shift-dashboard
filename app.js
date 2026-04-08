@@ -186,8 +186,7 @@ function initialize() {
   state.dateList = buildDateList();
   const savedState = loadPersistedState();
   hydrateState(savedState);
-  state.selectedDate = resolveSelectedDate(state.selectedDate);
-  state.selectedDistributionDate = resolveSelectedDate(state.selectedDistributionDate || state.selectedDate);
+  rebuildDerivedState();
 
   bindEvents();
   syncCsvTextsFromState();
@@ -208,6 +207,17 @@ function initialize() {
   }
   runGeneration(hasPersistedState() ? "保存済みデータを復元しました。" : "初期サンプルを反映しました。");
   requestAnimationFrame(() => renderAppView());
+}
+
+function rebuildDerivedState() {
+  state.dateList = buildDateList();
+  state.selectedDate = resolveSelectedDate(state.selectedDate);
+  state.selectedDistributionDate = resolveSelectedDate(state.selectedDistributionDate || state.selectedDate);
+  if (!hasRenderableGeneratedSchedule()) return;
+  recomputeAllScheduleState();
+  state.generationSummary = summarizeGeneration();
+  syncSelectedBoardAssignment();
+  syncSelectedDistributionAssignment();
 }
 
 function bindEvents() {
