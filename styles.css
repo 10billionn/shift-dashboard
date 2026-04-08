@@ -612,6 +612,15 @@ pre {
   color: #fff;
 }
 
+.primary-button.is-busy {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.primary-button.is-success {
+  opacity: 1;
+}
+
 .secondary-button {
   background: var(--blue-soft);
   color: var(--blue);

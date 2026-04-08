@@ -40,6 +40,8 @@
 const STORAGE_KEY = "shift-dashboard-state-v1";
 const SNAPSHOT_STORAGE_KEY = "shift-dashboard-backups-v1";
 const SNAPSHOT_SCHEMA_VERSION = 1;
+let generationSubmitUiState = "idle";
+let generationSubmitFeedbackTimer = null;
 const DASHBOARD_SLOT_COUNT = 7;
 let boardFeedbackTimer = null;
 let boardDragPayload = null;
@@ -1653,7 +1655,15 @@ function renderGenerationForm() {
   elements.generationFormArea.value = editingRow?.preferredArea || areas[0] || "";
   elements.generationFormHime.value = editingRow?.himeReservation === "あり" ? "あり" : "なし";
   elements.generationFormNote.value = editingRow?.note || "";
-  elements.generationRowSubmitButton.textContent = editingRow ? "更新" : "反映";
+  const defaultLabel = editingRow ? "更新" : "反映";
+  elements.generationRowSubmitButton.textContent = generationSubmitUiState === "busy"
+    ? "反映中…"
+    : generationSubmitUiState === "success"
+      ? "反映済み ✓"
+      : defaultLabel;
+  elements.generationRowSubmitButton.disabled = generationSubmitUiState === "busy";
+  elements.generationRowSubmitButton.classList.toggle("is-busy", generationSubmitUiState === "busy");
+  elements.generationRowSubmitButton.classList.toggle("is-success", generationSubmitUiState === "success");
   elements.generationRowCancelButton.hidden = !editingRow;
 }
 
@@ -1756,6 +1766,11 @@ function resetGenerationForm() {
   renderGenerationForm();
 }
 
+function setGenerationSubmitUiState(nextState) {
+  generationSubmitUiState = nextState;
+  renderGenerationForm();
+}
+
 function buildGenerationRow(row, id = "", status = "accepted") {
   const explicitPreferredAreas = normalizePreferredAreas(row.preferredAreas ?? row.preferredArea);
   const preferredAreas = explicitPreferredAreas.length ? explicitPreferredAreas : getTherapistDefaultPreferredAreas(row.name);
@@ -1776,28 +1791,43 @@ function buildGenerationRow(row, id = "", status = "accepted") {
 }
 
 function handleGenerationFormSubmit() {
-  const existing = state.generationRows.find((row) => row.id === state.generationEditingRowId);
-  const nextRow = buildGenerationRow({
-    name: elements.generationFormName.value,
-    dateKey: elements.generationFormDate.value,
-    startTime: elements.generationFormStart.value,
-    endTime: elements.generationFormEnd.value,
-    preferredAreas: [elements.generationFormArea.value],
-    himeReservation: elements.generationFormHime.value,
-    note: elements.generationFormNote.value
-  }, state.generationEditingRowId, existing?.status || "accepted");
+  if (generationSubmitUiState === "busy") return;
+  setGenerationSubmitUiState("busy");
+  window.requestAnimationFrame(() => {
+    const existing = state.generationRows.find((row) => row.id === state.generationEditingRowId);
+    const nextRow = buildGenerationRow({
+      name: elements.generationFormName.value,
+      dateKey: elements.generationFormDate.value,
+      startTime: elements.generationFormStart.value,
+      endTime: elements.generationFormEnd.value,
+      preferredAreas: [elements.generationFormArea.value],
+      himeReservation: elements.generationFormHime.value,
+      note: elements.generationFormNote.value
+    }, state.generationEditingRowId, existing?.status || "accepted");
 
-  if (existing) {
-    state.generationRows = state.generationRows.map((row) => row.id === existing.id ? nextRow : row);
-  } else {
-    state.generationRows = [...state.generationRows, nextRow];
-  }
+    if (existing) {
+      state.generationRows = state.generationRows.map((row) => row.id === existing.id ? nextRow : row);
+    } else {
+      state.generationRows = [...state.generationRows, nextRow];
+    }
 
-  state.generationEditingRowId = "";
-  state.generationWarnings = collectGenerationWarnings(state.generationRows);
-  markGenerationDirty();
-  persistState();
-  renderGeneration();
+    state.generationEditingRowId = "";
+    state.generationWarnings = collectGenerationWarnings(state.generationRows);
+    state.generatedSchedule = buildGeneratedSchedule();
+    recomputeAllScheduleState();
+    elements.generationResultNote.textContent = "個別調整を反映しました。";
+    persistState();
+    renderDashboard();
+    renderDistribution();
+    renderGeneration();
+    setGenerationSubmitUiState("success");
+    flashBoardUpdateStatus("反映しました。", "success");
+    if (generationSubmitFeedbackTimer) window.clearTimeout(generationSubmitFeedbackTimer);
+    generationSubmitFeedbackTimer = window.setTimeout(() => {
+      generationSubmitUiState = "idle";
+      renderGenerationForm();
+    }, 1000);
+  });
 }
 
 function handleGenerationSentTargetsClick(event) {
