@@ -314,7 +314,7 @@ function bindEvents() {
   elements.generationSentTargets?.addEventListener("click", handleGenerationSentTargetsClick);
   elements.generationRowSubmitButton?.addEventListener("click", handleGenerationFormSubmit);
   elements.generationRowCancelButton?.addEventListener("click", resetGenerationForm);
-  elements.requirementsList.addEventListener("change", handleRequirementChange);
+  elements.requirementsList?.addEventListener("change", handleRequirementChange);
   [
     elements.settingsDefaultEarlySlots,
     elements.settingsDefaultLateSlots,
