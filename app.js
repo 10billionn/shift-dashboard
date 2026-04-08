@@ -118,6 +118,7 @@ const elements = {
   generationFormNote: document.querySelector("#generationFormNote"),
   generationRowSubmitButton: document.querySelector("#generationRowSubmitButton"),
   generationRowCancelButton: document.querySelector("#generationRowCancelButton"),
+  generationPhaseStatus: document.querySelector("#generationPhaseStatus"),
   historyCsvInput: document.querySelector("#historyCsvInput"),
   historyCsvText: document.querySelector("#historyCsvText"),
   applyRequestCsvButton: document.querySelector("#applyRequestCsvButton"),
@@ -563,6 +564,12 @@ function renderGeneration() {
   elements.missingCount.textContent = `${missingTherapists.length}名`;
   if (elements.reviewCount) {
     elements.reviewCount.textContent = `${new Set(reviewRows.map((row) => row.name)).size}名`;
+  }
+  if (elements.generationPhaseStatus) {
+    elements.generationPhaseStatus.innerHTML = `
+      <span class="legend-chip normal">提出状況 ${missingTherapists.length ? `未提出 ${missingTherapists.length}名` : "未提出なし"}</span>
+      <span class="legend-chip normal">読込件数 ${state.generationRows.length}件</span>
+    `;
   }
   elements.generationAlerts.innerHTML = renderGenerationAlerts(checkSummary);
   elements.requestList.innerHTML = renderRequestRows();
@@ -1299,8 +1306,8 @@ function renderGenerationAlerts(checkSummary) {
   if (checkSummary.missing.length) {
     blocks.push(`
       <article class="alert-box warning">
-        <strong>未提出があります</strong>
-        <div>${checkSummary.missing.join(" / ")}</div>
+        <strong>未提出</strong>
+        <div>${checkSummary.missing.length}名</div>
       </article>
     `);
   }
@@ -1409,7 +1416,7 @@ function renderGenerationForm() {
   elements.generationFormArea.value = editingRow?.preferredArea || areas[0] || "";
   elements.generationFormHime.value = editingRow?.himeReservation === "あり" ? "あり" : "なし";
   elements.generationFormNote.value = editingRow?.note || "";
-  elements.generationRowSubmitButton.textContent = editingRow ? "更新" : "追加";
+  elements.generationRowSubmitButton.textContent = editingRow ? "更新" : "反映";
   elements.generationRowCancelButton.hidden = !editingRow;
 }
 

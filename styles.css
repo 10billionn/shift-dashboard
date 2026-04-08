@@ -1430,6 +1430,14 @@ pre {
   flex-wrap: wrap;
 }
 
+.generation-phase-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 12px;
+}
+
 .generation-import-head {
   display: grid;
   gap: 2px;
@@ -1635,6 +1643,10 @@ pre {
 
 .generation-manual-actions {
   justify-content: flex-end;
+}
+
+.generation-manual-actions .primary-button:active {
+  filter: brightness(0.97);
 }
 
 .generation-list-card .generation-import-head,
