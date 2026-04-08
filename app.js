@@ -1583,18 +1583,16 @@ function renderGenerationAlerts(checkSummary) {
 }
 
 function renderGenerationSentTargets() {
-  const therapistNames = Object.keys(samplePrototypeData.therapistProfiles).sort((left, right) => left.localeCompare(right, "ja"));
-  if (!therapistNames.length) {
-    return `<div class="empty-state">送信対象を選べるセラピストがありません。</div>`;
+  const targetNames = [...state.generationSentTargets].sort((left, right) => left.localeCompare(right, "ja"));
+  if (!targetNames.length) {
+    return `<div class="empty-state">提出対象はまだありません。</div>`;
   }
 
-  return therapistNames.map((name) => `
-    <button
-      class="generation-sent-chip ${state.generationSentTargets.includes(name) ? "active" : ""}"
-      type="button"
-      data-generation-sent-toggle="${name}"
-      aria-pressed="${state.generationSentTargets.includes(name) ? "true" : "false"}"
-    >${name}</button>
+  const submittedNames = new Set(state.generationRows.map((row) => row.name));
+  return targetNames.map((name) => `
+    <span class="generation-sent-chip ${submittedNames.has(name) ? "active" : ""}">
+      ${name}
+    </span>
   `).join("");
 }
 
@@ -1857,19 +1855,7 @@ function handleGenerationFormSubmit() {
 }
 
 function handleGenerationSentTargetsClick(event) {
-  const button = event.target.closest("[data-generation-sent-toggle]");
-  if (!button) return;
-  const name = button.dataset.generationSentToggle;
-  if (!name) return;
-
-  if (state.generationSentTargets.includes(name)) {
-    state.generationSentTargets = state.generationSentTargets.filter((item) => item !== name);
-  } else {
-    state.generationSentTargets = [...state.generationSentTargets, name].sort((left, right) => left.localeCompare(right, "ja"));
-  }
-
-  persistState();
-  renderGeneration();
+  return;
 }
 
 function renderBoardInspector(day) {
@@ -4137,12 +4123,11 @@ function getAssignmentsGroupedByTherapist() {
 
 function getDistributionItems() {
   if (state.distributionViewMode === "collect") {
-    const submittedNames = new Set(state.generationRows.map((row) => row.name));
-    return state.generationSentTargets
+    const therapistNames = Object.keys(samplePrototypeData.therapistProfiles).sort((left, right) => left.localeCompare(right, "ja"));
+    return therapistNames
       .map((name) => ({
         id: `request:${name}`,
-        name,
-        submitted: submittedNames.has(name)
+        name
       }))
       .sort((left, right) => left.name.localeCompare(right.name, "ja"));
   }
@@ -4276,8 +4261,13 @@ async function copyAllDistributionMessages() {
   try {
     await navigator.clipboard.writeText(text);
     state.copiedDistributionIds = [...new Set([...state.copiedDistributionIds, ...items.flatMap((item) => getDistributionItemAssignmentIds(item))])];
+    if (state.distributionViewMode === "collect") {
+      state.generationSentTargets = [...new Set([...state.generationSentTargets, ...items.map((item) => item.name)])]
+        .sort((left, right) => left.localeCompare(right, "ja"));
+    }
     persistState();
     renderDistribution();
+    renderGeneration();
     elements.copyStatus.textContent = state.distributionViewMode === "collect"
       ? "提出依頼をまとめてコピーしました。"
       : "配布メッセージをまとめてコピーしました。";
@@ -4299,9 +4289,14 @@ async function copyDistributionMessage() {
     await navigator.clipboard.writeText(text);
     if (selected) {
       state.copiedDistributionIds = [...new Set([...state.copiedDistributionIds, ...getDistributionItemAssignmentIds(selected)])];
+      if (state.distributionViewMode === "collect" && selected.name) {
+        state.generationSentTargets = [...new Set([...state.generationSentTargets, selected.name])]
+          .sort((left, right) => left.localeCompare(right, "ja"));
+      }
       persistState();
     }
     renderDistribution();
+    renderGeneration();
     elements.copyStatus.textContent = "コピーしました。";
     elements.copyStatus.className = "copy-status success";
   } catch (error) {
