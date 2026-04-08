@@ -243,7 +243,6 @@ function bindEvents() {
   });
 
   elements.reloadButton.addEventListener("click", () => {
-    if (!confirmUnsavedNavigation("サンプルを再読込する")) return;
     clearPersistedState();
     hydrateState(null);
     syncCsvTextsFromState();
@@ -267,7 +266,6 @@ function bindEvents() {
 
   elements.sidebarNav.querySelectorAll(".nav-item").forEach((button) => {
     button.addEventListener("click", () => {
-      if (!confirmUnsavedNavigation("画面を切り替える")) return;
       state.activeAppView = button.dataset.view;
       state.mobileMenuOpen = false;
       elements.sidebar.classList.remove("open");
@@ -433,13 +431,6 @@ function bindEvents() {
   elements.copyAllMessagesButton.addEventListener("click", copyAllDistributionMessages);
   elements.copyMessageButton.addEventListener("click", copyDistributionMessage);
   elements.backupSnapshotList?.addEventListener("click", handleBackupSnapshotListClick);
-
-  window.addEventListener("beforeunload", (event) => {
-    flushPersistedState();
-    if (!state.hasUnsavedChanges) return;
-    event.preventDefault();
-    event.returnValue = "";
-  });
 }
 
 function hydrateState(saved) {
@@ -4190,11 +4181,6 @@ function recomputeScheduleStateForDates(dateKeys) {
 
 function recomputeAllScheduleState() {
   recomputeScheduleStateForDates(state.dateList);
-}
-
-function confirmUnsavedNavigation(actionLabel) {
-  if (!state.hasUnsavedChanges) return true;
-  return window.confirm(`未保存の変更があります。${actionLabel}と保存前の調整内容が残ったままになります。続行しますか？`);
 }
 
 function isTimeOverlapping(left, right) {
