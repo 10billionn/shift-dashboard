@@ -258,8 +258,8 @@ function bindEvents() {
     });
   });
 
-  elements.requestList.addEventListener("click", handleRequestListClick);
-  elements.requestList.addEventListener("change", handleRequestListChange);
+  elements.requestList?.addEventListener("click", handleRequestListClick);
+  elements.requestList?.addEventListener("change", handleRequestListChange);
   elements.generationRowSubmitButton?.addEventListener("click", handleGenerationFormSubmit);
   elements.generationRowCancelButton?.addEventListener("click", resetGenerationForm);
   elements.requirementsList.addEventListener("change", handleRequirementChange);
@@ -572,7 +572,9 @@ function renderGeneration() {
     `;
   }
   elements.generationAlerts.innerHTML = renderGenerationAlerts(checkSummary);
-  elements.requestList.innerHTML = renderRequestRows();
+  if (elements.requestList) {
+    elements.requestList.innerHTML = renderRequestRows();
+  }
   elements.requirementsList.innerHTML = renderRequirements();
   renderGenerationForm();
   if (elements.generationDecisionSummary) {
