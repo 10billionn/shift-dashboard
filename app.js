@@ -42,6 +42,8 @@ const SNAPSHOT_STORAGE_KEY = "shift-dashboard-backups-v1";
 const SNAPSHOT_SCHEMA_VERSION = 1;
 let generationSubmitUiState = "idle";
 let generationSubmitFeedbackTimer = null;
+let settingsTherapistEditorName = "";
+let settingsTherapistEditorMode = "existing";
 const DASHBOARD_SLOT_COUNT = 7;
 let boardFeedbackTimer = null;
 let boardDragPayload = null;
@@ -587,6 +589,10 @@ function renderSettings() {
   elements.settingsAreas.value = settings.areas.join("\n");
   elements.settingsRoomNames.value = settings.roomNames.join("\n");
   if (elements.settingsTherapistMasterList) {
+    const names = Object.keys(settings.therapistMaster || {}).sort((left, right) => left.localeCompare(right, "ja"));
+    if (settingsTherapistEditorMode !== "new" && (!settingsTherapistEditorName || !names.includes(settingsTherapistEditorName))) {
+      settingsTherapistEditorName = names[0] || "";
+    }
     elements.settingsTherapistMasterList.innerHTML = renderTherapistMasterSettings();
   }
   renderBackupPanel();
@@ -594,15 +600,32 @@ function renderSettings() {
 
 function renderTherapistMasterSettings() {
   const settings = getAppSettings();
-  return Object.values(settings.therapistMaster || {}).map((entry) => `
-    <article class="settings-therapist-master-row" data-therapist-master-name="${escapeHtml(entry.name)}">
-      <div class="settings-therapist-master-head">
-        <strong>${escapeHtml(entry.name)}</strong>
+  const names = Object.keys(settings.therapistMaster || {}).sort((left, right) => left.localeCompare(right, "ja"));
+  const entry = settingsTherapistEditorMode === "new"
+    ? { name: "", mainArea: "", availableAreas: [], ngAreas: [], note: "" }
+    : settings.therapistMaster?.[settingsTherapistEditorName] || createTherapistMasterEntry(names[0] || "");
+  return `
+    <div class="settings-therapist-master-toolbar">
+      <label class="field-block wide">
+        <span class="field-label">セラピスト選択</span>
+        <select id="settingsTherapistMasterSelect" class="select-input">
+          ${names.map((name) => `<option value="${escapeHtml(name)}" ${name === settingsTherapistEditorName && settingsTherapistEditorMode !== "new" ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
+        </select>
+      </label>
+      <div class="settings-therapist-master-actions">
+        <button id="settingsTherapistAddButton" class="ghost-button" type="button">新規追加</button>
+        <button id="settingsTherapistDeleteButton" class="ghost-button" type="button" ${settingsTherapistEditorMode === "new" || !entry.name ? "disabled" : ""}>削除</button>
       </div>
+    </div>
+    <article class="settings-therapist-master-row">
       <div class="settings-therapist-master-grid">
         <label class="field-block">
+          <span class="field-label">名前</span>
+          <input id="settingsTherapistMasterName" class="text-input" type="text" value="${escapeHtml(entry.name)}" placeholder="セラピスト名">
+        </label>
+        <label class="field-block">
           <span class="field-label">メインエリア</span>
-          <select class="select-input" data-master-field="mainArea">
+          <select id="settingsTherapistMasterMainArea" class="select-input">
             <option value="">未設定</option>
             ${settings.areas.map((area) => `<option value="${escapeHtml(area)}" ${area === entry.mainArea ? "selected" : ""}>${escapeHtml(area)}</option>`).join("")}
           </select>
@@ -612,7 +635,7 @@ function renderTherapistMasterSettings() {
           <div class="settings-master-checks">
             ${settings.areas.map((area) => `
               <label class="filter-check compact">
-                <input type="checkbox" data-master-field="availableAreas" value="${escapeHtml(area)}" ${entry.availableAreas.includes(area) ? "checked" : ""}>
+                <input type="checkbox" data-master-editor="availableAreas" value="${escapeHtml(area)}" ${entry.availableAreas.includes(area) ? "checked" : ""}>
                 <span>${escapeHtml(area)}</span>
               </label>
             `).join("")}
@@ -623,7 +646,7 @@ function renderTherapistMasterSettings() {
           <div class="settings-master-checks">
             ${settings.areas.map((area) => `
               <label class="filter-check compact">
-                <input type="checkbox" data-master-field="ngAreas" value="${escapeHtml(area)}" ${entry.ngAreas.includes(area) ? "checked" : ""}>
+                <input type="checkbox" data-master-editor="ngAreas" value="${escapeHtml(area)}" ${entry.ngAreas.includes(area) ? "checked" : ""}>
                 <span>${escapeHtml(area)}</span>
               </label>
             `).join("")}
@@ -631,11 +654,14 @@ function renderTherapistMasterSettings() {
         </label>
         <label class="field-block wide">
           <span class="field-label">備考</span>
-          <input type="text" class="text-input" data-master-field="note" value="${escapeHtml(entry.note)}" placeholder="補助メモ">
+          <input id="settingsTherapistMasterNote" type="text" class="text-input" value="${escapeHtml(entry.note)}" placeholder="補助メモ">
         </label>
       </div>
+      <div class="settings-therapist-master-footer">
+        <button id="settingsTherapistSaveButton" class="primary-button" type="button">保存</button>
+      </div>
     </article>
-  `).join("");
+  `;
 }
 
 function renderDashboard() {
@@ -2895,24 +2921,63 @@ function handleSettingsChange() {
 }
 
 function handleTherapistMasterChange(event) {
-  const row = event.target.closest("[data-therapist-master-name]");
-  if (!row) return;
-  const name = row.dataset.therapistMasterName;
-  const settings = getAppSettings();
-  const current = { ...(settings.therapistMaster?.[name] || createTherapistMasterEntry(name)) };
-  current.mainArea = sanitizeText(row.querySelector('[data-master-field="mainArea"]')?.value);
-  current.availableAreas = [...new Set(Array.from(row.querySelectorAll('[data-master-field="availableAreas"]:checked')).map((input) => input.value).filter(Boolean))];
-  current.ngAreas = [...new Set(Array.from(row.querySelectorAll('[data-master-field="ngAreas"]:checked')).map((input) => input.value).filter(Boolean))];
-  current.note = sanitizeText(row.querySelector('[data-master-field="note"]')?.value);
-  state.appSettings = normalizeAppSettings({
-    ...settings,
-    therapistMaster: {
-      ...settings.therapistMaster,
-      [name]: current
+  const target = event.target;
+  if (target.id === "settingsTherapistMasterSelect") {
+    settingsTherapistEditorMode = "existing";
+    settingsTherapistEditorName = target.value;
+    renderSettings();
+    return;
+  }
+  if (target.id === "settingsTherapistAddButton") {
+    settingsTherapistEditorMode = "new";
+    settingsTherapistEditorName = "";
+    renderSettings();
+    return;
+  }
+  if (target.id === "settingsTherapistDeleteButton") {
+    const currentName = settingsTherapistEditorName;
+    if (!currentName) return;
+    if (!window.confirm(`${currentName} を削除しますか？`)) return;
+    const settings = getAppSettings();
+    const nextMaster = { ...settings.therapistMaster };
+    delete nextMaster[currentName];
+    state.appSettings = normalizeAppSettings({
+      ...settings,
+      therapistMaster: nextMaster
+    });
+    settingsTherapistEditorMode = "existing";
+    settingsTherapistEditorName = Object.keys(state.appSettings.therapistMaster || {}).sort((left, right) => left.localeCompare(right, "ja"))[0] || "";
+    persistState();
+    renderSettings();
+    return;
+  }
+  if (target.id === "settingsTherapistSaveButton") {
+    const settings = getAppSettings();
+    const nextName = normalizeTherapistName(elements.settingsTherapistMasterList.querySelector("#settingsTherapistMasterName")?.value);
+    if (!nextName) return;
+    const previousName = settingsTherapistEditorMode === "new" ? "" : settingsTherapistEditorName;
+    const nextEntry = {
+      name: nextName,
+      mainArea: sanitizeText(elements.settingsTherapistMasterList.querySelector("#settingsTherapistMasterMainArea")?.value),
+      availableAreas: [...new Set(Array.from(elements.settingsTherapistMasterList.querySelectorAll('[data-master-editor="availableAreas"]:checked')).map((input) => input.value).filter(Boolean))],
+      ngAreas: [...new Set(Array.from(elements.settingsTherapistMasterList.querySelectorAll('[data-master-editor="ngAreas"]:checked')).map((input) => input.value).filter(Boolean))],
+      note: sanitizeText(elements.settingsTherapistMasterList.querySelector("#settingsTherapistMasterNote")?.value)
+    };
+    const nextMaster = { ...settings.therapistMaster };
+    if (previousName && previousName !== nextName) {
+      delete nextMaster[previousName];
     }
-  });
-  markGenerationDirty();
-  persistState();
+    nextMaster[nextName] = nextEntry;
+    state.appSettings = normalizeAppSettings({
+      ...settings,
+      therapistMaster: nextMaster
+    });
+    settingsTherapistEditorMode = "existing";
+    settingsTherapistEditorName = nextName;
+    markGenerationDirty();
+    persistState();
+    renderSettings();
+  }
 }
 
 function applyRequestCsv() {
