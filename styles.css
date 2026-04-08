@@ -1703,6 +1703,38 @@ pre {
   grid-column: 1 / -1;
 }
 
+.settings-therapist-master-list {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-therapist-master-row {
+  border: 1px solid rgba(198, 210, 226, 0.55);
+  border-radius: 12px;
+  background: rgba(248, 250, 253, 0.88);
+  padding: 14px 16px;
+}
+
+.settings-therapist-master-head {
+  margin-bottom: 10px;
+}
+
+.settings-therapist-master-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.settings-master-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+.filter-check.compact {
+  margin: 0;
+}
+
 .compact-textarea {
   min-height: 120px;
 }

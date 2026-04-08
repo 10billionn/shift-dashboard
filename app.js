@@ -178,6 +178,7 @@ const elements = {
   settingsStoreRate: document.querySelector("#settingsStoreRate"),
   settingsAreas: document.querySelector("#settingsAreas"),
   settingsRoomNames: document.querySelector("#settingsRoomNames"),
+  settingsTherapistMasterList: document.querySelector("#settingsTherapistMasterList"),
   backupAutosaveStatus: document.querySelector("#backupAutosaveStatus"),
   createBackupButton: document.querySelector("#createBackupButton"),
   exportBackupButton: document.querySelector("#exportBackupButton"),
@@ -331,6 +332,8 @@ function bindEvents() {
     elements.settingsAreas,
     elements.settingsRoomNames
   ].forEach((input) => input?.addEventListener("change", handleSettingsChange));
+  elements.settingsTherapistMasterList?.addEventListener("change", handleTherapistMasterChange);
+  elements.settingsTherapistMasterList?.addEventListener("input", handleTherapistMasterChange);
   [elements.earlyShiftList, elements.lateShiftList].forEach((list) => {
     list.addEventListener("dragstart", handleShiftDragStart);
     list.addEventListener("dragend", handleShiftDragEnd);
@@ -581,7 +584,56 @@ function renderSettings() {
   elements.settingsStoreRate.value = settings.storeRate;
   elements.settingsAreas.value = settings.areas.join("\n");
   elements.settingsRoomNames.value = settings.roomNames.join("\n");
+  if (elements.settingsTherapistMasterList) {
+    elements.settingsTherapistMasterList.innerHTML = renderTherapistMasterSettings();
+  }
   renderBackupPanel();
+}
+
+function renderTherapistMasterSettings() {
+  const settings = getAppSettings();
+  return Object.values(settings.therapistMaster || {}).map((entry) => `
+    <article class="settings-therapist-master-row" data-therapist-master-name="${escapeHtml(entry.name)}">
+      <div class="settings-therapist-master-head">
+        <strong>${escapeHtml(entry.name)}</strong>
+      </div>
+      <div class="settings-therapist-master-grid">
+        <label class="field-block">
+          <span class="field-label">メインエリア</span>
+          <select class="select-input" data-master-field="mainArea">
+            <option value="">未設定</option>
+            ${settings.areas.map((area) => `<option value="${escapeHtml(area)}" ${area === entry.mainArea ? "selected" : ""}>${escapeHtml(area)}</option>`).join("")}
+          </select>
+        </label>
+        <label class="field-block wide">
+          <span class="field-label">対応可能エリア</span>
+          <div class="settings-master-checks">
+            ${settings.areas.map((area) => `
+              <label class="filter-check compact">
+                <input type="checkbox" data-master-field="availableAreas" value="${escapeHtml(area)}" ${entry.availableAreas.includes(area) ? "checked" : ""}>
+                <span>${escapeHtml(area)}</span>
+              </label>
+            `).join("")}
+          </div>
+        </label>
+        <label class="field-block wide">
+          <span class="field-label">NGエリア</span>
+          <div class="settings-master-checks">
+            ${settings.areas.map((area) => `
+              <label class="filter-check compact">
+                <input type="checkbox" data-master-field="ngAreas" value="${escapeHtml(area)}" ${entry.ngAreas.includes(area) ? "checked" : ""}>
+                <span>${escapeHtml(area)}</span>
+              </label>
+            `).join("")}
+          </div>
+        </label>
+        <label class="field-block wide">
+          <span class="field-label">備考</span>
+          <input type="text" class="text-input" data-master-field="note" value="${escapeHtml(entry.note)}" placeholder="補助メモ">
+        </label>
+      </div>
+    </article>
+  `).join("");
 }
 
 function renderDashboard() {
@@ -1704,7 +1756,8 @@ function resetGenerationForm() {
 }
 
 function buildGenerationRow(row, id = "", status = "accepted") {
-  const preferredAreas = normalizePreferredAreas(row.preferredAreas ?? row.preferredArea);
+  const explicitPreferredAreas = normalizePreferredAreas(row.preferredAreas ?? row.preferredArea);
+  const preferredAreas = explicitPreferredAreas.length ? explicitPreferredAreas : getTherapistDefaultPreferredAreas(row.name);
   const built = {
     id: id || `${normalizeDateKey(row.dateKey)}-${sanitizeText(row.name)}-${Date.now()}`,
     name: normalizeTherapistName(row.name),
@@ -2810,6 +2863,27 @@ function handleSettingsChange() {
   }
 }
 
+function handleTherapistMasterChange(event) {
+  const row = event.target.closest("[data-therapist-master-name]");
+  if (!row) return;
+  const name = row.dataset.therapistMasterName;
+  const settings = getAppSettings();
+  const current = { ...(settings.therapistMaster?.[name] || createTherapistMasterEntry(name)) };
+  current.mainArea = sanitizeText(row.querySelector('[data-master-field="mainArea"]')?.value);
+  current.availableAreas = [...new Set(Array.from(row.querySelectorAll('[data-master-field="availableAreas"]:checked')).map((input) => input.value).filter(Boolean))];
+  current.ngAreas = [...new Set(Array.from(row.querySelectorAll('[data-master-field="ngAreas"]:checked')).map((input) => input.value).filter(Boolean))];
+  current.note = sanitizeText(row.querySelector('[data-master-field="note"]')?.value);
+  state.appSettings = normalizeAppSettings({
+    ...settings,
+    therapistMaster: {
+      ...settings.therapistMaster,
+      [name]: current
+    }
+  });
+  markGenerationDirty();
+  persistState();
+}
+
 function applyRequestCsv() {
   const parsed = parseRequestCsv(requestCsvDraftText);
   state.generationRows = createGenerationRows(parsed.rows);
@@ -3903,8 +3977,11 @@ function scoreGenerationRow(row) {
 }
 
 function supportsArea(name, area) {
-  const profile = samplePrototypeData.therapistProfiles[name];
-  return !profile || !profile.areas || profile.areas.includes(area);
+  const master = getTherapistMasterEntry(name);
+  if (!area) return true;
+  if (master.ngAreas.includes(area)) return false;
+  if (!master.availableAreas.length) return true;
+  return master.availableAreas.includes(area) || master.mainArea === area;
 }
 
 function buildPriorityTags(item) {
@@ -4456,10 +4533,51 @@ function normalizePreferredAreas(value) {
   return [...new Set(normalized)];
 }
 
+function createTherapistMasterEntry(name, profile = samplePrototypeData.therapistProfiles[name] || {}) {
+  const normalizedAreas = normalizePreferredAreas(profile.areas || []);
+  return {
+    name,
+    mainArea: normalizedAreas[0] || "",
+    availableAreas: normalizedAreas,
+    ngAreas: normalizePreferredAreas(profile.ngAreas || []),
+    note: sanitizeText(profile.note)
+  };
+}
+
+function normalizeTherapistMasterMap(master = {}) {
+  const allNames = Array.from(new Set([
+    ...Object.keys(samplePrototypeData.therapistProfiles || {}),
+    ...Object.keys(master || {})
+  ])).sort((left, right) => left.localeCompare(right, "ja"));
+  return allNames.reduce((accumulator, name) => {
+    const base = createTherapistMasterEntry(name);
+    const saved = master?.[name] || {};
+    accumulator[name] = {
+      name,
+      mainArea: sanitizeText(saved.mainArea || base.mainArea),
+      availableAreas: normalizePreferredAreas(saved.availableAreas || base.availableAreas),
+      ngAreas: normalizePreferredAreas(saved.ngAreas || base.ngAreas),
+      note: sanitizeText(saved.note || base.note)
+    };
+    return accumulator;
+  }, {});
+}
+
+function getTherapistMasterEntry(name) {
+  return getAppSettings().therapistMaster?.[normalizeTherapistName(name)] || createTherapistMasterEntry(normalizeTherapistName(name));
+}
+
+function getTherapistDefaultPreferredAreas(name) {
+  const master = getTherapistMasterEntry(name);
+  return master.mainArea ? [master.mainArea] : [];
+}
+
 function getPreferredAreas(item) {
   if (!item) return [];
-  if (Array.isArray(item.preferredAreas)) return normalizePreferredAreas(item.preferredAreas);
-  return normalizePreferredAreas(item.preferredArea);
+  const explicitAreas = Array.isArray(item.preferredAreas)
+    ? normalizePreferredAreas(item.preferredAreas)
+    : normalizePreferredAreas(item.preferredArea);
+  return explicitAreas.length ? explicitAreas : getTherapistDefaultPreferredAreas(item.name);
 }
 
 function normalizeCsvTime(value) {
@@ -4612,6 +4730,7 @@ function normalizeAppSettings(settings) {
     businessEndHour: Number(settings.businessEndHour) || samplePrototypeData.settings.businessEndHour || 27,
     areas: Array.isArray(settings.areas) && settings.areas.length ? settings.areas : [...samplePrototypeData.settings.areas],
     roomNames: Array.isArray(settings.roomNames) && settings.roomNames.length ? settings.roomNames : Array.from({ length: Math.max(samplePrototypeData.settings.defaultEarlySlots || DASHBOARD_SLOT_COUNT, 7) }, (_, index) => `Room ${index + 1}`),
+    therapistMaster: normalizeTherapistMasterMap(settings.therapistMaster),
     shiftLabels: settings.shiftLabels || samplePrototypeData.settings.shiftLabels,
     averageUnitPrice: Number(settings.averageUnitPrice) || samplePrototypeData.settings.averageUnitPrice,
     storeRate: Number(settings.storeRate) || samplePrototypeData.settings.storeRate
