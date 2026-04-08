@@ -79,6 +79,7 @@ const elements = {
   saveScheduleButton: document.querySelector("#saveScheduleButton"),
   reloadButton: document.querySelector("#reloadButton"),
   selectedDateLabel: document.querySelector("#selectedDateLabel"),
+  selectedDatePicker: document.querySelector("#selectedDatePicker"),
   prevDayButton: document.querySelector("#prevDayButton"),
   todayButton: document.querySelector("#todayButton"),
   nextDayButton: document.querySelector("#nextDayButton"),
@@ -194,6 +195,11 @@ function bindEvents() {
   elements.prevDayButton.addEventListener("click", () => moveDate(-1));
   elements.todayButton.addEventListener("click", jumpToStartDate);
   elements.nextDayButton.addEventListener("click", () => moveDate(1));
+  elements.selectedDateLabel?.addEventListener("click", openSelectedDatePicker);
+  elements.selectedDatePicker?.addEventListener("change", () => {
+    if (!elements.selectedDatePicker.value) return;
+    updateSelectedDate(elements.selectedDatePicker.value);
+  });
 
   elements.sidebarNav.querySelectorAll(".nav-item").forEach((button) => {
     button.addEventListener("click", () => {
@@ -480,6 +486,11 @@ function renderDashboard() {
   const displayFillRate = displayNeeded ? Math.round((displayFilled / displayNeeded) * 100) : 100;
 
   elements.selectedDateLabel.textContent = `${formatDisplayDate(state.selectedDate)} (${formatWeekday(state.selectedDate)})`;
+  if (elements.selectedDatePicker) {
+    elements.selectedDatePicker.value = state.selectedDate;
+    elements.selectedDatePicker.min = state.dateList[0] || "";
+    elements.selectedDatePicker.max = state.dateList[state.dateList.length - 1] || "";
+  }
   elements.earlyCount.textContent = `${earlyFilled}/${earlySlotTotal}枠`;
   elements.lateCount.textContent = `${lateFilled}/${lateSlotTotal}枠`;
   elements.cutCount.textContent = `${cutRows.length}名`;
@@ -3845,6 +3856,16 @@ function moveDate(offset) {
 
 function jumpToStartDate() {
   updateSelectedDate(samplePrototypeData.settings.startDate);
+}
+
+function openSelectedDatePicker() {
+  if (!elements.selectedDatePicker) return;
+  elements.selectedDatePicker.value = state.selectedDate;
+  if (typeof elements.selectedDatePicker.showPicker === "function") {
+    elements.selectedDatePicker.showPicker();
+    return;
+  }
+  elements.selectedDatePicker.click();
 }
 
 function updateSelectedDate(nextDateKey) {

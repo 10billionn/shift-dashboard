@@ -318,6 +318,32 @@ pre {
   color: rgba(255, 255, 255, 0.9);
 }
 
+.selected-date-trigger {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.16s ease, opacity 0.16s ease;
+}
+
+.selected-date-trigger:hover {
+  color: rgba(255, 255, 255, 1);
+  opacity: 1;
+}
+
+.selected-date-trigger:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.45);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.selected-date-picker-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .panel-head,
 .subsection-head,
 .toolbar-row,
