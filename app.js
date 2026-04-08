@@ -1466,13 +1466,15 @@ function resetGenerationForm() {
 }
 
 function buildGenerationRow(row, id = "", status = "accepted") {
+  const preferredAreas = normalizePreferredAreas(row.preferredAreas ?? row.preferredArea);
   const built = {
     id: id || `${normalizeDateKey(row.dateKey)}-${sanitizeText(row.name)}-${Date.now()}`,
     name: normalizeTherapistName(row.name),
     dateKey: normalizeDateKey(row.dateKey),
     startTime: normalizeCsvTime(row.startTime),
     endTime: normalizeCsvTime(row.endTime),
-    preferredArea: normalizeAreaName(row.preferredArea),
+    preferredAreas,
+    preferredArea: preferredAreas[0] || "",
     himeReservation: normalizeHimeValue(row.himeReservation),
     note: sanitizeText(row.note),
     status: ["accepted", "hold", "cut"].includes(status) ? status : "accepted"
@@ -1488,7 +1490,7 @@ function handleGenerationFormSubmit() {
     dateKey: elements.generationFormDate.value,
     startTime: elements.generationFormStart.value,
     endTime: elements.generationFormEnd.value,
-    preferredArea: elements.generationFormArea.value,
+    preferredAreas: [elements.generationFormArea.value],
     himeReservation: elements.generationFormHime.value,
     note: elements.generationFormNote.value
   }, state.generationEditingRowId, existing?.status || "accepted");
@@ -1540,31 +1542,44 @@ function renderBoardInspector(day) {
       normalizeRoomIndex(assignment.roomIndex, position?.slotIndex ?? 0),
       assignment.assignedArea || assignment.preferredArea
     ).area || visualMeta.currentArea;
+  const preferredAreas = getPreferredAreas(assignment);
+  const hasFlexiblePreferredArea = preferredAreas.includes("どこでも可");
+  const preferredAreaMatchIndex = currentArea ? preferredAreas.findIndex((area) => area === currentArea) : -1;
+  const isPreferredAreaMatch = preferredAreaMatchIndex >= 0;
   const settings = getAppSettings();
   const startMinutes = toMinutes(assignment.startTime);
   const endMinutes = toMinutes(assignment.endTime);
   const isInvalidTime = startMinutes >= endMinutes
     || startMinutes < settings.businessStartHour * 60
     || endMinutes > settings.businessEndHour * 60;
-  const hasAreaMismatch = Boolean(assignment.preferredArea)
-    && currentArea
-    && assignment.preferredArea !== currentArea;
   const displayStatusLabel = isAdjustmentLane
     ? "調整中"
-    : hasAreaMismatch
-      ? "エリア不一致"
-      : "一致";
+    : !preferredAreas.length || hasFlexiblePreferredArea
+      ? "要確認"
+      : isPreferredAreaMatch
+        ? "希望内"
+        : "希望外";
   const ibMinutes = Number(profile.ibMinutes) > 0 ? Number(profile.ibMinutes) : 0;
   const statusClass = isAdjustmentLane
     ? "status-pending"
-    : hasAreaMismatch
+    : !preferredAreas.length || hasFlexiblePreferredArea
+      ? "status-review"
+      : !isPreferredAreaMatch
       ? "status-mismatch"
       : "status-match";
   const himeClass = assignment.himeReservation === "あり" ? "hime-yes" : "hime-no";
-  const preferredAreaClass = assignment.preferredArea ? `area-chip area-${areaClassName(assignment.preferredArea)}` : "";
+  const preferredAreaTags = preferredAreas.length
+    ? preferredAreas.map((area, index) => `
+        <span class="field-value area-chip area-${areaClassName(area)} ${currentArea === area ? "area-chip-active" : ""}">
+          ${escapeHtml(area)}${currentArea === area && preferredAreaMatchIndex > 0 ? `<span class="area-chip-rank">第${index + 1}希望</span>` : ""}
+        </span>
+      `).join("")
+    : `<span class="field-value area-chip area-default">未設定</span>`;
   const checkPoints = [
     ...(isAdjustmentLane ? ["調整中（未配置）"] : []),
-    ...(!isAdjustmentLane && hasAreaMismatch ? ["希望エリアと不一致"] : []),
+    ...(!preferredAreas.length ? ["希望未設定"] : []),
+    ...(!isAdjustmentLane && !hasFlexiblePreferredArea && preferredAreas.length && !isPreferredAreaMatch ? ["希望外配置"] : []),
+    ...(!isAdjustmentLane && isPreferredAreaMatch && preferredAreaMatchIndex > 0 ? ["第2希望以降で配置"] : []),
     ...(assignment.himeReservation === "あり" ? ["姫ありのため優先配置"] : []),
   ];
 
@@ -1580,7 +1595,7 @@ function renderBoardInspector(day) {
           <div class="board-inspector-meta">
             <div class="board-inspector-meta-item">
               <span class="field-label">希望エリア</span>
-              <span class="field-value ${preferredAreaClass}">${assignment.preferredArea || "未設定"}</span>
+              <div class="board-inspector-area-list">${preferredAreaTags}</div>
             </div>
             <div class="board-inspector-meta-item">
               <span class="field-label">ステータス</span>
@@ -2638,7 +2653,7 @@ function toAssignment(row, shiftType, dateKey, requirement, acceptedRows) {
   const settings = getAppSettings();
   const reasonTags = [];
   if (row.himeReservation === "あり") reasonTags.push("姫優先");
-  if (supportsArea(row.name, row.preferredArea)) reasonTags.push("エリア適正");
+  if (row.preferredArea && supportsArea(row.name, row.preferredArea)) reasonTags.push("エリア適正");
   if ((shiftType === "late" && toMinutes(row.endTime) >= 21 * 60) || (shiftType === "early" && toMinutes(row.startTime) <= 12 * 60)) {
     reasonTags.push("時間帯優先");
   }
@@ -2651,6 +2666,7 @@ function toAssignment(row, shiftType, dateKey, requirement, acceptedRows) {
     name: row.name,
     shiftType,
     shiftLabel: shiftType === "early" ? settings.shiftLabels.early : settings.shiftLabels.late,
+    preferredAreas: getPreferredAreas(row),
     preferredArea: row.preferredArea,
     assignedArea: row.preferredArea,
     startTime: row.startTime,
@@ -2680,6 +2696,7 @@ function syncSelectedBoardAssignment() {
 function updateAssignmentArea(assignmentId, nextArea, options = {}) {
   const row = state.generationRows.find((item) => item.id === assignmentId);
   if (row) {
+    row.preferredAreas = [nextArea];
     row.preferredArea = nextArea;
     row.issues = collectRowIssues(row);
   }
@@ -2688,6 +2705,7 @@ function updateAssignmentArea(assignmentId, nextArea, options = {}) {
     [...day.earlyAssignments, ...day.lateAssignments].forEach((assignment) => {
       if (!assignment) return;
       if (assignment.id !== assignmentId) return;
+      assignment.preferredAreas = [nextArea];
       assignment.preferredArea = nextArea;
       assignment.assignedArea = nextArea;
       assignment.warningArea = !supportsArea(assignment.name, nextArea);
@@ -3261,14 +3279,14 @@ function parseRequestCsv(text) {
     const normalizedDateKey = normalizeCsvDateKey(rawDate);
     const normalizedStart = normalizeCsvTime(rawStart);
     const normalizedEnd = normalizeCsvTime(rawEnd);
-    const normalizedArea = normalizeAreaName(rawArea);
+    const normalizedAreas = normalizePreferredAreas(rawArea);
     const normalizedHime = normalizeHimeValue(record["姫予約有無"]);
     const normalizedNote = sanitizeText(record["備考"]);
 
     if (!normalizedName) rowErrors.push("名前が不足しています");
     if (!normalizedDateKey) rowErrors.push("日付が不足または不正です");
     if (!normalizedStart || !normalizedEnd) rowErrors.push("開始または終了時刻が不正です");
-    if (!normalizedArea) rowErrors.push(rawArea ? "希望エリア名が未登録です" : "希望エリアが不足しています");
+    if (!normalizedAreas.length) rowErrors.push(rawArea ? "希望エリア名が未登録です" : "希望エリアが不足しています");
     if (normalizedName && !samplePrototypeData.therapistProfiles[normalizedName]) rowErrors.push("セラピスト名が未登録です");
 
     if (normalizedStart && normalizedEnd) {
@@ -3305,7 +3323,8 @@ function parseRequestCsv(text) {
       dateKey: normalizedDateKey,
       startTime: normalizedStart,
       endTime: normalizedEnd,
-      preferredArea: normalizedArea,
+      preferredAreas: normalizedAreas,
+      preferredArea: normalizedAreas[0] || "",
       himeReservation: normalizedHime,
       note: normalizedNote
     });
@@ -3344,12 +3363,13 @@ function createGenerationRows(rows) {
 }
 
 function collectRowIssues(row) {
+  const preferredAreas = getPreferredAreas(row);
   const issues = [];
   if (!row.startTime || !row.endTime) issues.push("時間未入力");
-  if (!row.preferredArea) issues.push("希望エリア未入力");
+  if (!preferredAreas.length) issues.push("希望エリア未入力");
   if (row.himeReservation !== "あり" && row.himeReservation !== "なし") issues.push("姫予約未設定");
-  if (row.preferredArea && !getAppSettings().areas.includes(row.preferredArea)) issues.push("非対応エリア含む");
-  if (row.name && row.preferredArea && !supportsArea(row.name, row.preferredArea)) issues.push("担当エリア要確認");
+  if (preferredAreas.some((area) => area !== "どこでも可" && !getAppSettings().areas.includes(area))) issues.push("非対応エリア含む");
+  if (row.name && preferredAreas.some((area) => area !== "どこでも可" && !supportsArea(row.name, area))) issues.push("担当エリア要確認");
   return issues;
 }
 
@@ -3934,6 +3954,7 @@ function buildBoardAdjustmentAssignment(row) {
     name: row.name,
     shiftType,
     shiftLabel: shiftType === "late" ? settings.shiftLabels.late : settings.shiftLabels.early,
+    preferredAreas: getPreferredAreas(row),
     preferredArea: row.preferredArea,
     assignedArea: row.preferredArea,
     roomIndex: -1,
@@ -4026,7 +4047,7 @@ function getWeeklyWeekdayClass(dateKey) {
 }
 function buildRequestCsv(rows) {
   const header = ["名前", "出勤可能日", "出勤開始時間", "出勤終了時間", "希望エリア", "姫予約有無", "備考"];
-  const body = rows.map((row) => [row.name, row.dateKey, row.startTime, row.endTime, row.preferredArea, row.himeReservation, row.note || ""]);
+  const body = rows.map((row) => [row.name, row.dateKey, row.startTime, row.endTime, getPreferredAreas(row).join("|"), row.himeReservation, row.note || ""]);
   return [header, ...body].map((line) => line.join(",")).join("\n");
 }
 
@@ -4082,6 +4103,22 @@ function normalizeAreaName(value) {
   if (aliasMatch) return aliasMatch[1];
   const areaMatch = getAppSettings().areas.find((area) => normalizeTextKey(area) === normalizedKey);
   return areaMatch || "";
+}
+
+function normalizePreferredAreas(value) {
+  const list = Array.isArray(value) ? value : String(value || "").split("|");
+  const normalized = list
+    .map((item) => sanitizeText(item))
+    .filter(Boolean)
+    .map((item) => normalizeTextKey(item) === normalizeTextKey("どこでも可") ? "どこでも可" : normalizeAreaName(item))
+    .filter(Boolean);
+  return [...new Set(normalized)];
+}
+
+function getPreferredAreas(item) {
+  if (!item) return [];
+  if (Array.isArray(item.preferredAreas)) return normalizePreferredAreas(item.preferredAreas);
+  return normalizePreferredAreas(item.preferredArea);
 }
 
 function normalizeCsvTime(value) {
@@ -4379,6 +4416,7 @@ function persistState() {
         dateKey: row.dateKey,
         startTime: row.startTime,
         endTime: row.endTime,
+        preferredAreas: getPreferredAreas(row),
         preferredArea: row.preferredArea,
         himeReservation: row.himeReservation,
         note: row.note,

@@ -3034,6 +3034,12 @@ button.weekly-day {
   font-size: 0.71rem;
 }
 
+.board-inspector-area-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .board-inspector .field-value.area-chip.area-kasai {
   background: color-mix(in srgb, var(--area-kasai) 12%, white);
   color: var(--area-kasai);
@@ -3068,6 +3074,17 @@ button.weekly-day {
   background: color-mix(in srgb, var(--area-default) 12%, white);
   color: var(--area-default);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--area-default) 18%, white);
+}
+
+.board-inspector .field-value.area-chip.area-chip-active {
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px currentColor, 0 0 0 2px rgba(17, 36, 63, 0.06);
+}
+
+.board-inspector .area-chip-rank {
+  margin-left: 6px;
+  font-size: 0.6rem;
+  opacity: 0.78;
 }
 
 .board-editor-grid {
@@ -3229,6 +3246,12 @@ button.weekly-day {
   color: rgba(90, 104, 123, 0.86);
   background: rgba(238, 242, 246, 0.92);
   box-shadow: inset 0 0 0 1px rgba(190, 201, 215, 0.28);
+}
+
+.board-inspector .field-value.status-review {
+  color: #9b5d1c;
+  background: rgba(255, 247, 223, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(201, 152, 25, 0.14);
 }
 
 .board-inspector .field-value.hime-yes {
