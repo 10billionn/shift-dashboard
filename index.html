@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-    <link rel="stylesheet" href="styles.css?v=202604082040">
+    <link rel="stylesheet" href="styles.css?v=202604082055">
 </head>
 <body>
   <div class="app-shell">
@@ -282,45 +282,29 @@
                 </div>
               </section>
 
-              <details class="stack-block generation-stage generation-stage-requirements generation-secondary-detail">
-                <summary class="generation-detail-summary">
-                  <div>
-                    <p class="stage-kicker">補足設定</p>
-                    <h3>必要人数を調整する</h3>
-                  </div>
-                  <span class="section-collapse-indicator" aria-hidden="true"></span>
-                </summary>
-                <div class="generation-detail-body">
-                  <div id="requirementsList" class="requirements-list"></div>
-                </div>
-              </details>
-
               <details class="stack-block generation-stage generation-stage-validation generation-secondary-detail">
                 <summary class="generation-detail-summary">
                   <div>
-                    <p class="stage-kicker">詳細確認</p>
-                    <h3>希望一覧を確認する</h3>
-                    <p class="section-note">必要な時だけ、行ごとの希望と調整内容を確認します</p>
+                    <p class="stage-kicker">補助情報</p>
+                    <h3>配置判断データ</h3>
                   </div>
                   <span class="section-collapse-indicator" aria-hidden="true"></span>
                 </summary>
-                <div class="generation-detail-body">
-                  <article class="import-card generation-import-card">
-                    <div class="generation-import-head">
-                      <label class="field-label" for="historyCsvInput">過去実績CSV</label>
-                      <p class="field-help">売上予測と店落ち予測の基礎データ</p>
-                    </div>
-                    <div class="csv-example">
-                      <strong>列見本</strong>
-                      <code>日付,売上予測,店落ち予測</code>
-                      <code>2026-04-06,340000,153000</code>
-                    </div>
-                    <input id="historyCsvInput" type="file" accept=".csv">
-                    <textarea id="historyCsvText" class="data-textarea generation-textarea" spellcheck="false"></textarea>
-                    <div class="action-row">
-                      <button id="applyHistoryCsvButton" class="ghost-button" type="button">実績反映</button>
-                      <button id="loadHistorySampleButton" class="ghost-button" type="button">サンプル読込</button>
-                    </div>
+                <div class="generation-detail-body generation-decision-data-grid">
+                  <article class="generation-data-card">
+                    <strong>セラピスト指標</strong>
+                    <p>本数 / 本指名率 / 店リピ率 / 出勤日数 / 勤怠安定性</p>
+                  </article>
+                  <article class="generation-data-card">
+                    <strong>ルーム指標</strong>
+                    <p>売上 / 本数 / エリアごとの強さ</p>
+                  </article>
+                  <article class="generation-data-card">
+                    <strong>時間帯需要</strong>
+                    <p>強い時間帯 / 弱い時間帯 を今後ここに集約します</p>
+                  </article>
+                  <article class="generation-data-note">
+                    <p>必要な時だけ開いて、配置判断の補助情報として使います。</p>
                   </article>
                 </div>
               </details>
@@ -443,7 +427,7 @@
 
   <div id="globalToast" class="global-toast" aria-live="polite"></div>
 
-  <script src="data.js?v=202604082040"></script>
-  <script src="app.js?v=202604082040"></script>
+  <script src="data.js?v=202604082055"></script>
+  <script src="app.js?v=202604082055"></script>
 </body>
 </html>

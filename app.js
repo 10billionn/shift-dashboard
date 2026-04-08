@@ -291,17 +291,21 @@ function bindEvents() {
     requestCsvDraftText = buildRequestCsv(samplePrototypeData.shiftRequests);
     elements.generationResultNote.textContent = "サンプルCSVを読み込みました。CSV反映で一覧に反映します。";
   });
-  elements.applyHistoryCsvButton.addEventListener("click", applyHistoryCsv);
-  elements.loadHistorySampleButton.addEventListener("click", () => {
-    elements.historyCsvText.value = buildHistoryCsv(samplePrototypeData.weeklyPerformance);
+  elements.applyHistoryCsvButton?.addEventListener("click", applyHistoryCsv);
+  elements.loadHistorySampleButton?.addEventListener("click", () => {
+    if (elements.historyCsvText) {
+      elements.historyCsvText.value = buildHistoryCsv(samplePrototypeData.weeklyPerformance);
+    }
   });
   elements.generateScheduleButton.addEventListener("click", handleGenerateScheduleClick);
 
   elements.requestCsvInput.addEventListener("change", async (event) => {
     requestCsvDraftText = await readFileText(event.target.files?.[0]);
   });
-  elements.historyCsvInput.addEventListener("change", async (event) => {
-    elements.historyCsvText.value = await readFileText(event.target.files?.[0]);
+  elements.historyCsvInput?.addEventListener("change", async (event) => {
+    if (elements.historyCsvText) {
+      elements.historyCsvText.value = await readFileText(event.target.files?.[0]);
+    }
   });
 
   elements.distributionDateSelect.addEventListener("change", () => {
@@ -420,7 +424,9 @@ function loadSampleState() {
 
 function syncCsvTextsFromState() {
   requestCsvDraftText = "";
-  elements.historyCsvText.value = buildHistoryCsv(state.historyRows);
+  if (elements.historyCsvText) {
+    elements.historyCsvText.value = buildHistoryCsv(state.historyRows);
+  }
 }
 
 function normalizeDashboardSectionOrder(order = []) {
@@ -586,7 +592,9 @@ function renderGeneration() {
   if (elements.requestList) {
     elements.requestList.innerHTML = renderRequestRows();
   }
-  elements.requirementsList.innerHTML = renderRequirements();
+  if (elements.requirementsList) {
+    elements.requirementsList.innerHTML = renderRequirements();
+  }
   renderGenerationForm();
   if (elements.generationDecisionSummary) {
     elements.generationDecisionSummary.innerHTML = `

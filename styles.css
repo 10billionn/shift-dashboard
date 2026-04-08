@@ -1471,6 +1471,42 @@ pre {
   color: #244e93;
 }
 
+.generation-decision-data-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.generation-data-card,
+.generation-data-note {
+  padding: 12px 14px;
+  border: 1px solid rgba(215, 224, 236, 0.74);
+  border-radius: 12px;
+  background: rgba(252, 253, 255, 0.94);
+}
+
+.generation-data-card {
+  display: grid;
+  gap: 6px;
+}
+
+.generation-data-card strong {
+  font-size: 0.88rem;
+  color: rgba(27, 36, 50, 0.86);
+}
+
+.generation-data-card p,
+.generation-data-note p {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: rgba(110, 124, 144, 0.82);
+}
+
+.generation-data-note {
+  grid-column: 1 / -1;
+}
+
 .generation-import-head {
   display: grid;
   gap: 2px;
