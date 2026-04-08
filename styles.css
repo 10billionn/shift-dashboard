@@ -319,36 +319,24 @@ pre {
 }
 
 .selected-date-trigger {
-  padding: 0;
+  padding: 2px 4px 2px 0;
   border: 0;
   background: transparent;
   cursor: pointer;
   text-align: left;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.28);
-  transition: color 0.16s ease, opacity 0.16s ease, border-color 0.16s ease;
+  transition: opacity 0.16s ease, color 0.16s ease;
 }
 
 .selected-date-trigger:hover {
-  color: rgba(255, 255, 255, 1);
-  opacity: 1;
-  border-color: rgba(255, 255, 255, 0.55);
+  opacity: 0.72;
 }
 
 .selected-date-trigger:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.45);
   outline-offset: 4px;
   border-radius: 8px;
-}
-
-.selected-date-trigger::after {
-  content: "▾";
-  font-size: 0.72rem;
-  line-height: 1;
-  color: rgba(255, 255, 255, 0.74);
-  transform: translateY(1px);
 }
 
 .selected-date-picker-input {
