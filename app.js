@@ -6,6 +6,7 @@
   boardDensity: "compact",
   activeShiftTab: "early",
   generationRows: [],
+  generationUsesSampleData: false,
   generationSentTargets: [],
   generationEditingRowId: "",
   generationErrors: [],
@@ -480,9 +481,10 @@ function hydrateState(saved) {
   state.generationSentTargets = Array.isArray(saved.generationSentTargets)
     ? saved.generationSentTargets.filter((name) => samplePrototypeData.therapistProfiles[name])
     : [];
+  state.generationUsesSampleData = Boolean(saved.generationUsesSampleData);
   state.generationRows = Array.isArray(saved.generationRows) && saved.generationRows.length
     ? restoreGenerationRows(saved.generationRows)
-    : createGenerationRows(samplePrototypeData.shiftRequests);
+    : [];
   state.historyRows = Array.isArray(saved.historyRows) && saved.historyRows.length
     ? saved.historyRows.map((row) => ({
       dateKey: normalizeDateKey(row.dateKey),
@@ -519,6 +521,7 @@ function loadSampleState() {
   state.aiDecisionEnabled = false;
   state.requirements = cloneRequirements(samplePrototypeData.requirements);
   state.generationSentTargets = [];
+  state.generationUsesSampleData = true;
   state.generationRows = createGenerationRows(samplePrototypeData.shiftRequests);
   state.historyRows = [...samplePrototypeData.weeklyPerformance];
   state.therapistMetricsData = createEmptyDecisionDataset();
@@ -1818,7 +1821,8 @@ function handleGenerationFormSubmit() {
   if (generationSubmitUiState === "busy") return;
   setGenerationSubmitUiState("busy");
   window.requestAnimationFrame(() => {
-    const existing = state.generationRows.find((row) => row.id === state.generationEditingRowId);
+    const baseRows = state.generationUsesSampleData ? [] : state.generationRows;
+    const existing = baseRows.find((row) => row.id === state.generationEditingRowId);
     const nextRow = buildGenerationRow({
       name: elements.generationFormName.value,
       dateKey: elements.generationFormDate.value,
@@ -1830,11 +1834,12 @@ function handleGenerationFormSubmit() {
     }, state.generationEditingRowId, existing?.status || "accepted");
 
     if (existing) {
-      state.generationRows = state.generationRows.map((row) => row.id === existing.id ? nextRow : row);
+      state.generationRows = baseRows.map((row) => row.id === existing.id ? nextRow : row);
     } else {
-      state.generationRows = [...state.generationRows, nextRow];
+      state.generationRows = [...baseRows, nextRow];
     }
 
+    state.generationUsesSampleData = false;
     state.generationEditingRowId = "";
     state.generationWarnings = collectGenerationWarnings(state.generationRows);
     state.generatedSchedule = buildGeneratedSchedule();
@@ -2968,6 +2973,7 @@ function handleTherapistMasterChange(event) {
 
 function applyRequestCsv() {
   const parsed = parseRequestCsv(requestCsvDraftText);
+  state.generationUsesSampleData = false;
   state.generationRows = createGenerationRows(parsed.rows);
   state.generationEditingRowId = "";
   state.generationErrors = parsed.errors;
@@ -4948,6 +4954,7 @@ function createPersistableState() {
     dashboardSectionOrder: state.dashboardSectionOrder,
     copiedDistributionIds: state.copiedDistributionIds,
     generationSentTargets: state.generationSentTargets,
+    generationUsesSampleData: state.generationUsesSampleData,
     distributionPendingOnly: state.distributionPendingOnly,
     aiDecisionEnabled: state.aiDecisionEnabled,
     selectedBoardAssignmentId: state.selectedBoardAssignmentId,
