@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-    <link rel="stylesheet" href="styles.css?v=202604081825">
+    <link rel="stylesheet" href="styles.css?v=202604081835">
 </head>
 <body>
   <div class="app-shell">
@@ -242,13 +242,6 @@
                     <button id="generationRowCancelButton" class="ghost-button" type="button" hidden>キャンセル</button>
                   </div>
                 </article>
-                <article class="import-card generation-list-card">
-                  <div class="generation-import-head">
-                    <h4>反映済み一覧</h4>
-                    <p class="field-help">読み込み済みデータをここで直して、そのまま生成へ進めます</p>
-                  </div>
-                  <div id="requestList" class="request-list generation-request-list"></div>
-                </article>
               </section>
 
               <section class="content-panel accent-panel generation-stage generation-stage-action">
@@ -279,6 +272,18 @@
                   <button id="generateScheduleButton" class="primary-button" type="button">この内容で生成</button>
                   <p id="generationResultNote" class="generation-result-note"></p>
                 </div>
+              </section>
+
+              <section class="stack-block generation-stage generation-stage-list">
+                <div class="subsection-head">
+                  <div>
+                    <p class="stage-kicker">確認一覧</p>
+                    <h3>反映済みデータ</h3>
+                  </div>
+                </div>
+                <article class="import-card generation-list-card">
+                  <div id="requestList" class="request-list generation-request-list"></div>
+                </article>
               </section>
 
               <details class="stack-block generation-stage generation-stage-requirements generation-secondary-detail">
@@ -442,7 +447,7 @@
 
   <div id="globalToast" class="global-toast" aria-live="polite"></div>
 
-  <script src="data.js?v=202604081825"></script>
-  <script src="app.js?v=202604081825"></script>
+  <script src="data.js?v=202604081835"></script>
+  <script src="app.js?v=202604081835"></script>
 </body>
 </html>
