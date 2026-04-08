@@ -10,6 +10,7 @@
   generationEditingRowId: "",
   generationErrors: [],
   generationWarnings: [],
+  aiDecisionEnabled: false,
   therapistMetricsData: { rows: [], loadedAt: "", errors: [], unmatched: 0 },
   roomMetricsData: { rows: [], loadedAt: "", errors: [], unmatched: 0 },
   demandMetricsData: { rows: [], loadedAt: "", errors: [], unmatched: 0 },
@@ -461,6 +462,7 @@ function hydrateState(saved) {
   state.editingAreaAssignmentId = "";
   state.hasUnsavedChanges = Boolean(saved.hasUnsavedChanges);
   state.hasManualAdjustments = Boolean(saved.hasManualAdjustments);
+  state.aiDecisionEnabled = Boolean(saved.aiDecisionEnabled);
   state.requirements = Array.isArray(saved.requirements) && saved.requirements.length
     ? cloneRequirements(saved.requirements)
     : cloneRequirements(samplePrototypeData.requirements);
@@ -503,6 +505,7 @@ function loadSampleState() {
   state.editingAreaAssignmentId = "";
   state.hasUnsavedChanges = false;
   state.hasManualAdjustments = false;
+  state.aiDecisionEnabled = false;
   state.requirements = cloneRequirements(samplePrototypeData.requirements);
   state.generationSentTargets = [];
   state.generationRows = createGenerationRows(samplePrototypeData.shiftRequests);
@@ -4754,6 +4757,7 @@ function createPersistableState() {
     copiedDistributionIds: state.copiedDistributionIds,
     generationSentTargets: state.generationSentTargets,
     distributionPendingOnly: state.distributionPendingOnly,
+    aiDecisionEnabled: state.aiDecisionEnabled,
     selectedBoardAssignmentId: state.selectedBoardAssignmentId,
     hasUnsavedChanges: state.hasUnsavedChanges,
     hasManualAdjustments: state.hasManualAdjustments,
