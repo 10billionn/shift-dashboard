@@ -45,6 +45,7 @@ let boardSuppressClickUntil = 0;
 let dashboardSectionDragState = null;
 let dashboardSectionArmedId = "";
 let dashboardSectionArmTimer = null;
+let requestCsvDraftText = "";
 
 const DASHBOARD_SECTION_IDS = ["weeklyAnalysis", "boardInspector", "riskSummary", "roomDetail", "summaryGrid", "cutBlock"];
 
@@ -107,7 +108,6 @@ const elements = {
   weeklyAnalysis: document.querySelector("#weeklyAnalysis"),
   dashboardSecondarySections: document.querySelector("#dashboardSecondarySections"),
   requestCsvInput: document.querySelector("#requestCsvInput"),
-  requestCsvText: document.querySelector("#requestCsvText"),
   generationFormName: document.querySelector("#generationFormName"),
   generationFormDate: document.querySelector("#generationFormDate"),
   generationFormStart: document.querySelector("#generationFormStart"),
@@ -278,8 +278,8 @@ function bindEvents() {
 
   elements.applyRequestCsvButton.addEventListener("click", applyRequestCsv);
   elements.loadRequestSampleButton.addEventListener("click", () => {
-    elements.requestCsvText.value = buildRequestCsv(samplePrototypeData.shiftRequests);
-    elements.requestCsvText.dataset.userEdited = "true";
+    requestCsvDraftText = buildRequestCsv(samplePrototypeData.shiftRequests);
+    elements.generationResultNote.textContent = "サンプルCSVを読み込みました。CSV反映で一覧に反映します。";
   });
   elements.applyHistoryCsvButton.addEventListener("click", applyHistoryCsv);
   elements.loadHistorySampleButton.addEventListener("click", () => {
@@ -288,11 +288,7 @@ function bindEvents() {
   elements.generateScheduleButton.addEventListener("click", handleGenerateScheduleClick);
 
   elements.requestCsvInput.addEventListener("change", async (event) => {
-    elements.requestCsvText.value = await readFileText(event.target.files?.[0]);
-    elements.requestCsvText.dataset.userEdited = "true";
-  });
-  elements.requestCsvText.addEventListener("input", () => {
-    elements.requestCsvText.dataset.userEdited = "true";
+    requestCsvDraftText = await readFileText(event.target.files?.[0]);
   });
   elements.historyCsvInput.addEventListener("change", async (event) => {
     elements.historyCsvText.value = await readFileText(event.target.files?.[0]);
@@ -409,8 +405,7 @@ function loadSampleState() {
 }
 
 function syncCsvTextsFromState() {
-  elements.requestCsvText.value = "";
-  delete elements.requestCsvText.dataset.userEdited;
+  requestCsvDraftText = "";
   elements.historyCsvText.value = buildHistoryCsv(state.historyRows);
 }
 
@@ -2475,13 +2470,12 @@ function handleSettingsChange() {
 }
 
 function applyRequestCsv() {
-  const parsed = parseRequestCsv(elements.requestCsvText.value);
+  const parsed = parseRequestCsv(requestCsvDraftText);
   state.generationRows = createGenerationRows(parsed.rows);
   state.generationEditingRowId = "";
   state.generationErrors = parsed.errors;
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
-  elements.requestCsvText.value = "";
-  delete elements.requestCsvText.dataset.userEdited;
+  requestCsvDraftText = "";
   markGenerationDirty();
   persistState();
   renderGeneration();
