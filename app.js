@@ -757,8 +757,8 @@ function renderDistribution() {
   const copiedCount = countCopiedDistributionItems(allItems);
   const pendingCount = Math.max(allItems.length - copiedCount, 0);
   elements.distributionStatusSummary.innerHTML = `
-    <span class="legend-chip empty">${isCollectMode ? "未提出" : "未配布"} ${pendingCount}件</span>
-    <span class="legend-chip booked">${isCollectMode ? "提出済み" : "配布済み"} ${copiedCount}件</span>
+    <span class="legend-chip empty">${isCollectMode ? "未配布" : "未配布"} ${pendingCount}件</span>
+    <span class="legend-chip booked">${isCollectMode ? "配布済み" : "配布済み"} ${copiedCount}件</span>
     <span class="legend-chip warning">${isCollectMode ? "回収" : "配布"}</span>
     <span class="legend-chip normal">${getDistributionFormatLabel(state.distributionFormat)}</span>
   `;
@@ -768,7 +768,7 @@ function renderDistribution() {
   syncSelectedDistributionAssignment();
 
   if (!items.length) {
-    elements.distributionList.innerHTML = `<div class="empty-state">${allItems.length && state.distributionPendingOnly ? `${isCollectMode ? "未提出" : "未配布"}の対象はありません。` : isCollectMode ? "送信対象のセラピストがいません。" : "配布対象のセラピストがいません。"}</div>`;
+    elements.distributionList.innerHTML = `<div class="empty-state">${allItems.length && state.distributionPendingOnly ? "未配布の対象はありません。" : isCollectMode ? "送信対象のセラピストがいません。" : "配布対象のセラピストがいません。"}</div>`;
     elements.distributionPreview.textContent = isCollectMode ? "回収モードで対象を選ぶと、ここに送信文面が出ます。" : "シフトを生成するとここに個別文言が出ます。";
     elements.copyStatus.textContent = "";
     elements.copyAllMessagesButton.disabled = true;
@@ -1923,12 +1923,14 @@ function renderDistributionItem(item) {
       <div class="distribution-item-top">
         <div>
           <strong>${item.name}</strong>
-          <div class="field-help">${isCollectMode ? (item.submitted ? "希望提出済み" : "今週の回収対象") : isTherapistMode ? `${item.assignments.length}件のシフト` : `${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})`}</div>
+          <div class="field-help">${isCollectMode ? "シフト希望回収対象" : isTherapistMode ? `${item.assignments.length}件のシフト` : `${formatSlashDate(item.dateKey)}(${formatWeekday(item.dateKey)})`}</div>
         </div>
         <div class="status-row tight">
-          ${isCollectMode ? `<span class="mini-badge rank">回収</span>` : isTherapistMode ? `<span class="mini-badge rank">個別</span>` : `<span class="shift-chip ${item.shiftType}">${item.shiftLabel}</span>`}
+          ${isCollectMode
+            ? `${copied ? `<span class="mini-badge booked">配布済み</span>` : `<span class="mini-badge pink">未配布</span>`}`
+            : `${isTherapistMode ? `<span class="mini-badge rank">個別</span>` : `<span class="shift-chip ${item.shiftType}">${item.shiftLabel}</span>`}
           <span class="mini-badge rank">${getDistributionFormatShortLabel(state.distributionFormat)}</span>
-          ${copied ? `<span class="mini-badge booked">${isCollectMode ? "提出依頼済み" : "配布済み"}</span>` : `<span class="mini-badge pink">${isCollectMode ? "未提出" : hasPartialPending ? "一部未配布" : "未配布"}</span>`}
+          ${copied ? `<span class="mini-badge booked">配布済み</span>` : `<span class="mini-badge pink">${hasPartialPending ? "一部未配布" : "未配布"}</span>`}`}
         </div>
       </div>
       ${isCollectMode ? `
@@ -1938,11 +1940,11 @@ function renderDistributionItem(item) {
             <span class="field-value">${state.distributionRequestDeadline ? `${formatSlashDate(state.distributionRequestDeadline)}(${formatWeekday(state.distributionRequestDeadline)})` : "未設定"}</span>
           </div>
           <div class="distribution-summary-item">
-            <span class="field-label">状態</span>
-            <span class="field-value">${item.submitted ? "提出済み" : "未提出"}</span>
+            <span class="field-label">配布状態</span>
+            <span class="field-value">${copied ? "配布済み" : "未配布"}</span>
           </div>
           <div class="distribution-summary-item">
-            <span class="field-label">送信</span>
+            <span class="field-label">送信情報</span>
             <span class="field-value">${copied ? "コピー済み" : "未送信"}</span>
           </div>
         </div>
