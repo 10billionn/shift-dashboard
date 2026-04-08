@@ -33,6 +33,8 @@
 };
 
 const STORAGE_KEY = "shift-dashboard-state-v1";
+const SNAPSHOT_STORAGE_KEY = "shift-dashboard-backups-v1";
+const SNAPSHOT_SCHEMA_VERSION = 1;
 const DASHBOARD_SLOT_COUNT = 7;
 let boardFeedbackTimer = null;
 let boardDragPayload = null;
@@ -47,6 +49,9 @@ let dashboardSectionDragState = null;
 let dashboardSectionArmedId = "";
 let dashboardSectionArmTimer = null;
 let requestCsvDraftText = "";
+let persistStateTimer = null;
+let autosaveStateLabel = "保存済み";
+let autosaveStateTone = "saved";
 
 const DASHBOARD_SECTION_IDS = ["weeklyAnalysis", "boardInspector", "riskSummary", "roomDetail", "summaryGrid", "cutBlock"];
 
@@ -155,7 +160,13 @@ const elements = {
   settingsAverageUnitPrice: document.querySelector("#settingsAverageUnitPrice"),
   settingsStoreRate: document.querySelector("#settingsStoreRate"),
   settingsAreas: document.querySelector("#settingsAreas"),
-  settingsRoomNames: document.querySelector("#settingsRoomNames")
+  settingsRoomNames: document.querySelector("#settingsRoomNames"),
+  backupAutosaveStatus: document.querySelector("#backupAutosaveStatus"),
+  createBackupButton: document.querySelector("#createBackupButton"),
+  exportBackupButton: document.querySelector("#exportBackupButton"),
+  importBackupButton: document.querySelector("#importBackupButton"),
+  importBackupInput: document.querySelector("#importBackupInput"),
+  backupSnapshotList: document.querySelector("#backupSnapshotList")
 };
 
 initialize();
@@ -167,16 +178,17 @@ function initialize() {
 
   bindEvents();
   syncCsvTextsFromState();
-  if (savedState?.generatedSchedule) {
+  if (hasRenderableGeneratedSchedule()) {
+    recomputeAllScheduleState();
     state.generationSummary = summarizeGeneration();
     syncSelectedBoardAssignment();
     syncSelectedDistributionAssignment();
     elements.generationResultNote.textContent = state.hasUnsavedChanges ? "保存前の変更を復元しました。" : "保存済みシフトを復元しました。";
-    renderAppView();
+    requestAnimationFrame(() => renderAppView());
     return;
   }
   runGeneration(hasPersistedState() ? "保存済みデータを復元しました。" : "初期サンプルを反映しました。");
-  renderAppView();
+  requestAnimationFrame(() => renderAppView());
 }
 
 function bindEvents() {
@@ -486,6 +498,13 @@ function renderSettings() {
 }
 
 function renderDashboard() {
+  if (!hasRenderableGeneratedSchedule() && state.generationRows.length) {
+    state.generatedSchedule = buildGeneratedSchedule();
+    recomputeAllScheduleState();
+  } else if (!state.generationSummary) {
+    recomputeAllScheduleState();
+  }
+
   const day = getScheduleDay(state.selectedDate);
   const boardRows = buildBoardRoomRows(day);
   const requirement = findRequirement(state.selectedDate);
@@ -526,6 +545,14 @@ function renderDashboard() {
   updateDayButtons();
   renderDashboardViewState();
   renderShiftTabState();
+}
+
+function hasRenderableGeneratedSchedule() {
+  return Boolean(
+    state.generatedSchedule
+    && Object.keys(state.generatedSchedule).length
+    && state.dateList.some((dateKey) => state.generatedSchedule[dateKey])
+  );
 }
 
 function renderBoardWorkspace(day = getScheduleDay(state.selectedDate), boardRows = buildBoardRoomRows(day), cutRows = getCutRowsForDate(day.dateKey)) {

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-    <link rel="stylesheet" href="styles.css?v=202604082300">
+    <link rel="stylesheet" href="styles.css?v=202604082330">
 </head>
 <body>
   <div class="app-shell">
@@ -422,6 +422,23 @@
                 </label>
                 <p class="field-help">例: 葛西1 / 葛西2 / 船橋1 / 浦安1</p>
               </article>
+              <article class="placeholder-card settings-card settings-card-wide">
+                <strong>バックアップ</strong>
+                <div class="backup-status-row">
+                  <span class="field-label">自動保存</span>
+                  <span id="backupAutosaveStatus" class="backup-status-pill">保存済み</span>
+                </div>
+                <div class="backup-actions">
+                  <button id="createBackupButton" class="ghost-button" type="button">バックアップを作成</button>
+                  <button id="exportBackupButton" class="ghost-button" type="button">JSON書き出し</button>
+                  <button id="importBackupButton" class="ghost-button" type="button">JSON読み込み</button>
+                  <input id="importBackupInput" type="file" accept="application/json,.json" hidden>
+                </div>
+                <div class="field-block">
+                  <span class="field-label">復元可能なバックアップ</span>
+                  <div id="backupSnapshotList" class="backup-snapshot-list"></div>
+                </div>
+              </article>
             </div>
           </section>
         </section>
@@ -431,7 +448,7 @@
 
   <div id="globalToast" class="global-toast" aria-live="polite"></div>
 
-  <script src="data.js?v=202604082300"></script>
-  <script src="app.js?v=202604082300"></script>
+  <script src="data.js?v=202604090015"></script>
+  <script src="app.js?v=202604090015"></script>
 </body>
 </html>
