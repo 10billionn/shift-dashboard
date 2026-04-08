@@ -279,6 +279,7 @@ function bindEvents() {
   elements.applyRequestCsvButton.addEventListener("click", applyRequestCsv);
   elements.loadRequestSampleButton.addEventListener("click", () => {
     elements.requestCsvText.value = buildRequestCsv(samplePrototypeData.shiftRequests);
+    elements.requestCsvText.dataset.userEdited = "true";
   });
   elements.applyHistoryCsvButton.addEventListener("click", applyHistoryCsv);
   elements.loadHistorySampleButton.addEventListener("click", () => {
@@ -288,6 +289,10 @@ function bindEvents() {
 
   elements.requestCsvInput.addEventListener("change", async (event) => {
     elements.requestCsvText.value = await readFileText(event.target.files?.[0]);
+    elements.requestCsvText.dataset.userEdited = "true";
+  });
+  elements.requestCsvText.addEventListener("input", () => {
+    elements.requestCsvText.dataset.userEdited = "true";
   });
   elements.historyCsvInput.addEventListener("change", async (event) => {
     elements.historyCsvText.value = await readFileText(event.target.files?.[0]);
@@ -404,7 +409,8 @@ function loadSampleState() {
 }
 
 function syncCsvTextsFromState() {
-  elements.requestCsvText.value = buildRequestCsv(state.generationRows);
+  elements.requestCsvText.value = "";
+  delete elements.requestCsvText.dataset.userEdited;
   elements.historyCsvText.value = buildHistoryCsv(state.historyRows);
 }
 
@@ -1441,7 +1447,6 @@ function handleGenerationFormSubmit() {
   }
 
   state.generationEditingRowId = "";
-  elements.requestCsvText.value = buildRequestCsv(state.generationRows);
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
   markGenerationDirty();
   persistState();
@@ -1650,7 +1655,6 @@ function handleRequestListClick(event) {
     if (actionButton.dataset.rowAction === "delete") {
       state.generationRows = state.generationRows.filter((item) => item.id !== rowId);
       if (state.generationEditingRowId === rowId) state.generationEditingRowId = "";
-      elements.requestCsvText.value = buildRequestCsv(state.generationRows);
       state.generationWarnings = collectGenerationWarnings(state.generationRows);
       markGenerationDirty();
       persistState();
@@ -1666,7 +1670,6 @@ function handleRequestListClick(event) {
   if (!row) return;
 
   row.status = button.dataset.status;
-  elements.requestCsvText.value = buildRequestCsv(state.generationRows);
   markGenerationDirty();
   persistState();
   renderGeneration();
@@ -1683,7 +1686,6 @@ function handleRequestListChange(event) {
   row[input.dataset.rowField] = input.dataset.rowField.includes("Time") ? normalizeTime(input.value) : input.value;
   row.issues = collectRowIssues(row);
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
-  elements.requestCsvText.value = buildRequestCsv(state.generationRows);
   markGenerationDirty();
   persistState();
   renderGeneration();
@@ -2478,6 +2480,8 @@ function applyRequestCsv() {
   state.generationEditingRowId = "";
   state.generationErrors = parsed.errors;
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
+  elements.requestCsvText.value = "";
+  delete elements.requestCsvText.dataset.userEdited;
   markGenerationDirty();
   persistState();
   renderGeneration();
