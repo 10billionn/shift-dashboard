@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-    <link rel="stylesheet" href="styles.css?v=202604091855">
+    <link rel="stylesheet" href="styles.css?v=202604081645">
 </head>
 <body>
   <div class="app-shell">
@@ -184,99 +184,116 @@
             <div class="panel-head">
               <div>
                 <h2>シフト作成</h2>
-                <p class="section-note">読み込み・確認・生成だけに集中する画面です</p>
+                <p class="section-note">生成前の確認と判断に集中する司令室です</p>
               </div>
             </div>
 
             <div class="generation-layout">
-              <section class="stack-block">
+              <section class="stack-block generation-stage generation-stage-input">
                 <div class="subsection-head">
-                  <h3>1. シフト希望CSV</h3>
+                  <div>
+                    <p class="stage-kicker">入力</p>
+                    <h3>CSV読み込み</h3>
+                  </div>
                 </div>
-                <article class="import-card">
-                  <label class="field-label" for="requestCsvInput">シフト希望CSV</label>
-                  <div class="csv-example">
-                    <strong>列見本</strong>
-                    <code>名前,出勤可能日,出勤開始時間,出勤終了時間,希望エリア,姫予約有無,備考</code>
-                    <code>れいか,2026-04-06,11:00,19:00,葛西,あり,葛西希望</code>
-                  </div>
-                  <input id="requestCsvInput" type="file" accept=".csv">
-                  <textarea id="requestCsvText" class="data-textarea" spellcheck="false"></textarea>
-                  <div class="action-row">
-                    <button id="applyRequestCsvButton" class="primary-button" type="button">CSV反映</button>
-                    <button id="loadRequestSampleButton" class="ghost-button" type="button">サンプル読込</button>
-                  </div>
-                </article>
+                <div class="generation-import-grid">
+                  <article class="import-card generation-import-card">
+                    <div class="generation-import-head">
+                      <label class="field-label" for="requestCsvInput">シフト希望CSV</label>
+                      <p class="field-help">希望・時間・エリアの元データ</p>
+                    </div>
+                    <div class="csv-example">
+                      <strong>列見本</strong>
+                      <code>名前,出勤可能日,出勤開始時間,出勤終了時間,希望エリア,姫予約有無,備考</code>
+                      <code>れいか,2026-04-06,11:00,19:00,葛西,あり,葛西希望</code>
+                    </div>
+                    <input id="requestCsvInput" type="file" accept=".csv">
+                    <textarea id="requestCsvText" class="data-textarea generation-textarea" spellcheck="false"></textarea>
+                    <div class="action-row">
+                      <button id="applyRequestCsvButton" class="primary-button" type="button">CSV反映</button>
+                      <button id="loadRequestSampleButton" class="ghost-button" type="button">サンプル読込</button>
+                    </div>
+                  </article>
+
+                  <article class="import-card generation-import-card">
+                    <div class="generation-import-head">
+                      <label class="field-label" for="historyCsvInput">過去実績CSV</label>
+                      <p class="field-help">売上予測と店落ち予測の基礎データ</p>
+                    </div>
+                    <div class="csv-example">
+                      <strong>列見本</strong>
+                      <code>日付,売上予測,店落ち予測</code>
+                      <code>2026-04-06,340000,153000</code>
+                    </div>
+                    <input id="historyCsvInput" type="file" accept=".csv">
+                    <textarea id="historyCsvText" class="data-textarea generation-textarea" spellcheck="false"></textarea>
+                    <div class="action-row">
+                      <button id="applyHistoryCsvButton" class="ghost-button" type="button">実績反映</button>
+                      <button id="loadHistorySampleButton" class="ghost-button" type="button">サンプル読込</button>
+                    </div>
+                  </article>
+                </div>
               </section>
 
-              <section class="stack-block">
+              <section class="stack-block generation-stage generation-stage-validation">
                 <div class="subsection-head">
-                  <h3>2. 過去実績CSV</h3>
-                </div>
-                <article class="import-card">
-                  <label class="field-label" for="historyCsvInput">過去実績CSV</label>
-                  <div class="csv-example">
-                    <strong>列見本</strong>
-                    <code>日付,売上予測,店落ち予測</code>
-                    <code>2026-04-06,340000,153000</code>
+                  <div>
+                    <p class="stage-kicker">検証</p>
+                    <h3>生成前チェック</h3>
+                    <p class="section-note">このまま生成してよいかを先に判断します</p>
                   </div>
-                  <input id="historyCsvInput" type="file" accept=".csv">
-                  <textarea id="historyCsvText" class="data-textarea" spellcheck="false"></textarea>
-                  <div class="action-row">
-                    <button id="applyHistoryCsvButton" class="ghost-button" type="button">実績反映</button>
-                    <button id="loadHistorySampleButton" class="ghost-button" type="button">サンプル読込</button>
-                  </div>
-                </article>
-              </section>
-
-              <section class="stack-block">
-                <div class="subsection-head">
-                  <h3>3. 生成前サマリー / 抜け漏れチェック</h3>
                 </div>
-                <div class="summary-grid compact">
-                  <article class="summary-card">
-                    <p>反映件数</p>
+                <div class="summary-grid compact generation-summary-grid">
+                  <article class="summary-card generation-summary-card">
+                    <p>読込件数</p>
                     <strong id="importedCount"></strong>
                   </article>
-                  <article class="summary-card warning">
+                  <article class="summary-card warning generation-summary-card">
                     <p>エラー件数</p>
                     <strong id="errorCount"></strong>
                   </article>
-                  <article class="summary-card">
-                    <p>未提出人数</p>
+                  <article class="summary-card generation-summary-card">
+                    <p>未登録人数</p>
                     <strong id="missingCount"></strong>
                   </article>
-                  <article class="summary-card warning">
+                  <article class="summary-card warning generation-summary-card">
                     <p>要確認人数</p>
                     <strong id="reviewCount"></strong>
                   </article>
                 </div>
-                <div id="generationAlerts" class="alert-stack"></div>
-              </section>
-
-              <section class="stack-block">
-                <div class="subsection-head">
-                  <h3>4. 採用 / カット / 保留</h3>
+                <div id="generationAlerts" class="alert-stack generation-alert-stack"></div>
+                <div class="generation-review-block">
+                  <div class="generation-review-head">
+                    <div>
+                      <h3>確認一覧</h3>
+                      <p class="section-note">正常行は静かに、要確認行だけ先に見つかるようにします</p>
+                    </div>
+                  </div>
+                  <div id="requestList" class="request-list generation-request-list"></div>
                 </div>
-                <div id="requestList" class="request-list"></div>
               </section>
 
-              <section class="stack-block">
+              <section class="stack-block generation-stage generation-stage-requirements">
                 <div class="subsection-head">
-                  <h3>5. 必要人数設定</h3>
+                  <div>
+                    <p class="stage-kicker">配置条件</p>
+                    <h3>日別必要人数</h3>
+                  </div>
                 </div>
                 <div id="requirementsList" class="requirements-list"></div>
               </section>
 
-              <section class="content-panel accent-panel">
+              <section class="content-panel accent-panel generation-stage generation-stage-action">
                 <div class="panel-head">
                   <div>
-                    <h3>6. 生成</h3>
-                    <p class="section-note">生成結果はダッシュボードと配布画面へ反映されます</p>
+                    <p class="stage-kicker">生成実行</p>
+                    <h3>この内容で生成</h3>
+                    <p class="section-note">要確認件数を見てからシフトへ反映します</p>
                   </div>
                 </div>
-                <div class="action-row">
-                  <button id="generateScheduleButton" class="primary-button" type="button">シフト生成</button>
+                <div id="generationDecisionSummary" class="generation-decision-summary"></div>
+                <div class="action-row generation-action-row">
+                  <button id="generateScheduleButton" class="primary-button" type="button">この内容で生成</button>
                   <p id="generationResultNote" class="generation-result-note"></p>
                 </div>
               </section>
@@ -399,7 +416,7 @@
 
   <div id="globalToast" class="global-toast" aria-live="polite"></div>
 
-    <script src="data.js?v=202604091855"></script>
-    <script src="app.js?v=202604091855"></script>
+  <script src="data.js?v=202604081645"></script>
+  <script src="app.js?v=202604081645"></script>
 </body>
 </html>

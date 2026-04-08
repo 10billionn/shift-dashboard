@@ -121,6 +121,7 @@ const elements = {
   requestList: document.querySelector("#requestList"),
   requirementsList: document.querySelector("#requirementsList"),
   generateScheduleButton: document.querySelector("#generateScheduleButton"),
+  generationDecisionSummary: document.querySelector("#generationDecisionSummary"),
   generationResultNote: document.querySelector("#generationResultNote"),
   distributionDateSelect: document.querySelector("#distributionDateSelect"),
   distributionViewModeTabs: document.querySelector("#distributionViewModeTabs"),
@@ -540,6 +541,13 @@ function renderGeneration() {
   elements.generationAlerts.innerHTML = renderGenerationAlerts(checkSummary);
   elements.requestList.innerHTML = renderRequestRows();
   elements.requirementsList.innerHTML = renderRequirements();
+  if (elements.generationDecisionSummary) {
+    elements.generationDecisionSummary.innerHTML = `
+      <span class="legend-chip normal">読込 ${state.generationRows.length}件</span>
+      <span class="legend-chip ${reviewRows.length ? "warning" : "normal"}">要確認 ${new Set(reviewRows.map((row) => row.name)).size}名</span>
+      <span class="legend-chip ${missingTherapists.length ? "warning" : "normal"}">未登録 ${missingTherapists.length}名</span>
+    `;
+  }
 }
 
 function renderDistribution() {
@@ -1335,24 +1343,26 @@ function renderRequestRows() {
     .slice()
     .sort((left, right) => left.dateKey.localeCompare(right.dateKey) || left.name.localeCompare(right.name, "ja"))
     .map((row) => `
-      <article class="request-card" data-row-id="${row.id}">
+      <article class="request-card ${row.issues.length ? "review-needed" : "review-normal"}" data-row-id="${row.id}">
         <div class="request-card-top">
           <div>
             <strong>${row.name}</strong>
-            <div class="section-note">${formatDisplayDate(row.dateKey)} (${formatWeekday(row.dateKey)}) / ${row.startTime} - ${row.endTime}</div>
+            <div class="section-note">${formatDisplayDate(row.dateKey)} (${formatWeekday(row.dateKey)})</div>
           </div>
           <span class="status-pill ${row.status}">${statusLabel(row.status)}</span>
         </div>
 
-        <div class="status-row">
-          <span class="field-value">希望エリア ${row.preferredArea || "未入力"}</span>
+        <div class="status-row request-meta-row">
+          <span class="field-value">時間 ${row.startTime} - ${row.endTime}</span>
+          <span class="field-value">希望エリア ${row.preferredArea || "未設定"}</span>
           <span class="field-value">姫予約 ${row.himeReservation || "未設定"}</span>
+          ${row.note ? `<span class="field-value">備考 ${escapeHtml(row.note)}</span>` : `<span class="field-value muted-field">備考 なし</span>`}
           ${row.issues.map((issue) => `<span class="alert-tag warning">${issue}</span>`).join("")}
         </div>
 
         <div class="request-edit-grid" data-row-id="${row.id}">
           <label class="field-block">
-            <span class="field-label">エリア調整</span>
+            <span class="field-label">希望エリア</span>
             <select class="select-input" data-row-field="preferredArea">
               <option value="">未設定</option>
               ${getAppSettings().areas.map((area) => `<option value="${area}" ${area === row.preferredArea ? "selected" : ""}>${area}</option>`).join("")}
@@ -1375,10 +1385,10 @@ function renderRequestRows() {
             </select>
           </label>
           <label class="field-block wide">
-            <span class="field-label">備考</span>
-            <input class="text-input" type="text" value="${escapeHtml(row.note || "")}" data-row-field="note" placeholder="終電 / 店泊 / ヘルプ可 など">
-          </label>
-        </div>
+              <span class="field-label">備考</span>
+              <input class="text-input" type="text" value="${escapeHtml(row.note || "")}" data-row-field="note" placeholder="終電 / 店泊 / ヘルプ可 など">
+            </label>
+          </div>
 
         <div class="status-toggle-group">
           <button class="status-toggle ${row.status === "accepted" ? "active" : ""}" type="button" data-row-id="${row.id}" data-status="accepted">採用</button>
