@@ -1477,6 +1477,20 @@ pre {
   gap: 10px;
 }
 
+.generation-detail-summary-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.generation-detail-summary-actions .ghost-button {
+  min-height: 30px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  border-radius: 999px;
+}
+
 .generation-data-card,
 .generation-data-note {
   padding: 12px 14px;
@@ -1488,6 +1502,13 @@ pre {
 .generation-data-card {
   display: grid;
   gap: 6px;
+}
+
+.generation-data-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .generation-data-card strong {
@@ -1503,8 +1524,76 @@ pre {
   color: rgba(110, 124, 144, 0.82);
 }
 
+.generation-data-card-metrics {
+  display: grid;
+  gap: 4px;
+}
+
+.generation-data-card-metrics span {
+  font-size: 0.79rem;
+  color: rgba(86, 101, 122, 0.84);
+}
+
 .generation-data-note {
   grid-column: 1 / -1;
+}
+
+.app-modal[hidden] {
+  display: none;
+}
+
+.app-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2400;
+}
+
+.app-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 36, 63, 0.18);
+  backdrop-filter: blur(3px);
+}
+
+.app-modal-dialog {
+  position: relative;
+  width: min(720px, calc(100vw - 32px));
+  margin: 72px auto 0;
+  border-radius: 18px;
+  border: 1px solid rgba(206, 217, 232, 0.82);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 42px rgba(17, 36, 63, 0.14);
+  overflow: hidden;
+}
+
+.app-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(223, 230, 239, 0.92);
+}
+
+.app-modal-head h3 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+
+.app-modal-body {
+  padding: 18px;
+}
+
+.decision-data-modal-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.decision-data-modal-grid .import-card {
+  padding: 14px;
+  border: 1px solid rgba(215, 224, 236, 0.74);
+  border-radius: 14px;
+  background: rgba(250, 252, 255, 0.92);
 }
 
 .generation-import-head {

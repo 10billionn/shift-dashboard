@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-    <link rel="stylesheet" href="styles.css?v=202604090045">
+    <link rel="stylesheet" href="styles.css?v=202604090155">
 </head>
 <body>
   <div class="app-shell">
@@ -292,25 +292,13 @@
                     <p class="stage-kicker">補助情報</p>
                     <h3>配置判断データ</h3>
                   </div>
-                  <span class="section-collapse-indicator" aria-hidden="true"></span>
+                  <div class="generation-detail-summary-actions">
+                    <button id="openDecisionDataModalButton" class="ghost-button" type="button">データ読込</button>
+                    <button id="reloadDecisionDataModalButton" class="ghost-button" type="button">再読込</button>
+                    <span class="section-collapse-indicator" aria-hidden="true"></span>
+                  </div>
                 </summary>
-                <div class="generation-detail-body generation-decision-data-grid">
-                  <article class="generation-data-card">
-                    <strong>セラピスト指標</strong>
-                    <p>本数 / 本指名率 / 店リピ率 / 出勤日数 / 勤怠安定性</p>
-                  </article>
-                  <article class="generation-data-card">
-                    <strong>ルーム指標</strong>
-                    <p>売上 / 本数 / エリアごとの強さ</p>
-                  </article>
-                  <article class="generation-data-card">
-                    <strong>時間帯需要</strong>
-                    <p>強い時間帯 / 弱い時間帯 を今後ここに集約します</p>
-                  </article>
-                  <article class="generation-data-note">
-                    <p>必要な時だけ開いて、配置判断の補助情報として使います。</p>
-                  </article>
-                </div>
+                <div id="generationDecisionDataCards" class="generation-detail-body generation-decision-data-grid"></div>
               </details>
             </div>
           </section>
@@ -447,8 +435,34 @@
   </div>
 
   <div id="globalToast" class="global-toast" aria-live="polite"></div>
+  <div id="decisionDataModal" class="app-modal" hidden>
+    <div class="app-modal-backdrop" data-modal-close="decision-data"></div>
+    <div class="app-modal-dialog">
+      <div class="app-modal-head">
+        <div>
+          <strong>配置判断データの読込</strong>
+          <p class="field-help">必要な指標だけ静かに差し込みます。</p>
+        </div>
+        <button id="closeDecisionDataModalButton" class="ghost-button" type="button">閉じる</button>
+      </div>
+      <div class="app-modal-body decision-data-modal-grid">
+        <article class="generation-data-card">
+          <strong>セラピスト指標CSV</strong>
+          <input id="therapistMetricsCsvInput" type="file" accept=".csv,text/csv">
+        </article>
+        <article class="generation-data-card">
+          <strong>ルーム指標CSV</strong>
+          <input id="roomMetricsCsvInput" type="file" accept=".csv,text/csv">
+        </article>
+        <article class="generation-data-card">
+          <strong>時間帯需要CSV</strong>
+          <input id="demandMetricsCsvInput" type="file" accept=".csv,text/csv">
+        </article>
+      </div>
+    </div>
+  </div>
 
-  <script src="data.js?v=202604090045"></script>
-  <script src="app.js?v=202604090045"></script>
+  <script src="data.js?v=202604090120"></script>
+  <script src="app.js?v=202604090155"></script>
 </body>
 </html>

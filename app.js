@@ -10,6 +10,9 @@
   generationEditingRowId: "",
   generationErrors: [],
   generationWarnings: [],
+  therapistMetricsData: { rows: [], loadedAt: "", errors: [], unmatched: 0 },
+  roomMetricsData: { rows: [], loadedAt: "", errors: [], unmatched: 0 },
+  demandMetricsData: { rows: [], loadedAt: "", errors: [], unmatched: 0 },
   appSettings: null,
   requirements: [],
   historyRows: [],
@@ -142,6 +145,14 @@ const elements = {
   generateScheduleButton: document.querySelector("#generateScheduleButton"),
   generationDecisionSummary: document.querySelector("#generationDecisionSummary"),
   generationResultNote: document.querySelector("#generationResultNote"),
+  openDecisionDataModalButton: document.querySelector("#openDecisionDataModalButton"),
+  reloadDecisionDataModalButton: document.querySelector("#reloadDecisionDataModalButton"),
+  closeDecisionDataModalButton: document.querySelector("#closeDecisionDataModalButton"),
+  decisionDataModal: document.querySelector("#decisionDataModal"),
+  generationDecisionDataCards: document.querySelector("#generationDecisionDataCards"),
+  therapistMetricsCsvInput: document.querySelector("#therapistMetricsCsvInput"),
+  roomMetricsCsvInput: document.querySelector("#roomMetricsCsvInput"),
+  demandMetricsCsvInput: document.querySelector("#demandMetricsCsvInput"),
   distributionDateSelect: document.querySelector("#distributionDateSelect"),
   distributionViewModeTabs: document.querySelector("#distributionViewModeTabs"),
   distributionPendingOnly: document.querySelector("#distributionPendingOnly"),
@@ -326,10 +337,27 @@ function bindEvents() {
     }
   });
   elements.generateScheduleButton.addEventListener("click", handleGenerateScheduleClick);
+  elements.openDecisionDataModalButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    openDecisionDataModal();
+  });
+  elements.reloadDecisionDataModalButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    openDecisionDataModal();
+  });
+  elements.closeDecisionDataModalButton?.addEventListener("click", closeDecisionDataModal);
+  elements.decisionDataModal?.addEventListener("click", (event) => {
+    if (event.target.closest("[data-modal-close='decision-data']")) closeDecisionDataModal();
+  });
 
   elements.requestCsvInput.addEventListener("change", async (event) => {
     requestCsvDraftText = await readFileText(event.target.files?.[0]);
   });
+  elements.therapistMetricsCsvInput?.addEventListener("change", (event) => handleDecisionDataImport(event, "therapist"));
+  elements.roomMetricsCsvInput?.addEventListener("change", (event) => handleDecisionDataImport(event, "room"));
+  elements.demandMetricsCsvInput?.addEventListener("change", (event) => handleDecisionDataImport(event, "demand"));
   elements.historyCsvInput?.addEventListener("change", async (event) => {
     if (elements.historyCsvText) {
       elements.historyCsvText.value = await readFileText(event.target.files?.[0]);
@@ -423,6 +451,9 @@ function hydrateState(saved) {
       storeForecast: Number(row.storeForecast) || 0
     }))
     : [...samplePrototypeData.weeklyPerformance];
+  state.therapistMetricsData = restoreDecisionDataset(saved.therapistMetricsData);
+  state.roomMetricsData = restoreDecisionDataset(saved.roomMetricsData);
+  state.demandMetricsData = restoreDecisionDataset(saved.demandMetricsData);
   state.generatedSchedule = saved.generatedSchedule ? restoreGeneratedSchedule(saved.generatedSchedule) : {};
 }
 
@@ -449,6 +480,9 @@ function loadSampleState() {
   state.generationSentTargets = [];
   state.generationRows = createGenerationRows(samplePrototypeData.shiftRequests);
   state.historyRows = [...samplePrototypeData.weeklyPerformance];
+  state.therapistMetricsData = createEmptyDecisionDataset();
+  state.roomMetricsData = createEmptyDecisionDataset();
+  state.demandMetricsData = createEmptyDecisionDataset();
   state.generatedSchedule = {};
 }
 
@@ -661,6 +695,9 @@ function renderGeneration() {
       <span class="legend-chip ${missingTherapists.length ? "warning" : "normal"}">未提出 ${missingTherapists.length}名</span>
       <span class="legend-chip ${reviewRows.length ? "warning" : "normal"}">要確認 ${new Set(reviewRows.map((row) => row.name)).size}名</span>
     `;
+  }
+  if (elements.generationDecisionDataCards) {
+    elements.generationDecisionDataCards.innerHTML = renderDecisionDataCards();
   }
 }
 
@@ -1515,6 +1552,100 @@ function renderGenerationForm() {
   elements.generationFormNote.value = editingRow?.note || "";
   elements.generationRowSubmitButton.textContent = editingRow ? "更新" : "反映";
   elements.generationRowCancelButton.hidden = !editingRow;
+}
+
+function renderDecisionDataCards() {
+  return [
+    renderDecisionDataCard("セラピスト指標", state.therapistMetricsData, "名"),
+    renderDecisionDataCard("ルーム指標", state.roomMetricsData, "室"),
+    renderDecisionDataCard("時間帯需要", state.demandMetricsData, "件")
+  ].join("");
+}
+
+function renderDecisionDataCard(title, dataset, unitLabel) {
+  const status = !dataset.loadedAt
+    ? { label: "未読込", tone: "normal" }
+    : dataset.errors.length || dataset.unmatched
+      ? { label: "要確認", tone: "warning" }
+      : { label: "読込済み", tone: "good" };
+  const metrics = !dataset.loadedAt
+    ? [`状態: ${status.label}`]
+    : [
+        `反映件数 ${dataset.rows.length}${unitLabel}`,
+        dataset.unmatched ? `未一致 ${dataset.unmatched}件` : dataset.errors.length ? `エラー ${dataset.errors.length}件` : "未一致 0件"
+      ];
+
+  return `
+    <article class="generation-data-card">
+      <div class="generation-data-card-top">
+        <strong>${title}</strong>
+        <span class="legend-chip ${status.tone}">${status.label}</span>
+      </div>
+      <div class="generation-data-card-metrics">
+        ${metrics.map((item) => `<span>${item}</span>`).join("")}
+      </div>
+      <div class="field-help">${dataset.loadedAt ? `最終更新 ${formatBackupTime(dataset.loadedAt)}` : "最終更新 なし"}</div>
+    </article>
+  `;
+}
+
+function createEmptyDecisionDataset() {
+  return { rows: [], loadedAt: "", errors: [], unmatched: 0 };
+}
+
+function restoreDecisionDataset(saved) {
+  if (!saved || typeof saved !== "object") return createEmptyDecisionDataset();
+  return {
+    rows: Array.isArray(saved.rows) ? saved.rows : [],
+    loadedAt: sanitizeText(saved.loadedAt),
+    errors: Array.isArray(saved.errors) ? saved.errors.map((item) => sanitizeText(item)).filter(Boolean) : [],
+    unmatched: Number(saved.unmatched) || 0
+  };
+}
+
+function openDecisionDataModal() {
+  if (!elements.decisionDataModal) return;
+  elements.decisionDataModal.hidden = false;
+}
+
+function closeDecisionDataModal() {
+  if (!elements.decisionDataModal) return;
+  elements.decisionDataModal.hidden = true;
+}
+
+async function handleDecisionDataImport(event, type) {
+  const file = event.target?.files?.[0];
+  if (!file) return;
+  try {
+    const text = await readFileText(file);
+    let parsed = createEmptyDecisionDataset();
+    let title = "データ";
+    if (type === "therapist") {
+      parsed = parseTherapistMetricsCsv(text);
+      title = "セラピスト指標";
+      state.therapistMetricsData = { ...parsed, loadedAt: new Date().toISOString() };
+    } else if (type === "room") {
+      parsed = parseRoomMetricsCsv(text);
+      title = "ルーム指標";
+      state.roomMetricsData = { ...parsed, loadedAt: new Date().toISOString() };
+    } else if (type === "demand") {
+      parsed = parseDemandMetricsCsv(text);
+      title = "時間帯需要";
+      state.demandMetricsData = { ...parsed, loadedAt: new Date().toISOString() };
+    }
+    persistState();
+    renderGeneration();
+    showToast(
+      parsed.errors.length || parsed.unmatched
+        ? `${title}を読み込みました（要確認あり）`
+        : `${title}を読み込みました。`,
+      parsed.errors.length || parsed.unmatched ? "warning" : "success"
+    );
+  } catch (error) {
+    showToast("CSVの読み込みに失敗しました。", "warning");
+  } finally {
+    if (event.target) event.target.value = "";
+  }
 }
 
 function resetGenerationForm() {
@@ -3418,6 +3549,47 @@ function parseHistoryCsv(text) {
   return { rows: parsedRows, errors: [] };
 }
 
+function parseTherapistMetricsCsv(text) {
+  const rows = parseCsvText(text);
+  if (!rows.length) return { rows: [], errors: ["CSVが空です。"], unmatched: 0 };
+  const headers = rows[0];
+  const nameHeader = headers.find((header) => ["名前", "セラピスト名"].includes(sanitizeText(header)));
+  if (!nameHeader) return { rows: [], errors: ["名前列が見つかりません。"], unmatched: 0 };
+  const parsed = rows.slice(1)
+    .map((columns) => mapCsvRecord(headers, columns))
+    .filter((record) => sanitizeText(record[nameHeader]))
+    .map((record) => ({ name: normalizeTherapistName(record[nameHeader]), raw: record }));
+  const unmatched = parsed.filter((row) => row.name && !samplePrototypeData.therapistProfiles[row.name]).length;
+  return { rows: parsed, errors: [], unmatched };
+}
+
+function parseRoomMetricsCsv(text) {
+  const rows = parseCsvText(text);
+  if (!rows.length) return { rows: [], errors: ["CSVが空です。"], unmatched: 0 };
+  const headers = rows[0];
+  const roomHeader = headers.find((header) => ["部屋名", "ルーム名", "枠名"].includes(sanitizeText(header)));
+  if (!roomHeader) return { rows: [], errors: ["部屋名列が見つかりません。"], unmatched: 0 };
+  const roomNames = new Set(getAppSettings().roomNames);
+  const parsed = rows.slice(1)
+    .map((columns) => mapCsvRecord(headers, columns))
+    .filter((record) => sanitizeText(record[roomHeader]))
+    .map((record) => ({ roomName: sanitizeText(record[roomHeader]), raw: record }));
+  const unmatched = parsed.filter((row) => !roomNames.has(row.roomName)).length;
+  return { rows: parsed, errors: [], unmatched };
+}
+
+function parseDemandMetricsCsv(text) {
+  const rows = parseCsvText(text);
+  if (!rows.length) return { rows: [], errors: ["CSVが空です。"], unmatched: 0 };
+  const headers = rows[0];
+  const keyHeader = headers.find((header) => ["曜日", "日付", "時間帯"].includes(sanitizeText(header))) || headers[0];
+  const parsed = rows.slice(1)
+    .map((columns) => mapCsvRecord(headers, columns))
+    .filter((record) => sanitizeText(record[keyHeader]))
+    .map((record) => ({ label: sanitizeText(record[keyHeader]), raw: record }));
+  return { rows: parsed, errors: [], unmatched: 0 };
+}
+
 function createGenerationRows(rows) {
   return rows.map((row, index) => buildGenerationRow(row, `${row.dateKey}-${row.name}-${index}`, "accepted"));
 }
@@ -4486,6 +4658,9 @@ function createPersistableState() {
     })),
     requirements: state.requirements,
     historyRows: state.historyRows,
+    therapistMetricsData: state.therapistMetricsData,
+    roomMetricsData: state.roomMetricsData,
+    demandMetricsData: state.demandMetricsData,
     appSettings: state.appSettings,
     generatedSchedule: state.generatedSchedule
   };
