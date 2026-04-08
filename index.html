@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-    <link rel="stylesheet" href="styles.css?v=202604081715">
+    <link rel="stylesheet" href="styles.css?v=202604081745">
 </head>
 <body>
   <div class="app-shell">
@@ -213,6 +213,56 @@
                     <button id="loadRequestSampleButton" class="ghost-button" type="button">サンプル読込</button>
                   </div>
                 </article>
+                <article class="import-card generation-manual-card">
+                  <div class="generation-import-head">
+                    <h4>手入力で追加・更新</h4>
+                    <p class="field-help">CSV反映後の1件追加や修正もここで行います</p>
+                  </div>
+                  <div class="generation-manual-grid">
+                    <label class="field-block">
+                      <span class="field-label">セラピスト名</span>
+                      <select id="generationFormName" class="select-input"></select>
+                    </label>
+                    <label class="field-block">
+                      <span class="field-label">日付</span>
+                      <input id="generationFormDate" class="date-input" type="date">
+                    </label>
+                    <label class="field-block">
+                      <span class="field-label">開始</span>
+                      <input id="generationFormStart" class="time-input" type="time" step="1800">
+                    </label>
+                    <label class="field-block">
+                      <span class="field-label">終了</span>
+                      <input id="generationFormEnd" class="time-input" type="time" step="1800">
+                    </label>
+                    <label class="field-block">
+                      <span class="field-label">希望エリア</span>
+                      <select id="generationFormArea" class="select-input"></select>
+                    </label>
+                    <label class="field-block">
+                      <span class="field-label">姫予約</span>
+                      <select id="generationFormHime" class="select-input">
+                        <option value="なし">なし</option>
+                        <option value="あり">あり</option>
+                      </select>
+                    </label>
+                    <label class="field-block wide">
+                      <span class="field-label">備考</span>
+                      <input id="generationFormNote" class="text-input" type="text" placeholder="終電 / 店泊 / ヘルプ可 など">
+                    </label>
+                  </div>
+                  <div class="action-row generation-manual-actions">
+                    <button id="generationRowSubmitButton" class="primary-button" type="button">追加</button>
+                    <button id="generationRowCancelButton" class="ghost-button" type="button" hidden>キャンセル</button>
+                  </div>
+                </article>
+                <article class="import-card generation-list-card">
+                  <div class="generation-import-head">
+                    <h4>反映済み一覧</h4>
+                    <p class="field-help">読み込み済みデータをここで直して、そのまま生成へ進めます</p>
+                  </div>
+                  <div id="requestList" class="request-list generation-request-list"></div>
+                </article>
               </section>
 
               <section class="content-panel accent-panel generation-stage generation-stage-action">
@@ -285,7 +335,6 @@
                       <button id="loadHistorySampleButton" class="ghost-button" type="button">サンプル読込</button>
                     </div>
                   </article>
-                  <div id="requestList" class="request-list generation-request-list"></div>
                 </div>
               </details>
             </div>
@@ -407,7 +456,7 @@
 
   <div id="globalToast" class="global-toast" aria-live="polite"></div>
 
-  <script src="data.js?v=202604081715"></script>
-  <script src="app.js?v=202604081715"></script>
+  <script src="data.js?v=202604081745"></script>
+  <script src="app.js?v=202604081745"></script>
 </body>
 </html>

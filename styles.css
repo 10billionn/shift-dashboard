@@ -1577,6 +1577,32 @@ pre {
   margin-bottom: 2px;
 }
 
+.generation-manual-card,
+.generation-list-card {
+  background: rgba(250, 252, 255, 0.86);
+  border-color: rgba(214, 223, 236, 0.8);
+  box-shadow: none;
+}
+
+.generation-manual-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.generation-manual-grid .field-block.wide {
+  grid-column: 1 / -1;
+}
+
+.generation-manual-actions {
+  justify-content: flex-end;
+}
+
+.generation-list-card .generation-import-head,
+.generation-manual-card .generation-import-head {
+  gap: 4px;
+}
+
 .generation-stage-action .primary-button {
   min-width: 180px;
 }
@@ -3420,6 +3446,10 @@ button.weekly-day {
   }
 
   .generation-import-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .generation-manual-grid {
     grid-template-columns: 1fr;
   }
 

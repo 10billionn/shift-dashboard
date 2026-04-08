@@ -6,6 +6,7 @@
   boardDensity: "compact",
   activeShiftTab: "early",
   generationRows: [],
+  generationEditingRowId: "",
   generationErrors: [],
   generationWarnings: [],
   appSettings: null,
@@ -107,6 +108,15 @@ const elements = {
   dashboardSecondarySections: document.querySelector("#dashboardSecondarySections"),
   requestCsvInput: document.querySelector("#requestCsvInput"),
   requestCsvText: document.querySelector("#requestCsvText"),
+  generationFormName: document.querySelector("#generationFormName"),
+  generationFormDate: document.querySelector("#generationFormDate"),
+  generationFormStart: document.querySelector("#generationFormStart"),
+  generationFormEnd: document.querySelector("#generationFormEnd"),
+  generationFormArea: document.querySelector("#generationFormArea"),
+  generationFormHime: document.querySelector("#generationFormHime"),
+  generationFormNote: document.querySelector("#generationFormNote"),
+  generationRowSubmitButton: document.querySelector("#generationRowSubmitButton"),
+  generationRowCancelButton: document.querySelector("#generationRowCancelButton"),
   historyCsvInput: document.querySelector("#historyCsvInput"),
   historyCsvText: document.querySelector("#historyCsvText"),
   applyRequestCsvButton: document.querySelector("#applyRequestCsvButton"),
@@ -243,6 +253,8 @@ function bindEvents() {
 
   elements.requestList.addEventListener("click", handleRequestListClick);
   elements.requestList.addEventListener("change", handleRequestListChange);
+  elements.generationRowSubmitButton?.addEventListener("click", handleGenerationFormSubmit);
+  elements.generationRowCancelButton?.addEventListener("click", resetGenerationForm);
   elements.requirementsList.addEventListener("change", handleRequirementChange);
   [
     elements.settingsDefaultEarlySlots,
@@ -543,6 +555,7 @@ function renderGeneration() {
   elements.generationAlerts.innerHTML = renderGenerationAlerts(checkSummary);
   elements.requestList.innerHTML = renderRequestRows();
   elements.requirementsList.innerHTML = renderRequirements();
+  renderGenerationForm();
   if (elements.generationDecisionSummary) {
     elements.generationDecisionSummary.innerHTML = `
       <span class="legend-chip normal">読込 ${state.generationRows.length}件</span>
@@ -1361,9 +1374,78 @@ function renderRequestRows() {
           <button class="status-toggle ${row.status === "accepted" ? "active" : ""}" type="button" data-row-id="${row.id}" data-status="accepted">採用</button>
           <button class="status-toggle ${row.status === "hold" ? "active" : ""}" type="button" data-row-id="${row.id}" data-status="hold">保留</button>
           <button class="status-toggle ${row.status === "cut" ? "active" : ""}" type="button" data-row-id="${row.id}" data-status="cut">カット</button>
+          <button class="status-toggle" type="button" data-row-id="${row.id}" data-row-action="edit">編集</button>
+          <button class="status-toggle" type="button" data-row-id="${row.id}" data-row-action="delete">削除</button>
         </div>
       </article>
     `).join("");
+}
+
+function renderGenerationForm() {
+  if (!elements.generationFormName) return;
+  const therapistNames = Object.keys(samplePrototypeData.therapistProfiles).sort((left, right) => left.localeCompare(right, "ja"));
+  const areas = getAppSettings().areas || [];
+  const editingRow = state.generationRows.find((row) => row.id === state.generationEditingRowId) || null;
+
+  elements.generationFormName.innerHTML = therapistNames.map((name) => `<option value="${name}">${name}</option>`).join("");
+  elements.generationFormArea.innerHTML = areas.map((area) => `<option value="${area}">${area}</option>`).join("");
+
+  elements.generationFormName.value = editingRow?.name || therapistNames[0] || "";
+  elements.generationFormDate.value = editingRow?.dateKey || state.selectedDate || samplePrototypeData.settings.startDate;
+  elements.generationFormStart.value = editingRow?.startTime || "11:00";
+  elements.generationFormEnd.value = editingRow?.endTime || "19:00";
+  elements.generationFormArea.value = editingRow?.preferredArea || areas[0] || "";
+  elements.generationFormHime.value = editingRow?.himeReservation === "あり" ? "あり" : "なし";
+  elements.generationFormNote.value = editingRow?.note || "";
+  elements.generationRowSubmitButton.textContent = editingRow ? "更新" : "追加";
+  elements.generationRowCancelButton.hidden = !editingRow;
+}
+
+function resetGenerationForm() {
+  state.generationEditingRowId = "";
+  renderGenerationForm();
+}
+
+function buildGenerationRow(row, id = "", status = "accepted") {
+  const built = {
+    id: id || `${normalizeDateKey(row.dateKey)}-${sanitizeText(row.name)}-${Date.now()}`,
+    name: sanitizeText(row.name),
+    dateKey: normalizeDateKey(row.dateKey),
+    startTime: normalizeTime(row.startTime),
+    endTime: normalizeTime(row.endTime),
+    preferredArea: sanitizeText(row.preferredArea),
+    himeReservation: sanitizeText(row.himeReservation) || "未設定",
+    note: sanitizeText(row.note),
+    status: ["accepted", "hold", "cut"].includes(status) ? status : "accepted"
+  };
+  built.issues = collectRowIssues(built);
+  return built;
+}
+
+function handleGenerationFormSubmit() {
+  const existing = state.generationRows.find((row) => row.id === state.generationEditingRowId);
+  const nextRow = buildGenerationRow({
+    name: elements.generationFormName.value,
+    dateKey: elements.generationFormDate.value,
+    startTime: elements.generationFormStart.value,
+    endTime: elements.generationFormEnd.value,
+    preferredArea: elements.generationFormArea.value,
+    himeReservation: elements.generationFormHime.value,
+    note: elements.generationFormNote.value
+  }, state.generationEditingRowId, existing?.status || "accepted");
+
+  if (existing) {
+    state.generationRows = state.generationRows.map((row) => row.id === existing.id ? nextRow : row);
+  } else {
+    state.generationRows = [...state.generationRows, nextRow];
+  }
+
+  state.generationEditingRowId = "";
+  elements.requestCsvText.value = buildRequestCsv(state.generationRows);
+  state.generationWarnings = collectGenerationWarnings(state.generationRows);
+  markGenerationDirty();
+  persistState();
+  renderGeneration();
 }
 
 function renderBoardInspector(day) {
@@ -1556,6 +1638,27 @@ function renderDistributionItem(item) {
 }
 
 function handleRequestListClick(event) {
+  const actionButton = event.target.closest("[data-row-id][data-row-action]");
+  if (actionButton) {
+    const rowId = actionButton.dataset.rowId;
+    if (actionButton.dataset.rowAction === "edit") {
+      state.generationEditingRowId = rowId;
+      renderGeneration();
+      return;
+    }
+
+    if (actionButton.dataset.rowAction === "delete") {
+      state.generationRows = state.generationRows.filter((item) => item.id !== rowId);
+      if (state.generationEditingRowId === rowId) state.generationEditingRowId = "";
+      elements.requestCsvText.value = buildRequestCsv(state.generationRows);
+      state.generationWarnings = collectGenerationWarnings(state.generationRows);
+      markGenerationDirty();
+      persistState();
+      renderGeneration();
+      return;
+    }
+  }
+
   const button = event.target.closest("[data-row-id][data-status]");
   if (!button) return;
 
@@ -1563,6 +1666,7 @@ function handleRequestListClick(event) {
   if (!row) return;
 
   row.status = button.dataset.status;
+  elements.requestCsvText.value = buildRequestCsv(state.generationRows);
   markGenerationDirty();
   persistState();
   renderGeneration();
@@ -1579,6 +1683,7 @@ function handleRequestListChange(event) {
   row[input.dataset.rowField] = input.dataset.rowField.includes("Time") ? normalizeTime(input.value) : input.value;
   row.issues = collectRowIssues(row);
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
+  elements.requestCsvText.value = buildRequestCsv(state.generationRows);
   markGenerationDirty();
   persistState();
   renderGeneration();
@@ -2370,6 +2475,7 @@ function handleSettingsChange() {
 function applyRequestCsv() {
   const parsed = parseRequestCsv(elements.requestCsvText.value);
   state.generationRows = createGenerationRows(parsed.rows);
+  state.generationEditingRowId = "";
   state.generationErrors = parsed.errors;
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
   markGenerationDirty();
@@ -3116,21 +3222,7 @@ function parseHistoryCsv(text) {
 }
 
 function createGenerationRows(rows) {
-  return rows.map((row, index) => {
-    const cloned = {
-      id: `${row.dateKey}-${row.name}-${index}`,
-      name: row.name,
-      dateKey: row.dateKey,
-      startTime: normalizeTime(row.startTime),
-      endTime: normalizeTime(row.endTime),
-      preferredArea: sanitizeText(row.preferredArea),
-      himeReservation: sanitizeText(row.himeReservation) || "未設定",
-      note: sanitizeText(row.note),
-      status: "accepted"
-    };
-    cloned.issues = collectRowIssues(cloned);
-    return cloned;
-  });
+  return rows.map((row, index) => buildGenerationRow(row, `${row.dateKey}-${row.name}-${index}`, "accepted"));
 }
 
 function collectRowIssues(row) {
@@ -3415,21 +3507,7 @@ function cloneRequirements(rows) {
 }
 
 function restoreGenerationRows(rows) {
-  return rows.map((row, index) => {
-    const restored = {
-      id: row.id || `${row.dateKey}-${row.name}-${index}`,
-      name: sanitizeText(row.name),
-      dateKey: normalizeDateKey(row.dateKey),
-      startTime: normalizeTime(row.startTime),
-      endTime: normalizeTime(row.endTime),
-      preferredArea: sanitizeText(row.preferredArea),
-      himeReservation: sanitizeText(row.himeReservation) || "未設定",
-      note: sanitizeText(row.note),
-      status: ["accepted", "hold", "cut"].includes(row.status) ? row.status : "accepted"
-    };
-    restored.issues = collectRowIssues(restored);
-    return restored;
-  });
+  return rows.map((row, index) => buildGenerationRow(row, row.id || `${row.dateKey}-${row.name}-${index}`, row.status));
 }
 
 function getAssignmentsForDate(dateKey) {
