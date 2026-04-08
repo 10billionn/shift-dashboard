@@ -393,7 +393,7 @@ pre {
 
 .dashboard-risk-panel .dashboard-collapsible-summary {
   padding: 10px 14px;
-  background: rgba(247, 249, 252, 0.74);
+  background: linear-gradient(180deg, rgba(250, 251, 253, 0.95), rgba(244, 247, 251, 0.92));
 }
 
 .dashboard-risk-panel .dashboard-collapsible-summary h3 {
@@ -840,7 +840,7 @@ pre {
 }
 
 .dashboard-collapsible:not([open]) .dashboard-collapsible-summary {
-  background: rgba(247, 249, 252, 0.74);
+  background: linear-gradient(180deg, rgba(250, 251, 253, 0.95), rgba(244, 247, 251, 0.92));
 }
 
 .dashboard-collapsible[open] {
