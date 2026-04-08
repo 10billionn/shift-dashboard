@@ -1384,6 +1384,10 @@ pre {
   gap: 12px;
 }
 
+.generation-import-card-primary {
+  background: rgba(252, 253, 255, 0.92);
+}
+
 .generation-import-card {
   background: rgba(250, 252, 255, 0.78);
   border-color: rgba(215, 224, 236, 0.76);
@@ -1564,6 +1568,43 @@ pre {
 
 .generation-stage-action .generation-result-note {
   min-height: 20px;
+}
+
+.generation-summary-grid-lite {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.generation-secondary-detail {
+  padding: 0;
+  overflow: hidden;
+}
+
+.generation-detail-summary {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  cursor: pointer;
+}
+
+.generation-detail-summary::-webkit-details-marker {
+  display: none;
+}
+
+.generation-secondary-detail .generation-detail-body {
+  display: grid;
+  gap: 12px;
+  padding: 0 18px 18px;
+}
+
+.generation-secondary-detail:not([open]) {
+  background: linear-gradient(180deg, rgba(248, 250, 253, 0.98), rgba(244, 248, 252, 0.98));
+}
+
+.generation-secondary-detail:not([open]) .generation-detail-summary {
+  padding-bottom: 16px;
 }
 
 .weekly-analysis {

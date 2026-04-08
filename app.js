@@ -537,15 +537,17 @@ function renderGeneration() {
   elements.importedCount.textContent = `${state.generationRows.length}件`;
   elements.errorCount.textContent = `${state.generationErrors.length}件`;
   elements.missingCount.textContent = `${missingTherapists.length}名`;
-  elements.reviewCount.textContent = `${new Set(reviewRows.map((row) => row.name)).size}名`;
+  if (elements.reviewCount) {
+    elements.reviewCount.textContent = `${new Set(reviewRows.map((row) => row.name)).size}名`;
+  }
   elements.generationAlerts.innerHTML = renderGenerationAlerts(checkSummary);
   elements.requestList.innerHTML = renderRequestRows();
   elements.requirementsList.innerHTML = renderRequirements();
   if (elements.generationDecisionSummary) {
     elements.generationDecisionSummary.innerHTML = `
       <span class="legend-chip normal">読込 ${state.generationRows.length}件</span>
-      <span class="legend-chip ${reviewRows.length ? "warning" : "normal"}">要確認 ${new Set(reviewRows.map((row) => row.name)).size}名</span>
       <span class="legend-chip ${missingTherapists.length ? "warning" : "normal"}">未登録 ${missingTherapists.length}名</span>
+      <span class="legend-chip ${reviewRows.length ? "warning" : "normal"}">要確認 ${new Set(reviewRows.map((row) => row.name)).size}名</span>
     `;
   }
 }
@@ -1259,37 +1261,11 @@ function renderRoomDetailItem(assignment) {
 
 function renderGenerationAlerts(checkSummary) {
   const blocks = [];
-  if (checkSummary.generationSummary.length) {
-    blocks.push(`
-      <article class="alert-box ok">
-        <strong>生成前サマリー</strong>
-        <div>${checkSummary.generationSummary.map((item) => `<div>${item}</div>`).join("")}</div>
-      </article>
-    `);
-  }
-
-  if (checkSummary.priorityFixes.length) {
-    blocks.push(`
-      <article class="alert-box danger">
-        <strong>修正優先リスト</strong>
-        <div>${checkSummary.priorityFixes.map((item, index) => `<div>${index + 1}. ${item}</div>`).join("")}</div>
-      </article>
-    `);
-  }
-
-  if (checkSummary.slots.length) {
-    blocks.push(`
-      <article class="alert-box slot-summary-box">
-        <strong>枠サマリー</strong>
-        <div>${checkSummary.slots.map((item) => `<div>${item}</div>`).join("")}</div>
-      </article>
-    `);
-  }
 
   if (state.generationErrors.length) {
     blocks.push(`
       <article class="alert-box danger">
-        <strong>CSVエラー</strong>
+        <strong>CSVエラーがあります</strong>
         <div>${state.generationErrors.map((error) => `<div>${error}</div>`).join("")}</div>
       </article>
     `);
@@ -1298,26 +1274,17 @@ function renderGenerationAlerts(checkSummary) {
   if (checkSummary.missing.length) {
     blocks.push(`
       <article class="alert-box warning">
-        <strong>未提出</strong>
+        <strong>未提出があります</strong>
         <div>${checkSummary.missing.join(" / ")}</div>
       </article>
     `);
   }
 
-  if (checkSummary.items.length) {
+  if (!state.generationErrors.length && !checkSummary.missing.length && checkSummary.items.length) {
     blocks.push(`
-      <article class="alert-box warning">
-        <strong>要確認</strong>
-        <div>${checkSummary.items.map((item) => `<div>${item.label}: ${item.names.length ? item.names.join(" / ") : "なし"}</div>`).join("")}</div>
-      </article>
-    `);
-  }
-
-  if (checkSummary.shortages.length) {
-    blocks.push(`
-      <article class="alert-box warning">
-        <strong>生成後の不足</strong>
-        <div>${checkSummary.shortages.map((item) => `<div>${item}</div>`).join("")}</div>
+      <article class="alert-box ok">
+        <strong>生成前チェック</strong>
+        <div>大きな不足はありません。必要なら詳細確認を開いて見直してください。</div>
       </article>
     `);
   }
@@ -1325,8 +1292,8 @@ function renderGenerationAlerts(checkSummary) {
   if (!blocks.length) {
     blocks.push(`
       <article class="alert-box ok">
-        <strong>チェック結果</strong>
-        <div>大きな不備はありません。必要人数を見直して生成できます。</div>
+        <strong>このまま生成できます</strong>
+        <div>未提出やCSVエラーは見つかっていません。</div>
       </article>
     `);
   }
