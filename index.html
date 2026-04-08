@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-    <link rel="stylesheet" href="styles.css?v=202604082020">
+    <link rel="stylesheet" href="styles.css?v=202604082040">
 </head>
 <body>
   <div class="app-shell">
@@ -190,6 +190,15 @@
             <div id="generationPhaseStatus" class="generation-phase-status"></div>
 
             <div class="generation-layout">
+              <section class="stack-block generation-stage generation-stage-sent">
+                <article class="import-card generation-import-card generation-sent-card">
+                  <div class="generation-import-head">
+                    <h4>今週の送信対象</h4>
+                  </div>
+                  <div id="generationSentTargets" class="generation-sent-targets"></div>
+                </article>
+              </section>
+
               <section class="stack-block generation-stage generation-stage-input">
                 <article class="import-card generation-import-card generation-import-card-primary">
                   <div class="generation-import-inline">
@@ -434,7 +443,7 @@
 
   <div id="globalToast" class="global-toast" aria-live="polite"></div>
 
-  <script src="data.js?v=202604082020"></script>
-  <script src="app.js?v=202604082020"></script>
+  <script src="data.js?v=202604082040"></script>
+  <script src="app.js?v=202604082040"></script>
 </body>
 </html>
