@@ -49,6 +49,11 @@ body {
   font-family: "Yu Gothic UI", "Hiragino Sans", sans-serif;
 }
 
+html,
+body {
+  overflow-x: hidden;
+}
+
 button,
 input,
 textarea,
@@ -2290,6 +2295,8 @@ button.weekly-day {
 .board-canvas {
   display: grid;
   gap: 14px;
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   overflow-y: visible;
   padding-bottom: 4px;
@@ -2300,7 +2307,9 @@ button.weekly-day {
 }
 
 .board-timeline {
+  width: max-content;
   min-width: 920px;
+  max-width: none;
   display: grid;
   gap: 14px;
   position: relative;
@@ -2395,6 +2404,7 @@ button.weekly-day {
   align-items: start;
   position: relative;
   overflow: visible;
+  min-width: 0;
 }
 
 .board-lane-head,
@@ -2706,6 +2716,7 @@ button.weekly-day {
   position: absolute;
   top: calc(5px + var(--board-stack-offset, 0px));
   bottom: 5px;
+  max-width: 100%;
   border-radius: 11px;
   border: 1px solid rgba(255,255,255,0.28);
   padding: 6px 8px;
