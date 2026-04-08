@@ -6,6 +6,7 @@
   boardDensity: "compact",
   activeShiftTab: "early",
   generationRows: [],
+  generationSentTargets: [],
   generationEditingRowId: "",
   generationErrors: [],
   generationWarnings: [],
@@ -119,6 +120,7 @@ const elements = {
   generationRowSubmitButton: document.querySelector("#generationRowSubmitButton"),
   generationRowCancelButton: document.querySelector("#generationRowCancelButton"),
   generationPhaseStatus: document.querySelector("#generationPhaseStatus"),
+  generationSentTargets: document.querySelector("#generationSentTargets"),
   historyCsvInput: document.querySelector("#historyCsvInput"),
   historyCsvText: document.querySelector("#historyCsvText"),
   applyRequestCsvButton: document.querySelector("#applyRequestCsvButton"),
@@ -260,6 +262,7 @@ function bindEvents() {
 
   elements.requestList?.addEventListener("click", handleRequestListClick);
   elements.requestList?.addEventListener("change", handleRequestListChange);
+  elements.generationSentTargets?.addEventListener("click", handleGenerationSentTargetsClick);
   elements.generationRowSubmitButton?.addEventListener("click", handleGenerationFormSubmit);
   elements.generationRowCancelButton?.addEventListener("click", resetGenerationForm);
   elements.requirementsList.addEventListener("change", handleRequirementChange);
@@ -373,6 +376,9 @@ function hydrateState(saved) {
   state.requirements = Array.isArray(saved.requirements) && saved.requirements.length
     ? cloneRequirements(saved.requirements)
     : cloneRequirements(samplePrototypeData.requirements);
+  state.generationSentTargets = Array.isArray(saved.generationSentTargets)
+    ? saved.generationSentTargets.filter((name) => samplePrototypeData.therapistProfiles[name])
+    : [];
   state.generationRows = Array.isArray(saved.generationRows) && saved.generationRows.length
     ? restoreGenerationRows(saved.generationRows)
     : createGenerationRows(samplePrototypeData.shiftRequests);
@@ -406,6 +412,7 @@ function loadSampleState() {
   state.hasUnsavedChanges = false;
   state.hasManualAdjustments = false;
   state.requirements = cloneRequirements(samplePrototypeData.requirements);
+  state.generationSentTargets = [];
   state.generationRows = createGenerationRows(samplePrototypeData.shiftRequests);
   state.historyRows = [...samplePrototypeData.weeklyPerformance];
   state.generatedSchedule = {};
@@ -567,11 +574,15 @@ function renderGeneration() {
   }
   if (elements.generationPhaseStatus) {
     elements.generationPhaseStatus.innerHTML = `
-      <span class="legend-chip normal">提出状況 ${missingTherapists.length ? `未提出 ${missingTherapists.length}名` : "未提出なし"}</span>
+      <span class="legend-chip normal">送信対象 ${state.generationSentTargets.length}名</span>
+      <span class="legend-chip ${missingTherapists.length ? "warning" : "normal"}">提出状況 ${missingTherapists.length ? `未提出 ${missingTherapists.length}名` : "未提出なし"}</span>
       <span class="legend-chip normal">読込件数 ${state.generationRows.length}件</span>
     `;
   }
   elements.generationAlerts.innerHTML = renderGenerationAlerts(checkSummary);
+  if (elements.generationSentTargets) {
+    elements.generationSentTargets.innerHTML = renderGenerationSentTargets();
+  }
   if (elements.requestList) {
     elements.requestList.innerHTML = renderRequestRows();
   }
@@ -579,8 +590,9 @@ function renderGeneration() {
   renderGenerationForm();
   if (elements.generationDecisionSummary) {
     elements.generationDecisionSummary.innerHTML = `
+      <span class="legend-chip normal">送信対象 ${state.generationSentTargets.length}名</span>
       <span class="legend-chip normal">読込 ${state.generationRows.length}件</span>
-      <span class="legend-chip ${missingTherapists.length ? "warning" : "normal"}">未登録 ${missingTherapists.length}名</span>
+      <span class="legend-chip ${missingTherapists.length ? "warning" : "normal"}">未提出 ${missingTherapists.length}名</span>
       <span class="legend-chip ${reviewRows.length ? "warning" : "normal"}">要確認 ${new Set(reviewRows.map((row) => row.name)).size}名</span>
     `;
   }
@@ -1335,6 +1347,22 @@ function renderGenerationAlerts(checkSummary) {
   return blocks.join("");
 }
 
+function renderGenerationSentTargets() {
+  const therapistNames = Object.keys(samplePrototypeData.therapistProfiles).sort((left, right) => left.localeCompare(right, "ja"));
+  if (!therapistNames.length) {
+    return `<div class="empty-state">送信対象を選べるセラピストがありません。</div>`;
+  }
+
+  return therapistNames.map((name) => `
+    <button
+      class="generation-sent-chip ${state.generationSentTargets.includes(name) ? "active" : ""}"
+      type="button"
+      data-generation-sent-toggle="${name}"
+      aria-pressed="${state.generationSentTargets.includes(name) ? "true" : "false"}"
+    >${name}</button>
+  `).join("");
+}
+
 function renderRequestRows() {
   if (!state.generationRows.length) {
     return `<div class="empty-state">CSVを反映すると希望一覧が表示されます。</div>`;
@@ -1464,6 +1492,22 @@ function handleGenerationFormSubmit() {
   state.generationEditingRowId = "";
   state.generationWarnings = collectGenerationWarnings(state.generationRows);
   markGenerationDirty();
+  persistState();
+  renderGeneration();
+}
+
+function handleGenerationSentTargetsClick(event) {
+  const button = event.target.closest("[data-generation-sent-toggle]");
+  if (!button) return;
+  const name = button.dataset.generationSentToggle;
+  if (!name) return;
+
+  if (state.generationSentTargets.includes(name)) {
+    state.generationSentTargets = state.generationSentTargets.filter((item) => item !== name);
+  } else {
+    state.generationSentTargets = [...state.generationSentTargets, name].sort((left, right) => left.localeCompare(right, "ja"));
+  }
+
   persistState();
   renderGeneration();
 }
@@ -3286,7 +3330,7 @@ function buildCheckSummary(rows, missingTherapists) {
 
 function getMissingTherapists() {
   const submittedNames = new Set(state.generationRows.map((row) => row.name));
-  return Object.keys(samplePrototypeData.therapistProfiles).filter((name) => !submittedNames.has(name));
+  return state.generationSentTargets.filter((name) => !submittedNames.has(name));
 }
 
 function getCutRowsForDate(dateKey) {
@@ -4205,10 +4249,11 @@ function persistState() {
       activeShiftTab: state.activeShiftTab,
     distributionViewMode: state.distributionViewMode,
     distributionFormat: state.distributionFormat,
-    weeklyAnalysisView: state.weeklyAnalysisView,
-    weekOffset: state.weekOffset,
-    dashboardSectionOrder: state.dashboardSectionOrder,
-    copiedDistributionIds: state.copiedDistributionIds,
+      weeklyAnalysisView: state.weeklyAnalysisView,
+      weekOffset: state.weekOffset,
+      dashboardSectionOrder: state.dashboardSectionOrder,
+      copiedDistributionIds: state.copiedDistributionIds,
+      generationSentTargets: state.generationSentTargets,
       distributionPendingOnly: state.distributionPendingOnly,
       selectedBoardAssignmentId: state.selectedBoardAssignmentId,
       hasUnsavedChanges: state.hasUnsavedChanges,
