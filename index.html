@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-    <link rel="stylesheet" href="styles.css?v=202604081950">
+    <link rel="stylesheet" href="styles.css?v=202604081955">
 </head>
 <body>
   <div class="app-shell">
@@ -47,7 +47,7 @@
                 <div>
                   <h2>シフトスケジュール</h2>
                   <button id="selectedDateLabel" class="selected-date-label selected-date-trigger" type="button" aria-label="日付を選択"></button>
-                  <input id="selectedDatePicker" class="selected-date-picker-input" type="date" hidden>
+                  <input id="selectedDatePicker" class="selected-date-picker-input" type="date" aria-hidden="true" tabindex="-1">
                 </div>
               </div>
             <div class="toolbar-row">
@@ -446,7 +446,7 @@
 
   <div id="globalToast" class="global-toast" aria-live="polite"></div>
 
-  <script src="data.js?v=202604081950"></script>
-  <script src="app.js?v=202604081950"></script>
+  <script src="data.js?v=202604081955"></script>
+  <script src="app.js?v=202604081955"></script>
 </body>
 </html>
