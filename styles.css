@@ -407,28 +407,28 @@ pre {
 }
 
 .dashboard-summary-grid .summary-card {
-  padding: 10px 11px;
-  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  border-radius: 12px;
   background: #f7f9fc;
   border: 1px solid #dbe3ee;
-  box-shadow: 0 1px 2px rgba(17, 36, 63, 0.025);
+  box-shadow: none;
 }
 
 .dashboard-summary-grid .summary-card p {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   font-size: 0.68rem;
   color: #7f8ea3;
 }
 
 .dashboard-summary-grid .summary-card strong {
-  font-size: 0.9rem;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 600;
   color: #1f2c3d;
 }
 
 .dashboard-summary-grid .summary-card:not(.emphasis) {
   box-shadow: none;
-  background: #f5f7fb;
+  background: #f7f9fc;
 }
 
 .dashboard-summary-grid .summary-card:not(.emphasis) strong {
@@ -449,30 +449,30 @@ pre {
 }
 
 .dashboard-summary-grid .summary-card.kpi-hot {
-  background: rgba(220, 80, 80, 0.15);
-  border-color: rgba(220, 80, 80, 0.18);
+  background: #fdecec;
+  border-color: #f8caca;
 }
 
 .dashboard-summary-grid .summary-card.kpi-warm {
-  background: rgba(240, 180, 60, 0.12);
-  border-color: rgba(220, 177, 84, 0.18);
+  background: #fff6e6;
+  border-color: #ffe2b8;
 }
 
 .dashboard-summary-grid .summary-card.kpi-cool {
-  background: rgba(100, 140, 200, 0.08);
-  border-color: rgba(120, 154, 206, 0.18);
+  background: #eef4ff;
+  border-color: #d6e4ff;
 }
 
 .dashboard-summary-grid .summary-card.kpi-hot strong {
-  color: #c05050;
+  color: #d64b4b;
 }
 
 .dashboard-summary-grid .summary-card.kpi-warm strong {
-  color: #c68a2b;
+  color: #c88400;
 }
 
 .dashboard-summary-grid .summary-card.kpi-cool strong {
-  color: #4a6fa5;
+  color: #3a6fd8;
 }
 
 .risk-summary-list {
