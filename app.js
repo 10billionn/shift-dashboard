@@ -596,6 +596,7 @@ function renderGeneration() {
     elements.requirementsList.innerHTML = renderRequirements();
   }
   renderGenerationForm();
+  elements.generateScheduleButton.disabled = state.generationErrors.length > 0;
   if (elements.generationDecisionSummary) {
     elements.generationDecisionSummary.innerHTML = `
       <span class="legend-chip normal">送信対象 ${state.generationSentTargets.length}名</span>
@@ -1317,10 +1318,11 @@ function renderGenerationAlerts(checkSummary) {
   const blocks = [];
 
   if (state.generationErrors.length) {
+    const previewErrors = state.generationErrors.slice(0, 5);
     blocks.push(`
       <article class="alert-box danger">
         <strong>CSVエラーがあります</strong>
-        <div>${state.generationErrors.map((error) => `<div>${error}</div>`).join("")}</div>
+        <div>${previewErrors.map((error) => `<div>${error}</div>`).join("")}${state.generationErrors.length > previewErrors.length ? `<div>他 ${state.generationErrors.length - previewErrors.length}件</div>` : ""}</div>
       </article>
     `);
   }
@@ -1466,12 +1468,12 @@ function resetGenerationForm() {
 function buildGenerationRow(row, id = "", status = "accepted") {
   const built = {
     id: id || `${normalizeDateKey(row.dateKey)}-${sanitizeText(row.name)}-${Date.now()}`,
-    name: sanitizeText(row.name),
+    name: normalizeTherapistName(row.name),
     dateKey: normalizeDateKey(row.dateKey),
-    startTime: normalizeTime(row.startTime),
-    endTime: normalizeTime(row.endTime),
-    preferredArea: sanitizeText(row.preferredArea),
-    himeReservation: sanitizeText(row.himeReservation) || "未設定",
+    startTime: normalizeCsvTime(row.startTime),
+    endTime: normalizeCsvTime(row.endTime),
+    preferredArea: normalizeAreaName(row.preferredArea),
+    himeReservation: normalizeHimeValue(row.himeReservation),
     note: sanitizeText(row.note),
     status: ["accepted", "hold", "cut"].includes(status) ? status : "accepted"
   };
@@ -3241,26 +3243,72 @@ function parseRequestCsv(text) {
 
   const parsedRows = [];
   const errors = [];
+  const seenDailyKeys = new Map();
+  const settings = getAppSettings();
 
   rows.slice(1).forEach((columns, index) => {
     if (!columns.some(Boolean)) return;
     const record = mapCsvRecord(headers, columns);
-    const row = {
-      name: sanitizeText(record["名前"]),
-      dateKey: sanitizeText(record["出勤可能日"]),
-      startTime: normalizeTime(record["出勤開始時間"]),
-      endTime: normalizeTime(record["出勤終了時間"]),
-      preferredArea: sanitizeText(record["希望エリア"]),
-      himeReservation: sanitizeText(record["姫予約有無"]),
-      note: sanitizeText(record["備考"])
-    };
+    const rawName = sanitizeText(record["名前"]);
+    const rawDate = sanitizeText(record["出勤可能日"]);
+    const rawStart = sanitizeText(record["出勤開始時間"]);
+    const rawEnd = sanitizeText(record["出勤終了時間"]);
+    const rawArea = sanitizeText(record["希望エリア"]);
+    const rowNumber = index + 2;
+    const rowErrors = [];
 
-    if (!row.name || !row.dateKey) {
-      errors.push(`${index + 2}行目: 名前または日付が不足しています。`);
+    const normalizedName = normalizeTherapistName(rawName);
+    const normalizedDateKey = normalizeCsvDateKey(rawDate);
+    const normalizedStart = normalizeCsvTime(rawStart);
+    const normalizedEnd = normalizeCsvTime(rawEnd);
+    const normalizedArea = normalizeAreaName(rawArea);
+    const normalizedHime = normalizeHimeValue(record["姫予約有無"]);
+    const normalizedNote = sanitizeText(record["備考"]);
+
+    if (!normalizedName) rowErrors.push("名前が不足しています");
+    if (!normalizedDateKey) rowErrors.push("日付が不足または不正です");
+    if (!normalizedStart || !normalizedEnd) rowErrors.push("開始または終了時刻が不正です");
+    if (!normalizedArea) rowErrors.push(rawArea ? "希望エリア名が未登録です" : "希望エリアが不足しています");
+    if (normalizedName && !samplePrototypeData.therapistProfiles[normalizedName]) rowErrors.push("セラピスト名が未登録です");
+
+    if (normalizedStart && normalizedEnd) {
+      const startMinutes = toMinutes(normalizedStart);
+      const endMinutes = toMinutes(normalizedEnd);
+      if (startMinutes >= endMinutes) {
+        rowErrors.push("開始終了時刻の前後関係が不正です");
+      }
+      if (startMinutes < settings.businessStartHour * 60 || endMinutes > settings.businessEndHour * 60) {
+        rowErrors.push("営業時間外の時間帯が含まれています");
+      }
+      const duration = endMinutes - startMinutes;
+      if (duration > 18 * 60 || duration < 60) {
+        rowErrors.push("同一日付内の時間帯が不自然です");
+      }
+    }
+
+    const duplicateKey = normalizedName && normalizedDateKey ? `${normalizedName}__${normalizedDateKey}` : "";
+    if (duplicateKey) {
+      if (seenDailyKeys.has(duplicateKey)) {
+        rowErrors.push("同一人物の重複提出です");
+      } else {
+        seenDailyKeys.set(duplicateKey, true);
+      }
+    }
+
+    if (rowErrors.length) {
+      rowErrors.forEach((message) => errors.push(`${rowNumber}行目: ${message}`));
       return;
     }
 
-    parsedRows.push(row);
+    parsedRows.push({
+      name: normalizedName,
+      dateKey: normalizedDateKey,
+      startTime: normalizedStart,
+      endTime: normalizedEnd,
+      preferredArea: normalizedArea,
+      himeReservation: normalizedHime,
+      note: normalizedNote
+    });
   });
 
   return { rows: parsedRows, errors };
@@ -3301,6 +3349,7 @@ function collectRowIssues(row) {
   if (!row.preferredArea) issues.push("希望エリア未入力");
   if (row.himeReservation !== "あり" && row.himeReservation !== "なし") issues.push("姫予約未設定");
   if (row.preferredArea && !getAppSettings().areas.includes(row.preferredArea)) issues.push("非対応エリア含む");
+  if (row.name && row.preferredArea && !supportsArea(row.name, row.preferredArea)) issues.push("担当エリア要確認");
   return issues;
 }
 
@@ -3309,7 +3358,7 @@ function collectGenerationWarnings(rows) {
 }
 
 function buildCheckSummary(rows, missingTherapists) {
-  const issueLabels = ["時間未入力", "希望エリア未入力", "姫予約未設定", "非対応エリア含む"];
+  const issueLabels = ["時間未入力", "希望エリア未入力", "姫予約未設定", "非対応エリア含む", "担当エリア要確認"];
   const items = issueLabels.map((label) => ({
     label,
     names: [...new Set(rows.filter((row) => row.issues.includes(label)).map((row) => `${row.name} ${formatSlashDate(row.dateKey)}`))]
@@ -4004,6 +4053,64 @@ function mapCsvRecord(headers, columns) {
 
 function sanitizeText(value) {
   return String(value || "").trim();
+}
+
+function normalizeTextKey(value) {
+  return sanitizeText(value).replace(/[\s　]+/g, "").toLowerCase();
+}
+
+function normalizeTherapistName(value) {
+  const text = sanitizeText(value);
+  if (!text) return "";
+  const exact = Object.keys(samplePrototypeData.therapistProfiles).find((name) => normalizeTextKey(name) === normalizeTextKey(text));
+  return exact || text;
+}
+
+function normalizeAreaName(value) {
+  const text = sanitizeText(value);
+  if (!text) return "";
+  const aliases = {
+    葛西: "葛西",
+    浦安: "浦安",
+    船橋: "船橋",
+    浅草橋: "浅草橋",
+    浅草: "浅草橋",
+    八千代: "八千代"
+  };
+  const normalizedKey = normalizeTextKey(text);
+  const aliasMatch = Object.entries(aliases).find(([alias]) => normalizeTextKey(alias) === normalizedKey);
+  if (aliasMatch) return aliasMatch[1];
+  const areaMatch = getAppSettings().areas.find((area) => normalizeTextKey(area) === normalizedKey);
+  return areaMatch || "";
+}
+
+function normalizeCsvTime(value) {
+  const text = sanitizeText(value);
+  if (!text) return "";
+  if (/^\d{1,2}$/.test(text)) return normalizeTime(`${text}:00`);
+  if (/^\d{3,4}$/.test(text)) {
+    const padded = text.padStart(4, "0");
+    return normalizeTime(`${padded.slice(0, 2)}:${padded.slice(2)}`);
+  }
+  return normalizeTime(text);
+}
+
+function normalizeCsvDateKey(value) {
+  const text = sanitizeText(value);
+  if (!text) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const slashMatch = text.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (!slashMatch) return "";
+  const [, year, month, day] = slashMatch;
+  return `${year}-${String(Number(month)).padStart(2, "0")}-${String(Number(day)).padStart(2, "0")}`;
+}
+
+function normalizeHimeValue(value) {
+  const text = sanitizeText(value);
+  if (!text) return "なし";
+  if (["あり", "有", "有り", "yes", "true", "1"].includes(text.toLowerCase ? text.toLowerCase() : text)) return "あり";
+  if (["なし", "無", "無し", "no", "false", "0"].includes(text.toLowerCase ? text.toLowerCase() : text)) return "なし";
+  return "なし";
 }
 
 function normalizeTime(value) {
