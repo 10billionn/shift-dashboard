@@ -1592,6 +1592,12 @@ pre {
   color: #244e93;
 }
 
+.generation-sent-chip.placed {
+  background: rgba(107, 114, 128, 0.1);
+  border-color: rgba(107, 114, 128, 0.18);
+  color: rgba(77, 85, 98, 0.82);
+}
+
 .generation-decision-data-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

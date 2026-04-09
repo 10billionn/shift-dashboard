@@ -326,6 +326,7 @@ function bindEvents() {
   elements.generationSentTargets?.addEventListener("click", handleGenerationSentTargetsClick);
   elements.generationRowSubmitButton?.addEventListener("click", handleGenerationFormSubmit);
   elements.generationRowCancelButton?.addEventListener("click", resetGenerationForm);
+  elements.generationFormDate?.addEventListener("change", () => renderGenerationForm());
   elements.requirementsList?.addEventListener("change", handleRequirementChange);
   [
     elements.settingsDefaultEarlySlots,
@@ -1658,9 +1659,14 @@ function renderGenerationSentTargets() {
   }
 
   const submittedNames = new Set(state.generationRows.map((row) => row.name));
+  const placedNames = new Set(
+    state.generationRows
+      .filter((row) => row.status === "accepted")
+      .map((row) => row.name)
+  );
   return targetNames.map((name) => `
-    <span class="generation-sent-chip ${submittedNames.has(name) ? "active" : ""}">
-      ${name}
+    <span class="generation-sent-chip ${submittedNames.has(name) ? "active" : ""} ${placedNames.has(name) ? "placed" : ""}">
+      ${name}${placedNames.has(name) ? "（配置済）" : ""}
     </span>
   `).join("");
 }
@@ -1737,12 +1743,23 @@ function renderGenerationForm() {
   const therapistNames = Object.keys(samplePrototypeData.therapistProfiles).sort((left, right) => left.localeCompare(right, "ja"));
   const areas = getAppSettings().areas || [];
   const editingRow = state.generationRows.find((row) => row.id === state.generationEditingRowId) || null;
+  const selectedDateKey = editingRow?.dateKey || state.selectedDate || samplePrototypeData.settings.startDate;
+  const occupiedNames = new Set(
+    state.generationRows
+      .filter((row) => row.dateKey === selectedDateKey && row.id !== state.generationEditingRowId)
+      .map((row) => row.name)
+  );
 
-  elements.generationFormName.innerHTML = therapistNames.map((name) => `<option value="${name}">${name}</option>`).join("");
+  elements.generationFormName.innerHTML = therapistNames.map((name) => `
+    <option value="${name}" ${occupiedNames.has(name) ? "disabled" : ""}>
+      ${name}${occupiedNames.has(name) ? "（配置済）" : ""}
+    </option>
+  `).join("");
   elements.generationFormArea.innerHTML = areas.map((area) => `<option value="${area}">${area}</option>`).join("");
 
-  elements.generationFormName.value = editingRow?.name || therapistNames[0] || "";
-  elements.generationFormDate.value = editingRow?.dateKey || state.selectedDate || samplePrototypeData.settings.startDate;
+  const defaultName = editingRow?.name || therapistNames.find((name) => !occupiedNames.has(name)) || therapistNames[0] || "";
+  elements.generationFormName.value = defaultName;
+  elements.generationFormDate.value = selectedDateKey;
   elements.generationFormStart.value = editingRow?.startTime || "11:00";
   elements.generationFormEnd.value = editingRow?.endTime || "19:00";
   elements.generationFormArea.value = editingRow?.preferredArea || areas[0] || "";
@@ -1898,6 +1915,13 @@ function handleGenerationFormSubmit() {
       himeReservation: elements.generationFormHime.value,
       note: elements.generationFormNote.value
     }, state.generationEditingRowId, existing?.status || "accepted");
+
+    const duplicateRow = findGenerationRowByTherapistDate(nextRow.name, nextRow.dateKey, existing?.id || "");
+    if (duplicateRow) {
+      setGenerationSubmitUiState("idle");
+      showToast("このセラピストは既に配置されています。", "warning");
+      return;
+    }
 
     if (existing) {
       state.generationRows = baseRows.map((row) => row.id === existing.id ? nextRow : row);
@@ -2825,6 +2849,12 @@ function commitBoardMove(assignmentId, roomIndex, startMinutes, endMinutes) {
   const scheduledAssignment = findScheduledAssignmentById(assignmentId);
   const assignment = scheduledAssignment || buildBoardAdjustmentAssignment(row);
   if (!assignment) return;
+  if (hasDuplicateBoardPlacement(assignmentId, assignment.name, assignment.dateKey)) {
+    flashBoardUpdateStatus("このセラピストは既に配置されています。", "warning");
+    showToast("このセラピストは既に配置されています。", "warning");
+    renderBoardWorkspace();
+    return false;
+  }
 
   const normalizedRoomIndex = normalizeRoomIndex(roomIndex, assignment.roomIndex ?? 0);
   const roomMeta = getRoomMeta(normalizedRoomIndex, assignment.assignedArea || assignment.preferredArea);
@@ -2883,19 +2913,22 @@ function commitBoardMove(assignmentId, roomIndex, startMinutes, endMinutes) {
     window.setTimeout(() => settledTrack?.classList.remove("drop-settle"), 140);
   });
   renderLinkedViewsAfterBoardEdit();
+  return true;
 }
 
 function restoreBoardAssignmentFromAdjustment(assignmentId, roomIndex) {
   const row = state.generationRows.find((item) => item.id === assignmentId && ["cut", "hold"].includes(item.status));
   const adjustmentAssignment = buildBoardAdjustmentAssignment(row);
   if (!adjustmentAssignment) return;
-  commitBoardMove(
+  const restored = commitBoardMove(
     assignmentId,
     roomIndex,
     toMinutes(adjustmentAssignment.startTime),
     toMinutes(adjustmentAssignment.endTime)
   );
-  showToast(`${adjustmentAssignment.name}を盤面に戻しました。`, "success");
+  if (restored) {
+    showToast(`${adjustmentAssignment.name}を盤面に戻しました。`, "success");
+  }
 }
 
 function handleBoardInspectorChange(event) {
@@ -3957,6 +3990,32 @@ function parseDemandMetricsCsv(text) {
 
 function createGenerationRows(rows) {
   return rows.map((row, index) => buildGenerationRow(row, `${row.dateKey}-${row.name}-${index}`, "accepted"));
+}
+
+function findGenerationRowByTherapistDate(name, dateKey, excludeId = "") {
+  const normalizedName = normalizeTherapistName(name);
+  const normalizedDateKey = normalizeDateKey(dateKey);
+  if (!normalizedName || !normalizedDateKey) return null;
+  return state.generationRows.find((row) => (
+    row.id !== excludeId
+    && normalizeTherapistName(row.name) === normalizedName
+    && normalizeDateKey(row.dateKey) === normalizedDateKey
+  )) || null;
+}
+
+function hasDuplicateBoardPlacement(assignmentId, name, dateKey) {
+  const normalizedName = normalizeTherapistName(name);
+  const normalizedDateKey = normalizeDateKey(dateKey);
+  if (!normalizedName || !normalizedDateKey) return false;
+  const day = state.generatedSchedule[normalizedDateKey];
+  if (!day) return false;
+  return [...day.earlyAssignments, ...day.lateAssignments]
+    .filter(Boolean)
+    .some((item) => (
+      item.id !== assignmentId
+      && normalizeTherapistName(item.name) === normalizedName
+      && normalizeDateKey(item.dateKey) === normalizedDateKey
+    ));
 }
 
 function collectRowIssues(row) {
