@@ -800,6 +800,41 @@ pre {
   line-height: 1.12;
 }
 
+.dashboard-side-tip {
+  display: grid;
+  gap: 6px;
+}
+
+.dashboard-side-tip-head {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(90, 104, 124, 0.78);
+}
+
+.dashboard-side-tip .tip-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 200, 0, 0.08);
+  border: 1px solid rgba(255, 226, 184, 0.78);
+  color: rgba(86, 69, 24, 0.92);
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: none;
+}
+
+.dashboard-side-tip .tip-box::before {
+  content: "💡";
+  flex: 0 0 auto;
+  line-height: 1.2;
+}
+
+.dashboard-side-tip .tip-box:empty {
+  display: none;
+}
+
 #dashboardListView.dashboard-view-panel {
   display: block;
 }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-    <link rel="stylesheet" href="styles.css?v=202604100510">
+    <link rel="stylesheet" href="styles.css?v=202604100525">
 </head>
 <body>
   <div class="app-shell">
@@ -93,6 +93,11 @@
                   <strong id="fillSummary"></strong>
                 </article>
               </section>
+
+              <section class="dashboard-side-tip">
+                <div class="dashboard-side-tip-head">今日のひとこと</div>
+                <div id="dashboardRiskSummary" class="tip-box"></div>
+              </section>
             </aside>
           </div>
 
@@ -109,19 +114,6 @@
               </div>
             </summary>
             <div id="weeklyAnalysis" class="weekly-analysis dashboard-collapsible-body"></div>
-          </details>
-
-          <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-risk-panel dashboard-sortable-section" data-section-id="riskSummary" draggable="false" open>
-            <summary class="dashboard-collapsible-summary">
-              <div>
-                <h3>今日のひとこと</h3>
-              </div>
-              <div class="dashboard-section-tools">
-                <span class="section-collapse-indicator" aria-hidden="true"></span>
-                <button class="section-drag-handle" type="button" draggable="true" data-section-drag-handle aria-label="今日のひとことを並び替え">⋮⋮</button>
-              </div>
-            </summary>
-            <div id="dashboardRiskSummary" class="risk-summary-list dashboard-collapsible-body"></div>
           </details>
 
           <div id="dashboardListView" class="dashboard-view-panel active dashboard-sortable-section" data-section-id="roomDetail" draggable="false">
@@ -474,6 +466,6 @@
   </div>
 
   <script src="data.js?v=202604090120"></script>
-  <script src="app.js?v=202604100455"></script>
+  <script src="app.js?v=202604100525"></script>
 </body>
 </html>
