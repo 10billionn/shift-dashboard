@@ -54,6 +54,8 @@ let boardResizeClientX = 0;
 let boardMoveState = null;
 let boardMoveFrameId = null;
 let boardMovePointer = { x: 0, y: 0 };
+let boardAutoScrollFrameId = null;
+let boardAutoScrollSpeed = 0;
 let boardSuppressClickUntil = 0;
 let dashboardSectionDragState = null;
 let dashboardSectionArmedId = "";
@@ -2418,6 +2420,7 @@ function handleBoardMoveStart(event) {
       endMinutes: initialEndTime
     }
   };
+  updateBoardAutoScroll(event.clientY);
 }
 
 function handleBoardResizeMove(event) {
@@ -2436,6 +2439,7 @@ function handleBoardResizeMove(event) {
 function handleBoardMoveMove(event) {
   if (!boardMoveState) return;
   boardMovePointer = { x: event.clientX, y: event.clientY };
+  updateBoardAutoScroll(event.clientY);
   if (boardMoveFrameId) return;
   boardMoveFrameId = window.requestAnimationFrame(() => {
     boardMoveFrameId = null;
@@ -2482,6 +2486,7 @@ function handleBoardMoveEnd(event) {
     window.cancelAnimationFrame(boardMoveFrameId);
     boardMoveFrameId = null;
   }
+  stopBoardAutoScroll();
 
   const moveState = boardMoveState;
   boardMoveState = null;
@@ -2499,6 +2504,67 @@ function handleBoardMoveEnd(event) {
     return;
   }
   commitBoardMove(moveState.assignmentId, preview.roomIndex, preview.startMinutes, preview.endMinutes);
+}
+
+function updateBoardAutoScroll(pointerY) {
+  if (!boardMoveState) {
+    stopBoardAutoScroll();
+    return;
+  }
+
+  const edgeThreshold = 100;
+  const maxSpeed = 18;
+  let nextSpeed = 0;
+
+  if (pointerY > window.innerHeight - edgeThreshold) {
+    const distance = window.innerHeight - pointerY;
+    const ratio = Math.max(0, Math.min(1, (edgeThreshold - distance) / edgeThreshold));
+    nextSpeed = Math.max(4, Math.round(maxSpeed * ratio));
+  } else if (pointerY < edgeThreshold) {
+    const ratio = Math.max(0, Math.min(1, (edgeThreshold - pointerY) / edgeThreshold));
+    nextSpeed = -Math.max(4, Math.round(maxSpeed * ratio));
+  }
+
+  boardAutoScrollSpeed = nextSpeed;
+  if (!boardAutoScrollSpeed) {
+    stopBoardAutoScroll();
+    return;
+  }
+
+  if (boardAutoScrollFrameId) return;
+  boardAutoScrollFrameId = window.requestAnimationFrame(runBoardAutoScroll);
+}
+
+function runBoardAutoScroll() {
+  boardAutoScrollFrameId = null;
+  if (!boardMoveState || !boardAutoScrollSpeed) return;
+
+  const previousScrollY = window.scrollY;
+  window.scrollBy(0, boardAutoScrollSpeed);
+  const scrolled = window.scrollY !== previousScrollY;
+
+  if (scrolled && boardMoveState) {
+    const preview = getBoardMovePreview(boardMoveState, boardMovePointer.x, boardMovePointer.y);
+    if (preview) {
+      boardMoveState.preview = preview;
+      boardMoveState.moved = boardMoveState.moved
+        || preview.dropzone !== boardMoveState.initialDropzone
+        || preview.roomIndex !== boardMoveState.initialRoomIndex
+        || preview.startMinutes !== boardMoveState.initialStartTime;
+      applyBoardMovePreview(boardMoveState, preview);
+    }
+  }
+
+  if (boardMoveState && boardAutoScrollSpeed) {
+    boardAutoScrollFrameId = window.requestAnimationFrame(runBoardAutoScroll);
+  }
+}
+
+function stopBoardAutoScroll() {
+  boardAutoScrollSpeed = 0;
+  if (!boardAutoScrollFrameId) return;
+  window.cancelAnimationFrame(boardAutoScrollFrameId);
+  boardAutoScrollFrameId = null;
 }
 
 function handleBoardDragStart(event) {
