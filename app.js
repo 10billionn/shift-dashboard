@@ -2466,6 +2466,8 @@ function handleBoardMoveStart(event) {
       guideStart,
       guideEnd,
       subLabel: movingBar.querySelector(".board-bar-sub"),
+      lastTargetTrack: null,
+      lastTargetLane: null,
     timelineStart: settings.businessStartHour * 60,
     timelineEnd: settings.businessEndHour * 60,
     moved: false,
@@ -2733,6 +2735,19 @@ function clearBoardTargetHighlights() {
   });
 }
 
+function updateBoardMoveTargetHighlight(moveState, targetTrack) {
+  const nextLane = targetTrack?.closest(".board-lane") || null;
+  if (moveState.lastTargetTrack === targetTrack && moveState.lastTargetLane === nextLane) {
+    return;
+  }
+  moveState.lastTargetTrack?.classList.remove("drag-over");
+  moveState.lastTargetLane?.classList.remove("drag-target-room");
+  moveState.lastTargetTrack = targetTrack || null;
+  moveState.lastTargetLane = nextLane;
+  moveState.lastTargetTrack?.classList.add("drag-over");
+  moveState.lastTargetLane?.classList.add("drag-target-room");
+}
+
 function clearBoardInteractionHighlights() {
   clearBoardTargetHighlights();
   document.querySelectorAll(".board-track.drag-origin").forEach((item) => {
@@ -2815,14 +2830,11 @@ function getBoardMovePreview(moveState, clientX, clientY) {
 }
 
 function applyBoardMovePreview(moveState, preview) {
-  clearBoardTargetHighlights();
   const sourceLane = moveState.bar.closest(".board-lane");
-  const targetLane = preview.targetTrack?.closest(".board-lane");
   const isSameTrack = preview.targetTrack === moveState.sourceTrack;
   moveState.sourceTrack.classList.toggle("drag-origin", !isSameTrack);
   sourceLane?.classList.toggle("drag-source-room", !isSameTrack);
-  preview.targetTrack?.classList.add("drag-over");
-  targetLane?.classList.add("drag-target-room");
+  updateBoardMoveTargetHighlight(moveState, preview.targetTrack);
 
   const snapNear = Math.abs(preview.rawStartMinutes - preview.startMinutes) < 6;
   const overlayHeight = (moveState.overlayRoot?.getBoundingClientRect()?.height || moveState.overlayRect?.height || preview.trackHeight);
