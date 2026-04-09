@@ -1196,17 +1196,19 @@ function buildBoardRoomRows(day) {
 
 function renderBoardLaneRow(row, index) {
   const isSelectedRoom = row.assignments.some((assignment) => assignment.id === state.selectedBoardAssignmentId);
+  const gapMarkup = renderBoardGapBars(row.assignments);
   const trackMarkup = row.assignments.length
-    ? `
-        <div class="board-track ${row.hasOverlap ? "board-track-overlap" : ""}" data-board-slot-index="${row.slotIndex}" data-board-lane-index="0">
-          ${row.stackedAssignments.map((item) => renderBoardBar(item.assignment, row.slotIndex, item.assignment.shiftType, item)).join("")}
-        </div>
-      `
-      : `
-        <div class="board-track board-track-empty" data-board-slot-index="${row.slotIndex}" data-board-lane-index="0">
-        <div class="board-gap board-gap-empty">空き</div>
-        </div>
-      `;
+      ? `
+          <div class="board-track ${row.hasOverlap ? "board-track-overlap" : ""}" data-board-slot-index="${row.slotIndex}" data-board-lane-index="0">
+            ${gapMarkup}
+            ${row.stackedAssignments.map((item) => renderBoardBar(item.assignment, row.slotIndex, item.assignment.shiftType, item)).join("")}
+          </div>
+        `
+        : `
+          <div class="board-track board-track-empty" data-board-slot-index="${row.slotIndex}" data-board-lane-index="0">
+            ${gapMarkup}
+          </div>
+        `;
 
     return `
               <div class="board-lane ${row.hasOverlap ? "overlapping-room" : ""} ${isSelectedRoom ? "active-room" : ""}">
@@ -1218,6 +1220,32 @@ function renderBoardLaneRow(row, index) {
           </div>
     </div>
   `;
+}
+
+function renderBoardGapBars(assignments) {
+  const settings = getAppSettings();
+  const timelineStart = settings.businessStartHour * 60;
+  const timelineEnd = settings.businessEndHour * 60;
+  const total = Math.max(timelineEnd - timelineStart, 1);
+  const longGaps = getLongBoardGapRanges(assignments, settings);
+  if (!longGaps.length) return "";
+
+  return longGaps.map((gap) => {
+    const left = ((gap.start - timelineStart) / total) * 100;
+    const width = ((gap.end - gap.start) / total) * 100;
+    const durationHours = Math.round(((gap.end - gap.start) / 60) * 10) / 10;
+    const label = width >= 22
+      ? `空き ${formatBoardTimeLabel(minutesToTime(gap.start), minutesToTime(gap.end))}`
+      : `${durationHours}h空き`;
+    return `
+      <div
+        class="board-gap-bar"
+        style="left:${left}%; width:${width}%;"
+        title="${escapeHtml(`空き ${minutesToTime(gap.start)}-${minutesToTime(gap.end)}`)}">
+        <span class="board-gap-bar-label">${label}</span>
+      </div>
+    `;
+  }).join("");
 }
 
 function renderAdjustmentLane(rows) {
@@ -1434,18 +1462,8 @@ function renderRoomDetailGroups(rows, day = getScheduleDay(state.selectedDate)) 
 }
 
 function getOccupiedMinutesForRoom(assignments, settings = getAppSettings()) {
-  const startBoundary = settings.businessStartHour * 60;
-  const endBoundary = settings.businessEndHour * 60;
-  const ranges = assignments
-    .map((assignment) => ({
-      start: Math.max(toMinutes(assignment.startTime), startBoundary),
-      end: Math.min(toMinutes(assignment.endTime), endBoundary)
-    }))
-    .filter((range) => range.end > range.start)
-    .sort((left, right) => left.start - right.start);
-
+  const ranges = getMergedBoardOccupiedRanges(assignments, settings);
   if (!ranges.length) return 0;
-
   let total = 0;
   let currentStart = ranges[0].start;
   let currentEnd = ranges[0].end;
@@ -1463,6 +1481,61 @@ function getOccupiedMinutesForRoom(assignments, settings = getAppSettings()) {
 
   total += currentEnd - currentStart;
   return total;
+}
+
+function getMergedBoardOccupiedRanges(assignments, settings = getAppSettings()) {
+  const startBoundary = settings.businessStartHour * 60;
+  const endBoundary = settings.businessEndHour * 60;
+  const ranges = assignments
+    .map((assignment) => ({
+      start: Math.max(toMinutes(assignment.startTime), startBoundary),
+      end: Math.min(toMinutes(assignment.endTime), endBoundary)
+    }))
+    .filter((range) => range.end > range.start)
+    .sort((left, right) => left.start - right.start);
+
+  if (!ranges.length) return [];
+
+  const merged = [{ ...ranges[0] }];
+  for (let index = 1; index < ranges.length; index += 1) {
+    const range = ranges[index];
+    const last = merged[merged.length - 1];
+    if (range.start <= last.end) {
+      last.end = Math.max(last.end, range.end);
+      continue;
+    }
+    merged.push({ ...range });
+  }
+
+  return merged;
+}
+
+function getLongBoardGapRanges(assignments, settings = getAppSettings()) {
+  const timelineStart = settings.businessStartHour * 60;
+  const timelineEnd = settings.businessEndHour * 60;
+  const occupied = getMergedBoardOccupiedRanges(assignments, settings);
+  const minGapMinutes = 6 * 60;
+  const gaps = [];
+  let cursor = timelineStart;
+
+  if (!occupied.length) {
+    return timelineEnd - timelineStart >= minGapMinutes
+      ? [{ start: timelineStart, end: timelineEnd }]
+      : [];
+  }
+
+  occupied.forEach((range) => {
+    if (range.start - cursor >= minGapMinutes) {
+      gaps.push({ start: cursor, end: range.start });
+    }
+    cursor = Math.max(cursor, range.end);
+  });
+
+  if (timelineEnd - cursor >= minGapMinutes) {
+    gaps.push({ start: cursor, end: timelineEnd });
+  }
+
+  return gaps;
 }
 
 function getRoomMetricTone(value, maxValue, thresholds = { lowToMid: 0.4, midToHigh: 0.75 }) {
