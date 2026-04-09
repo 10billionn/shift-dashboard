@@ -1638,61 +1638,29 @@ function getSnappedAssignmentPosition(dateKey, roomIndex, desiredStart, duration
   const timelineStart = settings.businessStartHour * 60;
   const timelineEnd = settings.businessEndHour * 60;
   const occupied = getLaneOccupiedRanges(dateKey, roomIndex, assignmentId);
-  const freeRanges = getLaneFreeRanges(dateKey, roomIndex, assignmentId, settings)
-    .filter((range) => (range.end - range.start) >= duration);
-
-  if (!freeRanges.length) {
-    return {
-      valid: false,
-      startMinutes: snapMinutes(Math.max(timelineStart, Math.min(timelineEnd - duration, desiredStart)), 15),
-      endMinutes: snapMinutes(Math.max(timelineStart + duration, Math.min(timelineEnd, desiredStart + duration)), 15),
-      occupied,
-      freeRanges: []
-    };
-  }
-
   const desiredSnapped = snapMinutes(desiredStart, 15);
-  const edgeCandidate = getEdgeSnapCandidate(desiredSnapped, duration, occupied);
-  let bestStart = null;
-  let bestDistance = Infinity;
+  const snapThreshold = 15;
+  const snapTargets = [
+    timelineStart,
+    Math.max(timelineStart, timelineEnd - duration),
+    ...occupied.flatMap((range) => [range.start - duration, range.start, range.end])
+  ].map((value) => Math.max(timelineStart, Math.min(timelineEnd - duration, snapMinutes(value, 15))));
 
-  freeRanges.forEach((range) => {
-    const candidateStart = Math.max(range.start, Math.min(range.end - duration, desiredSnapped));
-    const candidateDistance = Math.abs(candidateStart - desiredSnapped);
-    if (candidateDistance < bestDistance) {
-      bestDistance = candidateDistance;
-      bestStart = candidateStart;
+  let bestStart = Math.max(timelineStart, Math.min(timelineEnd - duration, desiredSnapped));
+  let bestDistance = snapThreshold + 1;
+
+  snapTargets.forEach((candidate) => {
+    const distance = Math.abs(candidate - desiredSnapped);
+    if (distance <= snapThreshold && distance < bestDistance) {
+      bestDistance = distance;
+      bestStart = candidate;
     }
   });
 
-  if (edgeCandidate !== null) {
-    const edgeSnapped = snapMinutes(edgeCandidate, 15);
-    const matchingFreeRange = freeRanges.find((range) => edgeSnapped >= range.start && edgeSnapped + duration <= range.end);
-    if (matchingFreeRange) {
-      const edgeDistance = Math.abs(edgeSnapped - desiredSnapped);
-      if (edgeDistance <= bestDistance) {
-        bestStart = edgeSnapped;
-        bestDistance = edgeDistance;
-      }
-    }
-  }
-
-  if (bestStart === null) {
-    return {
-      valid: false,
-      startMinutes: desiredSnapped,
-      endMinutes: desiredSnapped + duration,
-      occupied,
-      freeRanges
-    };
-  }
-
   return {
-    valid: true,
     startMinutes: bestStart,
     endMinutes: bestStart + duration,
-    occupied,
-    freeRanges
+    occupied
   };
 }
 
@@ -2705,12 +2673,6 @@ function handleBoardMoveEnd(event) {
     renderBoardWorkspace();
     return;
   }
-  if (!preview.isValidDrop) {
-    showToast("その位置には配置できません。", "warning");
-    renderBoardWorkspace();
-    return;
-  }
-
   boardSuppressClickUntil = Date.now() + 220;
   if (preview.dropzone === "adjustment") {
     moveBoardAssignmentToAdjustment(moveState.assignmentId, preview.startMinutes, preview.endMinutes);
@@ -2977,8 +2939,7 @@ function getBoardMovePreview(moveState, clientX, clientY) {
     snappedWidth,
     trackTop,
     trackHeight,
-    verticalDrag,
-    isValidDrop: snappedPosition.valid
+    verticalDrag
   };
 }
 
@@ -2993,7 +2954,6 @@ function applyBoardMovePreview(moveState, preview) {
   moveState.movingBar.style.width = `${preview.snappedWidth}px`;
   moveState.movingBar.style.transform = `translate3d(${preview.snappedLeft}px, ${preview.visualTop}px, 0)`;
   moveState.movingBar.classList.toggle("snap-near", snapNear);
-  moveState.movingBar.classList.toggle("invalid-drop", !preview.isValidDrop);
   if (moveState.guideBand) {
     moveState.guideBand.style.left = `${preview.snappedLeft}px`;
     moveState.guideBand.style.top = `${preview.trackTop}px`;
@@ -3001,7 +2961,6 @@ function applyBoardMovePreview(moveState, preview) {
     moveState.guideBand.style.height = `${preview.trackHeight}px`;
     moveState.guideBand.style.opacity = "";
     moveState.guideBand.classList.toggle("snap-near", snapNear);
-    moveState.guideBand.classList.toggle("invalid-drop", !preview.isValidDrop);
   }
   if (moveState.guideStart) {
     moveState.guideStart.style.left = `${preview.snappedLeft}px`;
