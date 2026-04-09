@@ -2065,12 +2065,6 @@ function renderBoardInspector(day) {
         </div>
       </div>
 
-      <div class="board-inspector-actions">
-        <button class="board-action-chip danger" type="button" data-board-action="delete">削除</button>
-        <button class="board-action-chip warning" type="button" data-board-action="moveToAdjustment">調整中へ</button>
-        <button class="board-action-chip subtle" type="button" data-board-action="restore" ${canRestore ? "" : "disabled"}>戻る</button>
-      </div>
-
       <div class="board-editor-grid compact-board-editor-grid">
         <label class="field-block">
           <span class="field-label">現在ルーム</span>
@@ -2114,9 +2108,12 @@ function renderBoardInspector(day) {
             <button class="ghost-button" type="button" data-board-action="endLater30">終了 +30分</button>
           </div>
         </div>
-        <div class="board-quick-actions-group board-quick-actions-group-side">
-          <button class="ghost-button adjustment-button" type="button" data-board-action="moveToAdjustment">調整中へ移動</button>
-        </div>
+      </div>
+
+      <div class="board-inspector-footer-actions">
+        <button class="board-action-chip danger" type="button" data-board-action="delete">削除</button>
+        <button class="board-action-chip warning" type="button" data-board-action="moveToAdjustment">調整中へ</button>
+        <button class="board-action-chip subtle" type="button" data-board-action="restore" ${canRestore ? "" : "disabled"}>戻る</button>
       </div>
     </article>
   `;

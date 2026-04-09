@@ -3238,7 +3238,7 @@ button.weekly-day {
 
 .dashboard-side-card .board-inspector-card {
   padding-inline: 0;
-  padding-block: 2px 0;
+  padding-block: 0;
   border: none;
   border-radius: 0;
   background: transparent;
@@ -3389,7 +3389,7 @@ button.weekly-day {
 .board-inspector-card {
   display: grid;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 4px 14px 8px;
   border: 1px solid rgba(200, 211, 225, 0.3);
   border-radius: var(--radius-md);
   background: rgba(251, 252, 253, 0.66);
@@ -3398,12 +3398,12 @@ button.weekly-day {
 
 .board-inspector-head {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .board-inspector-identity {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -3412,6 +3412,7 @@ button.weekly-day {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  margin: 0;
 }
 
 .board-inspector-actions {
@@ -3458,9 +3459,13 @@ button.weekly-day {
 }
 
 .board-inspector .therapist-name {
-  font-size: 1.15rem;
+  font-size: 1.42rem;
   font-weight: 800;
-  line-height: 1.05;
+  line-height: 1;
+}
+
+.board-inspector-name-row .mini-badge {
+  align-self: center;
 }
 
 .board-inspector-meta {
@@ -3717,6 +3722,21 @@ button.weekly-day {
   color: rgba(90, 104, 123, 0.82);
   background: rgba(238, 242, 246, 0.88);
   box-shadow: inset 0 0 0 1px rgba(190, 201, 215, 0.24);
+}
+
+.board-inspector-footer-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 8px;
+  margin-top: 2px;
+  border-top: 1px solid rgba(200, 211, 225, 0.22);
+}
+
+.board-inspector-footer-actions .board-action-chip {
+  justify-content: center;
+  min-height: 32px;
+  width: 100%;
 }
 
 .compact-checkpoints {
