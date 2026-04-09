@@ -3219,6 +3219,12 @@ button.weekly-day {
   padding: 0 14px 14px;
 }
 
+.dashboard-side-card-head:has(#boardUpdateStatus) {
+  justify-content: flex-end;
+  min-height: 18px;
+  padding-bottom: 0;
+}
+
 .dashboard-side-card .board-inspector-content {
   gap: 6px;
 }
@@ -3399,6 +3405,49 @@ button.weekly-day {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.board-inspector-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.board-action-chip {
+  appearance: none;
+  border: 1px solid rgba(200, 211, 225, 0.52);
+  border-radius: 999px;
+  background: rgba(248, 250, 253, 0.96);
+  color: var(--navy);
+  padding: 5px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, opacity 0.16s ease;
+}
+
+.board-action-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.board-action-chip.danger {
+  background: rgba(198, 84, 84, 0.1);
+  border-color: rgba(198, 84, 84, 0.18);
+  color: var(--danger);
+}
+
+.board-action-chip.warning {
+  background: rgba(201, 152, 25, 0.1);
+  border-color: rgba(201, 152, 25, 0.18);
+  color: #8a6410;
+}
+
+.board-action-chip.subtle {
+  background: rgba(46, 107, 203, 0.08);
+  border-color: rgba(46, 107, 203, 0.16);
+  color: var(--blue);
 }
 
 .board-inspector .therapist-name {

@@ -32,6 +32,7 @@
   distributionPendingOnly: false,
   selectedBoardAssignmentId: "",
   updatedBoardAssignmentId: "",
+  lastBoardAction: null,
   editingAreaAssignmentId: "",
   hasUnsavedChanges: false,
   hasManualAdjustments: false,
@@ -465,6 +466,19 @@ function hydrateState(saved) {
   state.distributionPendingOnly = Boolean(saved.distributionPendingOnly);
   state.selectedBoardAssignmentId = saved.selectedBoardAssignmentId || "";
   state.updatedBoardAssignmentId = "";
+  state.lastBoardAction = saved.lastBoardAction && typeof saved.lastBoardAction === "object"
+    ? {
+      type: saved.lastBoardAction.type,
+      assignmentId: saved.lastBoardAction.assignmentId || "",
+      from: saved.lastBoardAction.from ? {
+        dateKey: normalizeDateKey(saved.lastBoardAction.from.dateKey),
+        shiftType: saved.lastBoardAction.from.shiftType === "late" ? "late" : "early",
+        slotIndex: Number(saved.lastBoardAction.from.slotIndex) || 0,
+        startTime: normalizeTime(saved.lastBoardAction.from.startTime),
+        endTime: normalizeTime(saved.lastBoardAction.from.endTime)
+      } : null
+    }
+    : null;
   state.editingAreaAssignmentId = "";
   state.hasUnsavedChanges = Boolean(saved.hasUnsavedChanges);
   state.hasManualAdjustments = Boolean(saved.hasManualAdjustments);
@@ -2018,6 +2032,12 @@ function renderBoardInspector(day) {
     ...(!isAdjustmentLane && isPreferredAreaMatch && preferredAreaMatchIndex > 0 ? ["第2希望以降で配置"] : []),
     ...(assignment.himeReservation === "あり" ? ["姫ありのため優先配置"] : []),
   ];
+  const canRestore = Boolean(
+    isAdjustmentLane
+    && state.lastBoardAction
+    && state.lastBoardAction.type === "moveToAdjustment"
+    && state.lastBoardAction.assignmentId === assignment.id
+  );
 
   return `
     <article class="board-inspector-card">
@@ -2043,6 +2063,12 @@ function renderBoardInspector(day) {
             </div>
           </div>
         </div>
+      </div>
+
+      <div class="board-inspector-actions">
+        <button class="board-action-chip danger" type="button" data-board-action="delete">削除</button>
+        <button class="board-action-chip warning" type="button" data-board-action="moveToAdjustment">調整中へ</button>
+        <button class="board-action-chip subtle" type="button" data-board-action="restore" ${canRestore ? "" : "disabled"}>戻る</button>
       </div>
 
       <div class="board-editor-grid compact-board-editor-grid">
@@ -3052,8 +3078,18 @@ function handleBoardInspectorAction(event) {
     return;
   }
 
-  if (action === "moveToAdjustment" || action === "delete") {
+  if (action === "delete") {
+    confirmAndRemoveBoardAssignment(assignment.id);
+    return;
+  }
+
+  if (action === "moveToAdjustment") {
     moveBoardAssignmentToAdjustment(assignment.id);
+    return;
+  }
+
+  if (action === "restore") {
+    restoreLastBoardAssignment();
   }
 }
 
@@ -3406,14 +3442,21 @@ function removeBoardAssignment(assignmentId) {
   day[key] = slots;
 
   const row = state.generationRows.find((item) => item.id === assignmentId);
-  if (row) row.status = "hold";
+  if (row) {
+    row.status = "deleted";
+    row.issues = collectRowIssues(row);
+  }
+  if (state.lastBoardAction?.assignmentId === assignmentId) {
+    state.lastBoardAction = null;
+  }
 
   state.selectedBoardAssignmentId = "";
   state.updatedBoardAssignmentId = "";
   markManualScheduleDirty();
   recomputeScheduleStateForDates([state.selectedDate]);
   persistState();
-  flashBoardUpdateStatus("盤面から外しました。", "warning");
+  flashBoardUpdateStatus("削除しました。", "warning");
+  showToast("削除しました。", "success");
   renderBoardWorkspace();
   renderLinkedViewsAfterBoardEdit();
 }
@@ -3428,6 +3471,17 @@ function moveBoardAssignmentToAdjustment(assignmentId, startMinutes = null, endM
     const key = position.shiftType === "early" ? "earlyAssignments" : "lateAssignments";
     const slots = createSlotArray(day[key], position.shiftType);
     assignment = slots[position.slotIndex];
+    state.lastBoardAction = assignment ? {
+      type: "moveToAdjustment",
+      assignmentId,
+      from: {
+        dateKey: assignment.dateKey,
+        shiftType: position.shiftType,
+        slotIndex: position.slotIndex,
+        startTime: assignment.startTime,
+        endTime: assignment.endTime
+      }
+    } : null;
     slots[position.slotIndex] = null;
     day[key] = slots;
   } else if (!row || !["cut", "hold"].includes(row.status)) {
@@ -3454,6 +3508,57 @@ function moveBoardAssignmentToAdjustment(assignmentId, startMinutes = null, endM
     "warning"
   );
   renderBoardWorkspace();
+  renderLinkedViewsAfterBoardEdit();
+}
+
+function confirmAndRemoveBoardAssignment(assignmentId) {
+  if (!window.confirm("本当に削除しますか？")) return;
+  removeBoardAssignment(assignmentId);
+}
+
+function restoreLastBoardAssignment() {
+  const action = state.lastBoardAction;
+  if (!action || action.type !== "moveToAdjustment" || !action.from) return;
+  const row = state.generationRows.find((item) => item.id === action.assignmentId && item.status === "hold");
+  if (!row) return;
+
+  const { dateKey, shiftType, slotIndex, startTime, endTime } = action.from;
+  const day = state.generatedSchedule[dateKey] || (state.generatedSchedule[dateKey] = emptyDay(dateKey));
+  const key = shiftType === "late" ? "lateAssignments" : "earlyAssignments";
+  const slots = createSlotArray(day[key], shiftType);
+
+  if (slots[slotIndex]) {
+    flashBoardUpdateStatus("元の枠が埋まっているため戻せません。", "warning");
+    showToast("元の枠が埋まっているため戻せません。", "warning");
+    return;
+  }
+
+  const roomMeta = getRoomMeta(slotIndex, row.assignedArea || row.preferredArea);
+  row.status = "accepted";
+  row.startTime = normalizeTime(startTime);
+  row.endTime = normalizeTime(endTime);
+  row.issues = collectRowIssues(row);
+  slots[slotIndex] = {
+    ...buildBoardAdjustmentAssignment(row),
+    roomIndex: slotIndex,
+    assignedArea: roomMeta.area || row.assignedArea || row.preferredArea,
+    startTime: row.startTime,
+    endTime: row.endTime,
+    warningArea: !supportsArea(row.name, roomMeta.area || row.preferredArea)
+  };
+  day[key] = slots;
+
+  state.selectedDate = dateKey;
+  state.selectedBoardAssignmentId = action.assignmentId;
+  state.updatedBoardAssignmentId = action.assignmentId;
+  state.lastBoardAction = null;
+  state.generationWarnings = collectGenerationWarnings(state.generationRows);
+  markManualScheduleDirty();
+  recomputeScheduleStateForDates([dateKey]);
+  persistState();
+  flashBoardUpdateStatus("元の配置へ戻しました。", "success");
+  showToast("元の配置へ戻しました。", "success");
+  renderDashboard();
   renderLinkedViewsAfterBoardEdit();
 }
 
@@ -5165,6 +5270,7 @@ function createPersistableState() {
     distributionPendingOnly: state.distributionPendingOnly,
     aiDecisionEnabled: state.aiDecisionEnabled,
     selectedBoardAssignmentId: state.selectedBoardAssignmentId,
+    lastBoardAction: state.lastBoardAction,
     hasUnsavedChanges: state.hasUnsavedChanges,
     hasManualAdjustments: state.hasManualAdjustments,
     generationRows: state.generationRows.map((row) => ({
