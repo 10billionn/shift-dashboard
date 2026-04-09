@@ -1550,6 +1550,152 @@ function getLongBoardGapRanges(assignments, settings = getAppSettings()) {
   return gaps;
 }
 
+function mergeRanges(ranges) {
+  const normalized = ranges
+    .filter((range) => range && range.end > range.start)
+    .map((range) => ({ start: range.start, end: range.end }))
+    .sort((left, right) => left.start - right.start);
+
+  if (!normalized.length) return [];
+
+  const merged = [{ ...normalized[0] }];
+  for (let index = 1; index < normalized.length; index += 1) {
+    const range = normalized[index];
+    const last = merged[merged.length - 1];
+    if (range.start <= last.end) {
+      last.end = Math.max(last.end, range.end);
+    } else {
+      merged.push({ ...range });
+    }
+  }
+  return merged;
+}
+
+function getLaneOccupiedRanges(dateKey, roomIndex, excludingAssignmentId = "") {
+  const day = getScheduleDay(dateKey);
+  const assignments = [...day.earlyAssignments, ...day.lateAssignments]
+    .filter(Boolean)
+    .filter((assignment) => assignment.id !== excludingAssignmentId)
+    .filter((assignment) => normalizeRoomIndex(assignment.roomIndex, -1) === normalizeRoomIndex(roomIndex, -1))
+    .map((assignment) => ({
+      start: toMinutes(assignment.startTime),
+      end: toMinutes(assignment.endTime)
+    }));
+
+  return mergeRanges(assignments);
+}
+
+function getLaneFreeRanges(dateKey, roomIndex, excludingAssignmentId = "", settings = getAppSettings()) {
+  const timelineStart = settings.businessStartHour * 60;
+  const timelineEnd = settings.businessEndHour * 60;
+  const occupied = getLaneOccupiedRanges(dateKey, roomIndex, excludingAssignmentId)
+    .map((range) => ({
+      start: Math.max(range.start, timelineStart),
+      end: Math.min(range.end, timelineEnd)
+    }))
+    .filter((range) => range.end > range.start);
+
+  if (!occupied.length) {
+    return [{ start: timelineStart, end: timelineEnd }];
+  }
+
+  const free = [];
+  let cursor = timelineStart;
+  occupied.forEach((range) => {
+    if (range.start > cursor) free.push({ start: cursor, end: range.start });
+    cursor = Math.max(cursor, range.end);
+  });
+  if (cursor < timelineEnd) free.push({ start: cursor, end: timelineEnd });
+  return free;
+}
+
+function getEdgeSnapCandidate(desiredStart, duration, occupiedRanges, thresholdMinutes = 15) {
+  let bestCandidate = null;
+  let bestDistance = Infinity;
+
+  occupiedRanges.forEach((range) => {
+    const afterStart = range.end;
+    if (afterStart + duration <= Infinity) {
+      const distance = Math.abs(desiredStart - afterStart);
+      if (distance <= thresholdMinutes && distance < bestDistance) {
+        bestDistance = distance;
+        bestCandidate = afterStart;
+      }
+    }
+
+    const beforeStart = range.start - duration;
+    const distance = Math.abs(desiredStart - beforeStart);
+    if (distance <= thresholdMinutes && distance < bestDistance) {
+      bestDistance = distance;
+      bestCandidate = beforeStart;
+    }
+  });
+
+  return bestCandidate;
+}
+
+function getSnappedAssignmentPosition(dateKey, roomIndex, desiredStart, duration, assignmentId = "", settings = getAppSettings()) {
+  const timelineStart = settings.businessStartHour * 60;
+  const timelineEnd = settings.businessEndHour * 60;
+  const occupied = getLaneOccupiedRanges(dateKey, roomIndex, assignmentId);
+  const freeRanges = getLaneFreeRanges(dateKey, roomIndex, assignmentId, settings)
+    .filter((range) => (range.end - range.start) >= duration);
+
+  if (!freeRanges.length) {
+    return {
+      valid: false,
+      startMinutes: snapMinutes(Math.max(timelineStart, Math.min(timelineEnd - duration, desiredStart)), 15),
+      endMinutes: snapMinutes(Math.max(timelineStart + duration, Math.min(timelineEnd, desiredStart + duration)), 15),
+      occupied,
+      freeRanges: []
+    };
+  }
+
+  const desiredSnapped = snapMinutes(desiredStart, 15);
+  const edgeCandidate = getEdgeSnapCandidate(desiredSnapped, duration, occupied);
+  let bestStart = null;
+  let bestDistance = Infinity;
+
+  freeRanges.forEach((range) => {
+    const candidateStart = Math.max(range.start, Math.min(range.end - duration, desiredSnapped));
+    const candidateDistance = Math.abs(candidateStart - desiredSnapped);
+    if (candidateDistance < bestDistance) {
+      bestDistance = candidateDistance;
+      bestStart = candidateStart;
+    }
+  });
+
+  if (edgeCandidate !== null) {
+    const edgeSnapped = snapMinutes(edgeCandidate, 15);
+    const matchingFreeRange = freeRanges.find((range) => edgeSnapped >= range.start && edgeSnapped + duration <= range.end);
+    if (matchingFreeRange) {
+      const edgeDistance = Math.abs(edgeSnapped - desiredSnapped);
+      if (edgeDistance <= bestDistance) {
+        bestStart = edgeSnapped;
+        bestDistance = edgeDistance;
+      }
+    }
+  }
+
+  if (bestStart === null) {
+    return {
+      valid: false,
+      startMinutes: desiredSnapped,
+      endMinutes: desiredSnapped + duration,
+      occupied,
+      freeRanges
+    };
+  }
+
+  return {
+    valid: true,
+    startMinutes: bestStart,
+    endMinutes: bestStart + duration,
+    occupied,
+    freeRanges
+  };
+}
+
 function getRoomMetricTone(value, maxValue, thresholds = { lowToMid: 0.4, midToHigh: 0.75 }) {
   if (value <= 0 || maxValue <= 0) return "metric-low";
   const ratio = value / maxValue;
@@ -2559,6 +2705,11 @@ function handleBoardMoveEnd(event) {
     renderBoardWorkspace();
     return;
   }
+  if (!preview.isValidDrop) {
+    showToast("その位置には配置できません。", "warning");
+    renderBoardWorkspace();
+    return;
+  }
 
   boardSuppressClickUntil = Date.now() + 220;
   if (preview.dropzone === "adjustment") {
@@ -2782,19 +2933,26 @@ function getBoardMovePreview(moveState, clientX, clientY) {
       moveState.timelineStart + (((visualLeft - trackLeft) / trackRect.width) * total)
     )
   );
-  const startMinutes = Math.max(
-    moveState.timelineStart,
-    Math.min(moveState.timelineEnd - moveState.duration, snapMinutes(rawStartMinutes, 15))
-  );
-  const rawEndMinutes = rawStartMinutes + moveState.duration;
-  const endMinutes = startMinutes + moveState.duration;
-  if (startMinutes >= endMinutes) return null;
 
   const targetTrack = activeTrack;
   const dropzone = targetTrack.dataset.boardDropzone || "room";
   const roomIndex = dropzone === "adjustment"
     ? null
     : normalizeRoomIndex(targetTrack.dataset.boardSlotIndex, null);
+  const snappedPosition = dropzone === "adjustment"
+    ? {
+        valid: true,
+        startMinutes: Math.max(
+          moveState.timelineStart,
+          Math.min(moveState.timelineEnd - moveState.duration, snapMinutes(rawStartMinutes, 15))
+        ),
+        endMinutes: 0
+      }
+    : getSnappedAssignmentPosition(state.selectedDate, roomIndex, rawStartMinutes, moveState.duration, moveState.assignmentId);
+  const startMinutes = snappedPosition.startMinutes;
+  const endMinutes = dropzone === "adjustment" ? (startMinutes + moveState.duration) : snappedPosition.endMinutes;
+  if (startMinutes >= endMinutes) return null;
+  const rawEndMinutes = rawStartMinutes + moveState.duration;
   const visualWidth = Math.max((((rawEndMinutes - rawStartMinutes) / total) * trackRect.width), 24);
   const snappedLeft = trackRect.left - overlayRect.left + (((startMinutes - moveState.timelineStart) / total) * trackRect.width);
   const snappedWidth = Math.max((((endMinutes - startMinutes) / total) * trackRect.width), 24);
@@ -2819,7 +2977,8 @@ function getBoardMovePreview(moveState, clientX, clientY) {
     snappedWidth,
     trackTop,
     trackHeight,
-    verticalDrag
+    verticalDrag,
+    isValidDrop: snappedPosition.valid
   };
 }
 
@@ -2831,9 +2990,10 @@ function applyBoardMovePreview(moveState, preview) {
 
   moveState.movingBar.style.left = "0px";
   moveState.movingBar.style.top = "0px";
-  moveState.movingBar.style.width = `${preview.visualWidth}px`;
-  moveState.movingBar.style.transform = `translate3d(${preview.visualLeft}px, ${preview.visualTop}px, 0)`;
+  moveState.movingBar.style.width = `${preview.snappedWidth}px`;
+  moveState.movingBar.style.transform = `translate3d(${preview.snappedLeft}px, ${preview.visualTop}px, 0)`;
   moveState.movingBar.classList.toggle("snap-near", snapNear);
+  moveState.movingBar.classList.toggle("invalid-drop", !preview.isValidDrop);
   if (moveState.guideBand) {
     moveState.guideBand.style.left = `${preview.snappedLeft}px`;
     moveState.guideBand.style.top = `${preview.trackTop}px`;
@@ -2841,6 +3001,7 @@ function applyBoardMovePreview(moveState, preview) {
     moveState.guideBand.style.height = `${preview.trackHeight}px`;
     moveState.guideBand.style.opacity = "";
     moveState.guideBand.classList.toggle("snap-near", snapNear);
+    moveState.guideBand.classList.toggle("invalid-drop", !preview.isValidDrop);
   }
   if (moveState.guideStart) {
     moveState.guideStart.style.left = `${preview.snappedLeft}px`;
@@ -2858,8 +3019,8 @@ function applyBoardMovePreview(moveState, preview) {
   }
   if (moveState.subLabel) {
     moveState.subLabel.textContent = formatBoardTimeLabel(
-      minutesToTime(Math.round(preview.rawStartMinutes)),
-      minutesToTime(Math.round(preview.rawEndMinutes)),
+      minutesToTime(Math.round(preview.startMinutes)),
+      minutesToTime(Math.round(preview.endMinutes)),
       state.boardDensity !== "comfortable"
     );
   }
