@@ -1295,7 +1295,7 @@ function renderAdjustmentBar(row, index) {
     <button
       class="board-bar board-adjustment-bar area-${colorKey} ${row.id === state.selectedBoardAssignmentId ? "selected" : ""}"
       type="button"
-      draggable="true"
+      draggable="false"
       data-board-assignment-id="${row.id}"
       data-assignment-location="adjustment"
       data-board-slot-index="-1"
@@ -2454,6 +2454,7 @@ function handleBoardMoveStart(event) {
       endMinutes: initialEndTime
     }
   };
+  document.body.classList.add("board-dragging");
   updateBoardAutoScroll(event.clientY);
 }
 
@@ -2524,6 +2525,7 @@ function handleBoardMoveEnd(event) {
 
   const moveState = boardMoveState;
   boardMoveState = null;
+  document.body.classList.remove("board-dragging");
   const preview = getBoardMovePreview(moveState, event.clientX, event.clientY) || moveState.preview;
   cleanupBoardMovePreview(moveState);
 
@@ -2718,7 +2720,7 @@ function getBoardMovePreview(moveState, clientX, clientY) {
   const maxVisualTop = maxTrackBottom - overlayRect.top - moveState.barHeight;
   const visualTop = Math.max(minVisualTop, Math.min(maxVisualTop, unclampedVisualTop));
   const centerY = clientY;
-  const activeTrack = getBoardTrackFromPoint(clientX, clientY) || getBoardTrackFromCenterY(centerY) || moveState.sourceTrack;
+  const activeTrack = getBoardTrackFromPoint(clientX, clientY) || moveState.sourceTrack;
   const trackRect = activeTrack?.getBoundingClientRect() || moveState.sourceTrack.getBoundingClientRect();
   if (!trackRect.width) return null;
 
@@ -2780,10 +2782,8 @@ function applyBoardMovePreview(moveState, preview) {
   clearBoardInteractionHighlights();
   moveState.sourceTrack.classList.add("drag-origin");
   moveState.bar.closest(".board-lane")?.classList.add("drag-source-room");
-  if (!preview.verticalDrag) {
-    preview.targetTrack?.classList.add("drag-over");
-    preview.targetTrack?.closest(".board-lane")?.classList.add("drag-target-room");
-  }
+  preview.targetTrack?.classList.add("drag-over");
+  preview.targetTrack?.closest(".board-lane")?.classList.add("drag-target-room");
 
   const snapNear = Math.abs(preview.rawStartMinutes - preview.startMinutes) < 6;
   const overlayHeight = (moveState.overlayRoot?.getBoundingClientRect()?.height || moveState.overlayRect?.height || preview.trackHeight);
@@ -2798,21 +2798,21 @@ function applyBoardMovePreview(moveState, preview) {
     moveState.guideBand.style.top = `${preview.trackTop}px`;
     moveState.guideBand.style.width = `${preview.snappedWidth}px`;
     moveState.guideBand.style.height = `${preview.trackHeight}px`;
-    moveState.guideBand.style.opacity = preview.verticalDrag ? "0" : "";
+    moveState.guideBand.style.opacity = "";
     moveState.guideBand.classList.toggle("snap-near", snapNear);
   }
   if (moveState.guideStart) {
     moveState.guideStart.style.left = `${preview.snappedLeft}px`;
-    moveState.guideStart.style.top = `${preview.verticalDrag ? 0 : preview.trackTop}px`;
-    moveState.guideStart.style.height = `${preview.verticalDrag ? overlayHeight : preview.trackHeight}px`;
-    moveState.guideStart.style.opacity = preview.verticalDrag ? "0.45" : "";
+    moveState.guideStart.style.top = `${preview.trackTop}px`;
+    moveState.guideStart.style.height = `${preview.trackHeight}px`;
+    moveState.guideStart.style.opacity = "";
     moveState.guideStart.classList.toggle("snap-near", snapNear);
   }
   if (moveState.guideEnd) {
     moveState.guideEnd.style.left = `${preview.snappedLeft + preview.snappedWidth}px`;
-    moveState.guideEnd.style.top = `${preview.verticalDrag ? 0 : preview.trackTop}px`;
-    moveState.guideEnd.style.height = `${preview.verticalDrag ? overlayHeight : preview.trackHeight}px`;
-    moveState.guideEnd.style.opacity = preview.verticalDrag ? "0.45" : "";
+    moveState.guideEnd.style.top = `${preview.trackTop}px`;
+    moveState.guideEnd.style.height = `${preview.trackHeight}px`;
+    moveState.guideEnd.style.opacity = "";
     moveState.guideEnd.classList.toggle("snap-near", snapNear);
   }
   if (moveState.subLabel) {
