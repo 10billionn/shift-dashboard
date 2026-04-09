@@ -2938,9 +2938,13 @@ button.weekly-day {
 }
 
 .board-bar.board-ghost {
-  opacity: 0.18;
-  filter: saturate(0.8);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  filter: none;
   box-shadow: none;
+  border-color: transparent;
+  background: transparent;
 }
 
 .board-bar.resizing {
