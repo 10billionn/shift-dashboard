@@ -2897,6 +2897,27 @@ button.weekly-day {
   cursor: grab;
 }
 
+.board-dragging .board-bar,
+.board-dragging .board-bar.board-ghost,
+.board-dragging .board-bar.board-moving,
+.board-dragging .board-bar.board-moving-overlay,
+.board-dragging .board-track,
+.board-dragging .board-lane-title,
+.board-dragging .board-lane-head,
+.board-dragging .board-track-wrap,
+.board-dragging .board-drag-guide-band,
+.board-dragging .board-drag-guide-line {
+  transition: none !important;
+  animation: none !important;
+}
+
+.board-dragging .board-bar:hover,
+.board-dragging .board-track.drag-over,
+.board-dragging .board-lane.drag-target-room .board-lane-title,
+.board-dragging .board-lane.drag-target-room .board-lane-head {
+  transform: none !important;
+}
+
 .board-bar.dragging {
   opacity: 0.74;
   filter: saturate(0.98) brightness(1.03);
@@ -2935,6 +2956,11 @@ button.weekly-day {
 .board-dragging .board-bar:hover .board-resize-handle {
   opacity: 0;
   background: transparent;
+}
+
+.board-dragging .board-bar.board-ghost {
+  opacity: 0.38;
+  filter: saturate(0.82) brightness(0.98);
 }
 
 .board-bar.board-ghost {
