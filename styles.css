@@ -2925,6 +2925,7 @@ button.weekly-day {
   opacity: 0.96;
   box-shadow: 0 16px 28px rgba(17, 36, 63, 0.2);
   z-index: 999;
+  transition: none;
 }
 
 .board-bar.board-moving-overlay {
@@ -2933,6 +2934,7 @@ button.weekly-day {
   pointer-events: none;
   z-index: 1000;
   overflow: hidden;
+  transition: none;
 }
 
 .board-bar.board-moving-overlay.snap-near {

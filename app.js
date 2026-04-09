@@ -2411,6 +2411,8 @@ function handleBoardMoveStart(event) {
     assignmentId: assignment.id,
     initialX: event.clientX,
     initialY: event.clientY,
+    grabOffsetX: event.clientX - barRect.left,
+    grabOffsetY: event.clientY - barRect.top,
     initialStartTime,
     initialEndTime,
       duration: initialEndTime - initialStartTime,
@@ -2421,6 +2423,7 @@ function handleBoardMoveStart(event) {
       sourceTrack: track,
       sourceTrackRect: trackRect,
       bar,
+      barWidth: barRect.width,
       barHeight: barRect.height,
       barOffsetTop: barRect.top - trackRect.top,
         overlayRoot,
@@ -2698,32 +2701,38 @@ function clearBoardInteractionHighlights() {
 function getBoardMovePreview(moveState, clientX, clientY) {
   const overlayRect = moveState.overlayRoot?.getBoundingClientRect() || moveState.overlayRect;
   const sourceTrackRect = moveState.sourceTrack.getBoundingClientRect();
-  const deltaX = clientX - moveState.initialX;
-  const deltaY = clientY - moveState.initialY;
   const trackRects = Array.from(elements.dashboardBoardCanvas.querySelectorAll(".board-track"))
     .map((track) => ({ track, rect: track.getBoundingClientRect() }))
     .filter((item) => item.rect.height > 0);
   const minTrackTop = trackRects.length ? Math.min(...trackRects.map((item) => item.rect.top)) : sourceTrackRect.top;
   const maxTrackBottom = trackRects.length ? Math.max(...trackRects.map((item) => item.rect.bottom)) : sourceTrackRect.bottom;
-  const unclampedVisualTop = (sourceTrackRect.top - overlayRect.top) + moveState.barOffsetTop + deltaY;
+  const unclampedVisualTop = clientY - overlayRect.top - moveState.grabOffsetY;
   const minVisualTop = minTrackTop - overlayRect.top;
   const maxVisualTop = maxTrackBottom - overlayRect.top - moveState.barHeight;
   const visualTop = Math.max(minVisualTop, Math.min(maxVisualTop, unclampedVisualTop));
-  const centerY = overlayRect.top + visualTop + (moveState.barHeight / 2);
-  const activeTrack = getBoardTrackFromCenterY(centerY) || moveState.sourceTrack;
+  const centerY = clientY;
+  const activeTrack = getBoardTrackFromPoint(clientX, clientY) || getBoardTrackFromCenterY(centerY) || moveState.sourceTrack;
   const trackRect = activeTrack?.getBoundingClientRect() || moveState.sourceTrack.getBoundingClientRect();
   if (!trackRect.width) return null;
 
-  const pxPerMinute = trackRect.width / (moveState.timelineEnd - moveState.timelineStart);
-  const rawMinutes = deltaX / pxPerMinute;
-  const snappedMinutes = snapMinutes(rawMinutes, 15);
+  const total = moveState.timelineEnd - moveState.timelineStart;
+  const trackLeft = trackRect.left - overlayRect.left;
+  const pxPerMinute = trackRect.width / total;
+  const durationWidth = Math.max(moveState.barWidth || (moveState.duration * pxPerMinute), 24);
+  const minVisualLeft = trackLeft;
+  const maxVisualLeft = trackLeft + trackRect.width - durationWidth;
+  const unclampedVisualLeft = clientX - overlayRect.left - moveState.grabOffsetX;
+  const visualLeft = Math.max(minVisualLeft, Math.min(maxVisualLeft, unclampedVisualLeft));
   const rawStartMinutes = Math.max(
     moveState.timelineStart,
-    Math.min(moveState.timelineEnd - moveState.duration, moveState.initialStartTime + rawMinutes)
+    Math.min(
+      moveState.timelineEnd - moveState.duration,
+      moveState.timelineStart + (((visualLeft - trackLeft) / trackRect.width) * total)
+    )
   );
   const startMinutes = Math.max(
     moveState.timelineStart,
-    Math.min(moveState.timelineEnd - moveState.duration, moveState.initialStartTime + snappedMinutes)
+    Math.min(moveState.timelineEnd - moveState.duration, snapMinutes(rawStartMinutes, 15))
   );
   const rawEndMinutes = rawStartMinutes + moveState.duration;
   const endMinutes = startMinutes + moveState.duration;
@@ -2734,14 +2743,12 @@ function getBoardMovePreview(moveState, clientX, clientY) {
   const roomIndex = dropzone === "adjustment"
     ? null
     : normalizeRoomIndex(targetTrack.dataset.boardSlotIndex, moveState.initialRoomIndex);
-  const total = moveState.timelineEnd - moveState.timelineStart;
-  const visualLeft = trackRect.left - overlayRect.left + (((rawStartMinutes - moveState.timelineStart) / total) * trackRect.width);
   const visualWidth = Math.max((((rawEndMinutes - rawStartMinutes) / total) * trackRect.width), 24);
   const snappedLeft = trackRect.left - overlayRect.left + (((startMinutes - moveState.timelineStart) / total) * trackRect.width);
   const snappedWidth = Math.max((((endMinutes - startMinutes) / total) * trackRect.width), 24);
   const trackTop = trackRect.top - overlayRect.top;
   const trackHeight = trackRect.height;
-  const verticalDrag = Math.abs(deltaY) > 10 && Math.abs(deltaY) > Math.abs(deltaX);
+  const verticalDrag = Math.abs(clientY - moveState.initialY) > 10 && Math.abs(clientY - moveState.initialY) > Math.abs(clientX - moveState.initialX);
   return {
     dropzone,
     roomIndex,
@@ -2777,7 +2784,7 @@ function applyBoardMovePreview(moveState, preview) {
   moveState.movingBar.style.left = `${preview.visualLeft}px`;
   moveState.movingBar.style.top = `${preview.visualTop}px`;
   moveState.movingBar.style.width = `${preview.visualWidth}px`;
-  moveState.movingBar.style.transform = `scale(1.02)`;
+  moveState.movingBar.style.transform = "none";
   moveState.movingBar.classList.toggle("snap-near", snapNear);
   if (moveState.guideBand) {
     moveState.guideBand.style.left = `${preview.snappedLeft}px`;
