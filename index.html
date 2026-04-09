@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シフトダッシュボード</title>
-    <link rel="stylesheet" href="styles.css?v=202604100420">
+    <link rel="stylesheet" href="styles.css?v=202604100455">
 </head>
 <body>
   <div class="app-shell">
@@ -59,16 +59,49 @@
             </div>
           </section>
 
-          <section id="dashboardBoardView" class="content-panel dashboard-view-panel board-placeholder-panel">
-            <div id="dashboardBoardCanvas" class="board-canvas"></div>
-          </section>
+          <div class="dashboard-board-layout">
+            <div class="dashboard-main-board">
+              <section id="dashboardBoardView" class="content-panel dashboard-view-panel board-placeholder-panel">
+                <div id="dashboardBoardCanvas" class="board-canvas"></div>
+              </section>
+            </div>
+
+            <aside class="dashboard-side-panel">
+              <section id="boardInspector" class="content-panel dashboard-side-card board-inspector board-inspector-panel">
+                <div class="dashboard-side-card-head">
+                  <h3>セラピスト詳細</h3>
+                  <p id="boardUpdateStatus" class="copy-status"></p>
+                </div>
+                <div id="boardInspectorContent" class="board-inspector-content"></div>
+              </section>
+
+              <section class="summary-grid dashboard-summary-grid dashboard-side-summary">
+                <article class="summary-card emphasis">
+                  <p>売上予測</p>
+                  <strong id="salesSummary"></strong>
+                </article>
+                <article class="summary-card">
+                  <p>店落ち予測</p>
+                  <strong id="storeSummary"></strong>
+                </article>
+                <article class="summary-card warning">
+                  <p>不足数</p>
+                  <strong id="shortageSummary"></strong>
+                </article>
+                <article class="summary-card ok">
+                  <p>当日充足率</p>
+                  <strong id="fillSummary"></strong>
+                </article>
+              </section>
+            </aside>
+          </div>
 
           <div id="dashboardSecondarySections" class="dashboard-secondary-sections">
-          <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-weekly-block dashboard-sortable-section" data-section-id="weeklyAnalysis" draggable="false">
-            <summary class="dashboard-collapsible-summary">
-              <div>
-                <h2>週間分析</h2>
-              </div>
+            <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-weekly-block dashboard-sortable-section" data-section-id="weeklyAnalysis" draggable="false">
+              <summary class="dashboard-collapsible-summary">
+                <div>
+                  <h2>週間分析</h2>
+                </div>
               <div class="dashboard-section-tools">
                 <span class="panel-count">週次</span>
                 <span class="section-collapse-indicator" aria-hidden="true"></span>
@@ -76,20 +109,6 @@
               </div>
             </summary>
             <div id="weeklyAnalysis" class="weekly-analysis dashboard-collapsible-body"></div>
-          </details>
-
-          <details id="boardInspector" class="content-panel dashboard-collapsible dashboard-secondary-block board-inspector board-inspector-panel dashboard-sortable-section" data-section-id="boardInspector" draggable="false">
-            <summary class="dashboard-collapsible-summary">
-              <div>
-                <h3>セラピスト詳細</h3>
-              </div>
-              <div class="dashboard-section-tools">
-                <p id="boardUpdateStatus" class="copy-status"></p>
-                <span class="section-collapse-indicator" aria-hidden="true"></span>
-                <button class="section-drag-handle" type="button" draggable="true" data-section-drag-handle aria-label="選択中のセラピストを並び替え">⋮⋮</button>
-              </div>
-            </summary>
-            <div id="boardInspectorContent" class="dashboard-collapsible-body board-inspector-content"></div>
           </details>
 
           <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-risk-panel dashboard-sortable-section" data-section-id="riskSummary" draggable="false" open>
@@ -143,26 +162,6 @@
               </div>
             </details>
           </div>
-
-          <section class="summary-grid dashboard-summary-grid dashboard-sortable-section" data-section-id="summaryGrid" draggable="false">
-            <button class="section-drag-handle section-drag-handle-floating" type="button" draggable="true" data-section-drag-handle aria-label="サマリーを並び替え">⋮⋮</button>
-            <article class="summary-card emphasis">
-              <p>売上予測</p>
-              <strong id="salesSummary"></strong>
-            </article>
-            <article class="summary-card">
-              <p>店落ち予測</p>
-              <strong id="storeSummary"></strong>
-            </article>
-            <article class="summary-card warning">
-              <p>不足数</p>
-              <strong id="shortageSummary"></strong>
-            </article>
-            <article class="summary-card ok">
-              <p>当日充足率</p>
-              <strong id="fillSummary"></strong>
-            </article>
-          </section>
 
           <details class="content-panel dashboard-collapsible dashboard-secondary-block dashboard-cut-block dashboard-sortable-section" data-section-id="cutBlock" draggable="false">
             <summary class="dashboard-collapsible-summary">
@@ -475,6 +474,6 @@
   </div>
 
   <script src="data.js?v=202604090120"></script>
-  <script src="app.js?v=202604100315"></script>
+  <script src="app.js?v=202604100455"></script>
 </body>
 </html>

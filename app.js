@@ -27,7 +27,7 @@
   distributionRequestDeadline: "",
   weeklyAnalysisView: "cards",
   weekOffset: 0,
-  dashboardSectionOrder: ["weeklyAnalysis", "boardInspector", "riskSummary", "roomDetail", "summaryGrid", "cutBlock"],
+  dashboardSectionOrder: ["weeklyAnalysis", "riskSummary", "roomDetail", "cutBlock"],
   copiedDistributionIds: [],
   distributionPendingOnly: false,
   selectedBoardAssignmentId: "",
@@ -63,7 +63,7 @@ let persistStateTimer = null;
 let autosaveStateLabel = "保存済み";
 let autosaveStateTone = "saved";
 
-const DASHBOARD_SECTION_IDS = ["weeklyAnalysis", "boardInspector", "riskSummary", "roomDetail", "summaryGrid", "cutBlock"];
+const DASHBOARD_SECTION_IDS = ["weeklyAnalysis", "riskSummary", "roomDetail", "cutBlock"];
 
 const viewMeta = {
   dashboard: {

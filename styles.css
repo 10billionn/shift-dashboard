@@ -730,6 +730,61 @@ pre {
   margin-bottom: 6px;
 }
 
+#dashboardBoardView {
+  min-width: 0;
+}
+
+.dashboard-board-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.dashboard-main-board {
+  flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.dashboard-side-panel {
+  width: 320px;
+  flex-shrink: 0;
+  display: grid;
+  gap: 12px;
+  align-self: stretch;
+  max-height: calc(100vh - 124px);
+  overflow-y: auto;
+}
+
+.dashboard-side-card {
+  padding: 12px 14px 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 255, 0.96));
+  border-color: rgba(200, 211, 225, 0.72);
+  box-shadow: 0 10px 24px rgba(17, 36, 63, 0.05);
+}
+
+.dashboard-side-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.dashboard-side-card-head h3 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+
+.dashboard-side-summary {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.dashboard-side-summary .summary-card {
+  margin: 0;
+}
+
 #dashboardListView.dashboard-view-panel {
   display: block;
 }
@@ -3057,6 +3112,24 @@ button.weekly-day {
   padding: 0 14px 14px;
 }
 
+.dashboard-side-card .board-inspector-content {
+  gap: 8px;
+}
+
+.dashboard-side-card .board-inspector-card {
+  padding-inline: 0;
+  padding-block: 2px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dashboard-side-card .compact-empty-state {
+  padding: 12px;
+  border-radius: 12px;
+}
+
 .room-detail-list {
   display: grid;
   gap: 10px;
@@ -3876,6 +3949,16 @@ button.weekly-day {
 
   .board-editor-grid {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-board-layout {
+    flex-direction: column;
+  }
+
+  .dashboard-side-panel {
+    width: 100%;
+    max-height: none;
+    overflow-y: visible;
   }
 }
 
