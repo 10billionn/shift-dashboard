@@ -1743,23 +1743,29 @@ function renderGenerationForm() {
   const therapistNames = Object.keys(samplePrototypeData.therapistProfiles).sort((left, right) => left.localeCompare(right, "ja"));
   const areas = getAppSettings().areas || [];
   const editingRow = state.generationRows.find((row) => row.id === state.generationEditingRowId) || null;
-  const selectedDateKey = editingRow?.dateKey || state.selectedDate || samplePrototypeData.settings.startDate;
-  const occupiedNames = new Set(
-    state.generationRows
-      .filter((row) => row.dateKey === selectedDateKey && row.id !== state.generationEditingRowId)
-      .map((row) => row.name)
-  );
+  const draftDateKey = editingRow?.dateKey
+    || normalizeDateKey(elements.generationFormDate?.value)
+    || state.selectedDate
+    || samplePrototypeData.settings.startDate;
+  const availableNames = therapistNames.filter((name) => !state.generationRows.some((row) => (
+    row.name === name
+    && row.dateKey === draftDateKey
+    && row.id !== state.generationEditingRowId
+  )));
 
-  elements.generationFormName.innerHTML = therapistNames.map((name) => `
-    <option value="${name}" ${occupiedNames.has(name) ? "disabled" : ""}>
-      ${name}${occupiedNames.has(name) ? "（配置済）" : ""}
-    </option>
-  `).join("");
+  elements.generationFormName.innerHTML = availableNames.length
+    ? availableNames.map((name) => `<option value="${name}">${name}</option>`).join("")
+    : `<option value="">候補なし</option>`;
   elements.generationFormArea.innerHTML = areas.map((area) => `<option value="${area}">${area}</option>`).join("");
 
-  const defaultName = editingRow?.name || therapistNames.find((name) => !occupiedNames.has(name)) || therapistNames[0] || "";
+  if (editingRow) {
+    elements.generationFormDate.value = editingRow.dateKey;
+  } else if (!elements.generationFormDate.value) {
+    elements.generationFormDate.value = state.selectedDate || samplePrototypeData.settings.startDate;
+  }
+
+  const defaultName = editingRow?.name || availableNames[0] || "";
   elements.generationFormName.value = defaultName;
-  elements.generationFormDate.value = selectedDateKey;
   elements.generationFormStart.value = editingRow?.startTime || "11:00";
   elements.generationFormEnd.value = editingRow?.endTime || "19:00";
   elements.generationFormArea.value = editingRow?.preferredArea || areas[0] || "";
@@ -1771,7 +1777,7 @@ function renderGenerationForm() {
     : generationSubmitUiState === "success"
       ? "反映済み ✓"
       : defaultLabel;
-  elements.generationRowSubmitButton.disabled = generationSubmitUiState === "busy";
+  elements.generationRowSubmitButton.disabled = generationSubmitUiState === "busy" || !availableNames.length;
   elements.generationRowSubmitButton.classList.toggle("is-busy", generationSubmitUiState === "busy");
   elements.generationRowSubmitButton.classList.toggle("is-success", generationSubmitUiState === "success");
   elements.generationRowCancelButton.hidden = !editingRow;
@@ -1902,6 +1908,7 @@ function buildGenerationRow(row, id = "", status = "accepted") {
 
 function handleGenerationFormSubmit() {
   if (generationSubmitUiState === "busy") return;
+  if (!elements.generationFormName?.value) return;
   setGenerationSubmitUiState("busy");
   window.requestAnimationFrame(() => {
     const baseRows = state.generationUsesSampleData ? [] : state.generationRows;
