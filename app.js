@@ -2673,9 +2673,18 @@ function clearBoardInteractionHighlights() {
 
 function getBoardMovePreview(moveState, clientX, clientY) {
   const overlayRect = moveState.overlayRoot?.getBoundingClientRect() || moveState.overlayRect;
+  const sourceTrackRect = moveState.sourceTrack.getBoundingClientRect();
   const deltaX = clientX - moveState.initialX;
   const deltaY = clientY - moveState.initialY;
-  const visualTop = (moveState.sourceTrackRect.top - overlayRect.top) + moveState.barOffsetTop + deltaY;
+  const trackRects = Array.from(elements.dashboardBoardCanvas.querySelectorAll(".board-track"))
+    .map((track) => ({ track, rect: track.getBoundingClientRect() }))
+    .filter((item) => item.rect.height > 0);
+  const minTrackTop = trackRects.length ? Math.min(...trackRects.map((item) => item.rect.top)) : sourceTrackRect.top;
+  const maxTrackBottom = trackRects.length ? Math.max(...trackRects.map((item) => item.rect.bottom)) : sourceTrackRect.bottom;
+  const unclampedVisualTop = (sourceTrackRect.top - overlayRect.top) + moveState.barOffsetTop + deltaY;
+  const minVisualTop = minTrackTop - overlayRect.top;
+  const maxVisualTop = maxTrackBottom - overlayRect.top - moveState.barHeight;
+  const visualTop = Math.max(minVisualTop, Math.min(maxVisualTop, unclampedVisualTop));
   const centerY = overlayRect.top + visualTop + (moveState.barHeight / 2);
   const activeTrack = getBoardTrackFromCenterY(centerY) || moveState.sourceTrack;
   const trackRect = activeTrack?.getBoundingClientRect() || moveState.sourceTrack.getBoundingClientRect();

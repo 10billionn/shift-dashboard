@@ -2727,7 +2727,7 @@ button.weekly-day {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  overflow: visible;
+  overflow: hidden;
   z-index: 500;
 }
 
@@ -2741,14 +2741,7 @@ button.weekly-day {
 }
 
 .board-drag-guide-line {
-  position: absolute;
-  width: 2px;
-  margin-left: -1px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(46, 107, 203, 0.36), rgba(46, 107, 203, 0.12));
-  opacity: 0.68;
-  pointer-events: none;
-  transition: opacity 0.14s ease, transform 0.14s ease;
+  display: none;
 }
 
 .board-drag-guide-band.snap-near {
@@ -2933,6 +2926,7 @@ button.weekly-day {
   margin: 0;
   pointer-events: none;
   z-index: 1000;
+  overflow: hidden;
 }
 
 .board-bar.board-moving-overlay.snap-near {
