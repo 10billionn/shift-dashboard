@@ -2724,12 +2724,22 @@ function handleBoardDrop(event) {
   boardDragPayload = null;
 }
 
-function clearBoardInteractionHighlights() {
-  document.querySelectorAll(".board-track.drag-over, .board-track.drag-origin, .board-track.editing-track").forEach((item) => {
-    item.classList.remove("drag-over", "drag-origin", "editing-track");
+function clearBoardTargetHighlights() {
+  document.querySelectorAll(".board-track.drag-over, .board-track.editing-track").forEach((item) => {
+    item.classList.remove("drag-over", "editing-track");
   });
-  document.querySelectorAll(".board-lane.drag-target-room, .board-lane.drag-source-room, .board-lane.resizing-room").forEach((item) => {
-    item.classList.remove("drag-target-room", "drag-source-room", "resizing-room");
+  document.querySelectorAll(".board-lane.drag-target-room, .board-lane.resizing-room").forEach((item) => {
+    item.classList.remove("drag-target-room", "resizing-room");
+  });
+}
+
+function clearBoardInteractionHighlights() {
+  clearBoardTargetHighlights();
+  document.querySelectorAll(".board-track.drag-origin").forEach((item) => {
+    item.classList.remove("drag-origin");
+  });
+  document.querySelectorAll(".board-lane.drag-source-room").forEach((item) => {
+    item.classList.remove("drag-source-room");
   });
 }
 
@@ -2805,11 +2815,14 @@ function getBoardMovePreview(moveState, clientX, clientY) {
 }
 
 function applyBoardMovePreview(moveState, preview) {
-  clearBoardInteractionHighlights();
-  moveState.sourceTrack.classList.add("drag-origin");
-  moveState.bar.closest(".board-lane")?.classList.add("drag-source-room");
+  clearBoardTargetHighlights();
+  const sourceLane = moveState.bar.closest(".board-lane");
+  const targetLane = preview.targetTrack?.closest(".board-lane");
+  const isSameTrack = preview.targetTrack === moveState.sourceTrack;
+  moveState.sourceTrack.classList.toggle("drag-origin", !isSameTrack);
+  sourceLane?.classList.toggle("drag-source-room", !isSameTrack);
   preview.targetTrack?.classList.add("drag-over");
-  preview.targetTrack?.closest(".board-lane")?.classList.add("drag-target-room");
+  targetLane?.classList.add("drag-target-room");
 
   const snapNear = Math.abs(preview.rawStartMinutes - preview.startMinutes) < 6;
   const overlayHeight = (moveState.overlayRoot?.getBoundingClientRect()?.height || moveState.overlayRect?.height || preview.trackHeight);
