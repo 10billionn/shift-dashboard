@@ -2419,11 +2419,12 @@ function handleBoardMoveStart(event) {
   const movingBar = bar.cloneNode(true);
   movingBar.classList.remove("updated");
   movingBar.classList.add("dragging", "board-moving", "board-moving-overlay");
-  movingBar.style.left = `${barRect.left - (overlayRect?.left || 0)}px`;
-  movingBar.style.top = `${barRect.top - (overlayRect?.top || 0)}px`;
+  movingBar.style.left = "0px";
+  movingBar.style.top = "0px";
   movingBar.style.width = `${barRect.width}px`;
   movingBar.style.height = `${barRect.height}px`;
   movingBar.style.bottom = "auto";
+  movingBar.style.transform = `translate3d(${barRect.left - (overlayRect?.left || 0)}px, ${barRect.top - (overlayRect?.top || 0)}px, 0)`;
   const guideBand = document.createElement("div");
   guideBand.className = "board-drag-guide-band";
   const guideStart = document.createElement("div");
@@ -2822,10 +2823,10 @@ function applyBoardMovePreview(moveState, preview) {
   const snapNear = Math.abs(preview.rawStartMinutes - preview.startMinutes) < 6;
   const overlayHeight = (moveState.overlayRoot?.getBoundingClientRect()?.height || moveState.overlayRect?.height || preview.trackHeight);
 
-  moveState.movingBar.style.left = `${preview.visualLeft}px`;
-  moveState.movingBar.style.top = `${preview.visualTop}px`;
+  moveState.movingBar.style.left = "0px";
+  moveState.movingBar.style.top = "0px";
   moveState.movingBar.style.width = `${preview.visualWidth}px`;
-  moveState.movingBar.style.transform = "none";
+  moveState.movingBar.style.transform = `translate3d(${preview.visualLeft}px, ${preview.visualTop}px, 0)`;
   moveState.movingBar.classList.toggle("snap-near", snapNear);
   if (moveState.guideBand) {
     moveState.guideBand.style.left = `${preview.snappedLeft}px`;

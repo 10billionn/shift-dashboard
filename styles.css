@@ -2933,6 +2933,8 @@ button.weekly-day {
   box-shadow: 0 16px 28px rgba(17, 36, 63, 0.2);
   z-index: 999;
   transition: none;
+  will-change: transform, width;
+  backface-visibility: hidden;
 }
 
 .board-bar.board-moving-overlay {
@@ -2942,6 +2944,8 @@ button.weekly-day {
   z-index: 1000;
   overflow: hidden;
   transition: none;
+  will-change: transform, width;
+  backface-visibility: hidden;
 }
 
 .board-bar.board-moving-overlay.snap-near {
@@ -2960,14 +2964,14 @@ button.weekly-day {
 
 .board-dragging .board-bar.board-ghost {
   opacity: 0.38;
-  filter: saturate(0.82) brightness(0.98);
+  filter: none;
 }
 
 .board-bar.board-ghost {
   opacity: 0.38;
   visibility: visible;
   pointer-events: none;
-  filter: saturate(0.82) brightness(0.98);
+  filter: none;
   box-shadow: none;
 }
 
