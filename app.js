@@ -2471,6 +2471,10 @@ function handleBoardMoveStart(event) {
       subLabel: movingBar.querySelector(".board-bar-sub"),
       lastTargetTrack: null,
       lastTargetLane: null,
+      lastValidTargetTrack: track,
+      lastValidRoomIndex: (track.dataset.boardDropzone || "room") === "adjustment"
+        ? null
+        : normalizeRoomIndex(track.dataset.boardSlotIndex, null),
     timelineStart: settings.businessStartHour * 60,
     timelineEnd: settings.businessEndHour * 60,
     moved: false,
@@ -2757,8 +2761,10 @@ function getBoardMovePreview(moveState, clientX, clientY) {
   const maxVisualTop = maxTrackBottom - overlayRect.top - moveState.barHeight;
   const visualTop = Math.max(minVisualTop, Math.min(maxVisualTop, unclampedVisualTop));
   const centerY = clientY;
-  const activeTrack = getBoardTrackFromPoint(clientX, clientY) || moveState.sourceTrack;
-  const trackRect = activeTrack?.getBoundingClientRect() || moveState.sourceTrack.getBoundingClientRect();
+  const pointerTrack = getBoardTrackFromPoint(clientX, clientY);
+  const activeTrack = pointerTrack || moveState.lastValidTargetTrack || null;
+  if (!activeTrack) return null;
+  const trackRect = activeTrack.getBoundingClientRect();
   if (!trackRect.width) return null;
 
   const total = moveState.timelineEnd - moveState.timelineStart;
@@ -2784,17 +2790,19 @@ function getBoardMovePreview(moveState, clientX, clientY) {
   const endMinutes = startMinutes + moveState.duration;
   if (startMinutes >= endMinutes) return null;
 
-  const targetTrack = activeTrack || moveState.sourceTrack;
+  const targetTrack = activeTrack;
   const dropzone = targetTrack.dataset.boardDropzone || "room";
   const roomIndex = dropzone === "adjustment"
     ? null
-    : normalizeRoomIndex(targetTrack.dataset.boardSlotIndex, moveState.initialRoomIndex);
+    : normalizeRoomIndex(targetTrack.dataset.boardSlotIndex, null);
   const visualWidth = Math.max((((rawEndMinutes - rawStartMinutes) / total) * trackRect.width), 24);
   const snappedLeft = trackRect.left - overlayRect.left + (((startMinutes - moveState.timelineStart) / total) * trackRect.width);
   const snappedWidth = Math.max((((endMinutes - startMinutes) / total) * trackRect.width), 24);
   const trackTop = trackRect.top - overlayRect.top;
   const trackHeight = trackRect.height;
   const verticalDrag = Math.abs(clientY - moveState.initialY) > 10 && Math.abs(clientY - moveState.initialY) > Math.abs(clientX - moveState.initialX);
+  moveState.lastValidTargetTrack = targetTrack;
+  moveState.lastValidRoomIndex = roomIndex;
   return {
     dropzone,
     roomIndex,
