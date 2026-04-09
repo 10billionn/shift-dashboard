@@ -737,7 +737,7 @@ pre {
 .dashboard-board-layout {
   display: flex;
   align-items: flex-start;
-  gap: 16px;
+  gap: 20px;
 }
 
 .dashboard-main-board {
@@ -751,8 +751,10 @@ pre {
   flex-shrink: 0;
   display: grid;
   gap: 10px;
-  align-self: stretch;
-  max-height: calc(100vh - 124px);
+  align-self: flex-start;
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
   overflow-y: auto;
 }
 
@@ -4007,6 +4009,8 @@ button.weekly-day {
 
   .dashboard-side-panel {
     width: 100%;
+    position: relative;
+    top: auto;
     max-height: none;
     overflow-y: visible;
   }
