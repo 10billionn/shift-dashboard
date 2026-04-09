@@ -2413,6 +2413,7 @@ button.weekly-day {
   overflow-x: auto;
   overflow-y: visible;
   padding-bottom: 4px;
+  touch-action: none;
 }
 
 #dashboardBoardView .board-canvas {

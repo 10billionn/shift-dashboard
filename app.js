@@ -53,10 +53,10 @@ let boardResizeState = null;
 let boardResizeFrameId = null;
 let boardResizeClientX = 0;
 let boardMoveState = null;
-let boardMoveFrameId = null;
 let boardMovePointer = { x: 0, y: 0 };
 let boardAutoScrollFrameId = null;
 let boardAutoScrollSpeed = 0;
+let boardPointerCaptureId = null;
 let boardSuppressClickUntil = 0;
 let dashboardSectionDragState = null;
 let dashboardSectionArmedId = "";
@@ -296,12 +296,10 @@ function bindEvents() {
   });
 
   elements.dashboardBoardCanvas.addEventListener("click", handleBoardCanvasClick);
-  elements.dashboardBoardCanvas.addEventListener("dragstart", handleBoardDragStart);
-  elements.dashboardBoardCanvas.addEventListener("dragend", handleBoardDragEnd);
-  elements.dashboardBoardCanvas.addEventListener("dragover", handleBoardDragOver);
-  elements.dashboardBoardCanvas.addEventListener("dragleave", handleBoardDragLeave);
-  elements.dashboardBoardCanvas.addEventListener("drop", handleBoardDrop);
-  elements.dashboardBoardCanvas.addEventListener("mousedown", handleBoardPointerStart);
+  elements.dashboardBoardCanvas.addEventListener("pointerdown", handleBoardPointerStart);
+  elements.dashboardBoardCanvas.addEventListener("pointermove", handleBoardPointerMove);
+  elements.dashboardBoardCanvas.addEventListener("pointerup", handleBoardPointerEnd);
+  elements.dashboardBoardCanvas.addEventListener("pointercancel", handleBoardPointerEnd);
   elements.boardInspectorContent.addEventListener("change", handleBoardInspectorChange);
   elements.boardInspectorContent.addEventListener("click", handleBoardInspectorAction);
   elements.weeklyAnalysis.addEventListener("click", handleWeeklyAnalysisClick);
@@ -312,9 +310,6 @@ function bindEvents() {
   elements.dashboardSecondarySections?.addEventListener("drop", handleDashboardSectionDrop);
   elements.dashboardSecondarySections?.addEventListener("dragend", handleDashboardSectionDragEnd);
   window.addEventListener("pointerup", handleDashboardSectionPointerUp);
-  window.addEventListener("mousemove", handleBoardPointerMove);
-  window.addEventListener("mouseup", handleBoardPointerEnd);
-
   elements.shiftTabs.querySelectorAll(".shift-tab").forEach((button) => {
     button.addEventListener("click", () => {
       state.activeShiftTab = button.dataset.shift;
@@ -2348,8 +2343,16 @@ function handleBoardCanvasClick(event) {
 
 function handleBoardPointerStart(event) {
   handleBoardResizeStart(event);
-  if (boardResizeState) return;
+  if (boardResizeState) {
+    event.currentTarget?.setPointerCapture?.(event.pointerId);
+    boardPointerCaptureId = event.pointerId;
+    return;
+  }
   handleBoardMoveStart(event);
+  if (boardMoveState) {
+    event.currentTarget?.setPointerCapture?.(event.pointerId);
+    boardPointerCaptureId = event.pointerId;
+  }
 }
 
 function handleBoardPointerMove(event) {
@@ -2360,6 +2363,10 @@ function handleBoardPointerMove(event) {
 function handleBoardPointerEnd(event) {
   handleBoardResizeEnd(event);
   handleBoardMoveEnd(event);
+  if (boardPointerCaptureId === event.pointerId) {
+    event.currentTarget?.releasePointerCapture?.(event.pointerId);
+    boardPointerCaptureId = null;
+  }
 }
 
 function handleBoardResizeStart(event) {
@@ -2499,19 +2506,14 @@ function handleBoardMoveMove(event) {
   if (!boardMoveState) return;
   boardMovePointer = { x: event.clientX, y: event.clientY };
   updateBoardAutoScroll(event.clientY);
-  if (boardMoveFrameId) return;
-  boardMoveFrameId = window.requestAnimationFrame(() => {
-    boardMoveFrameId = null;
-    if (!boardMoveState) return;
-      const preview = getBoardMovePreview(boardMoveState, boardMovePointer.x, boardMovePointer.y);
-      if (!preview) return;
-      boardMoveState.preview = preview;
-      boardMoveState.moved = boardMoveState.moved
-        || preview.dropzone !== boardMoveState.initialDropzone
-        || preview.roomIndex !== boardMoveState.initialRoomIndex
-        || preview.startMinutes !== boardMoveState.initialStartTime;
-      applyBoardMovePreview(boardMoveState, preview);
-    });
+  const preview = getBoardMovePreview(boardMoveState, boardMovePointer.x, boardMovePointer.y);
+  if (!preview) return;
+  boardMoveState.preview = preview;
+  boardMoveState.moved = boardMoveState.moved
+    || preview.dropzone !== boardMoveState.initialDropzone
+    || preview.roomIndex !== boardMoveState.initialRoomIndex
+    || preview.startMinutes !== boardMoveState.initialStartTime;
+  applyBoardMovePreview(boardMoveState, preview);
 }
 
 function handleBoardResizeEnd(event) {
@@ -2541,10 +2543,6 @@ function handleBoardResizeEnd(event) {
 
 function handleBoardMoveEnd(event) {
   if (!boardMoveState) return;
-  if (boardMoveFrameId) {
-    window.cancelAnimationFrame(boardMoveFrameId);
-    boardMoveFrameId = null;
-  }
   stopBoardAutoScroll();
 
   const moveState = boardMoveState;
