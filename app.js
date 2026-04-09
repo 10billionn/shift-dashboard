@@ -48,6 +48,7 @@ let settingsTherapistEditorName = "";
 let settingsTherapistEditorMode = "existing";
 const DASHBOARD_SLOT_COUNT = 7;
 let boardFeedbackTimer = null;
+let boardResizeFeedbackTimer = null;
 let boardDragPayload = null;
 let boardResizeState = null;
 let boardResizeFrameId = null;
@@ -2497,7 +2498,7 @@ function handleBoardResizeStart(event) {
   event.stopPropagation();
   boardDragPayload = null;
   state.selectedBoardAssignmentId = assignment.id;
-  bar.classList.add("resizing");
+  bar.classList.add("resizing", handle.dataset.resizeHandle === "start" ? "resize-start" : "resize-end");
   track.classList.add("editing-track");
   bar.closest(".board-lane")?.classList.add("resizing-room");
   boardResizeState = {
@@ -2510,7 +2511,8 @@ function handleBoardResizeStart(event) {
     initialEndTime: toMinutes(assignment.endTime),
     track,
     bar,
-    subLabel: bar.querySelector(".board-bar-sub")
+    subLabel: bar.querySelector(".board-bar-sub"),
+    lastPreviewKey: ""
   };
 }
 
@@ -2642,9 +2644,13 @@ function handleBoardResizeEnd(event) {
   }
   const resizeState = boardResizeState;
   boardResizeState = null;
-  resizeState.bar.classList.remove("resizing");
+  resizeState.bar.classList.remove("resizing", "resize-start", "resize-end", "resize-snap");
   resizeState.track?.classList.remove("editing-track");
   resizeState.bar.closest(".board-lane")?.classList.remove("resizing-room");
+  if (boardResizeFeedbackTimer) {
+    clearTimeout(boardResizeFeedbackTimer);
+    boardResizeFeedbackTimer = null;
+  }
   const preview = getBoardResizePreview(event.clientX, resizeState);
   if (!preview) {
     renderDashboard();
@@ -3865,6 +3871,20 @@ function applyBoardResizePreview(resizeState, preview) {
   const width = Math.max(((preview.endMinutes - preview.startMinutes) / total) * 100, 4);
   resizeState.bar.style.left = `${left}%`;
   resizeState.bar.style.width = `${width}%`;
+  const previewKey = `${preview.startMinutes}-${preview.endMinutes}`;
+  if (resizeState.lastPreviewKey && resizeState.lastPreviewKey !== previewKey) {
+    resizeState.bar.classList.remove("resize-snap");
+    void resizeState.bar.offsetWidth;
+    resizeState.bar.classList.add("resize-snap");
+    if (boardResizeFeedbackTimer) {
+      clearTimeout(boardResizeFeedbackTimer);
+    }
+    boardResizeFeedbackTimer = setTimeout(() => {
+      resizeState.bar.classList.remove("resize-snap");
+      boardResizeFeedbackTimer = null;
+    }, 100);
+  }
+  resizeState.lastPreviewKey = previewKey;
   if (resizeState.subLabel) {
     resizeState.subLabel.textContent = `${minutesToTime(preview.startMinutes)}-${minutesToTime(preview.endMinutes)}`;
   }
