@@ -2413,10 +2413,8 @@ function handleBoardMoveStart(event) {
   const overlayRoot = elements.dashboardBoardCanvas.querySelector("[data-board-drag-overlay]");
   const overlayRect = overlayRoot?.getBoundingClientRect();
 
-  clearBoardInteractionHighlights();
+  clearBoardTargetHighlights();
   bar.classList.add("board-ghost");
-  track.classList.add("drag-origin");
-  bar.closest(".board-lane")?.classList.add("drag-source-room");
 
   const movingBar = bar.cloneNode(true);
   movingBar.classList.remove("updated");
@@ -2639,7 +2637,7 @@ function handleBoardDragStart(event) {
   }
   const bar = event.target.closest("[data-board-assignment-id]");
   if (!bar) return;
-  clearBoardInteractionHighlights();
+  clearBoardTargetHighlights();
   boardDragPayload = {
     assignmentId: bar.dataset.boardAssignmentId,
     slotIndex: Number(bar.dataset.boardSlotIndex),
@@ -2650,8 +2648,6 @@ function handleBoardDragStart(event) {
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData("text/plain", JSON.stringify(boardDragPayload));
   bar.classList.add("dragging");
-  bar.closest(".board-track")?.classList.add("drag-origin");
-  bar.closest(".board-lane")?.classList.add("drag-source-room");
 }
 
 function handleBoardDragEnd(event) {
@@ -2747,12 +2743,6 @@ function updateBoardMoveTargetHighlight(moveState, targetTrack) {
 
 function clearBoardInteractionHighlights() {
   clearBoardTargetHighlights();
-  document.querySelectorAll(".board-track.drag-origin").forEach((item) => {
-    item.classList.remove("drag-origin");
-  });
-  document.querySelectorAll(".board-lane.drag-source-room").forEach((item) => {
-    item.classList.remove("drag-source-room");
-  });
 }
 
 function getBoardMovePreview(moveState, clientX, clientY) {
@@ -2827,10 +2817,6 @@ function getBoardMovePreview(moveState, clientX, clientY) {
 }
 
 function applyBoardMovePreview(moveState, preview) {
-  const sourceLane = moveState.bar.closest(".board-lane");
-  const isSameTrack = preview.targetTrack === moveState.sourceTrack;
-  moveState.sourceTrack.classList.toggle("drag-origin", !isSameTrack);
-  sourceLane?.classList.toggle("drag-source-room", !isSameTrack);
   updateBoardMoveTargetHighlight(moveState, preview.targetTrack);
 
   const snapNear = Math.abs(preview.rawStartMinutes - preview.startMinutes) < 6;
