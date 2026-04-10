@@ -2708,6 +2708,11 @@ button.weekly-day {
   box-shadow: inset 0 0 0 2px rgba(46, 107, 203, 0.14), 0 0 0 3px rgba(46, 107, 203, 0.06);
 }
 
+.board-lane.resizing-room .board-track-wrap {
+  background: rgba(46, 107, 203, 0.04);
+  border-radius: 18px;
+}
+
 .board-track.board-track-overlap {
   background:
       repeating-linear-gradient(
@@ -2997,22 +3002,24 @@ button.weekly-day {
 
 .board-bar.resizing {
   border-color: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 0 0 3px rgba(46, 107, 203, 0.18), 0 12px 22px rgba(17, 36, 63, 0.18);
+  box-shadow: 0 0 0 4px rgba(46, 107, 203, 0.22), 0 14px 24px rgba(17, 36, 63, 0.2);
   z-index: 9;
+  outline: 1px solid rgba(255, 255, 255, 0.18);
+  transition: none;
 }
 
 .board-bar.resizing.resize-start {
   box-shadow:
-    inset 3px 0 0 rgba(255, 255, 255, 0.78),
-    0 0 0 2px rgba(46, 107, 203, 0.12),
-    0 10px 18px rgba(17, 36, 63, 0.14);
+    inset 5px 0 0 rgba(255, 255, 255, 0.86),
+    0 0 0 4px rgba(46, 107, 203, 0.2),
+    0 12px 20px rgba(17, 36, 63, 0.16);
 }
 
 .board-bar.resizing.resize-end {
   box-shadow:
-    inset -3px 0 0 rgba(255, 255, 255, 0.78),
-    0 0 0 2px rgba(46, 107, 203, 0.12),
-    0 10px 18px rgba(17, 36, 63, 0.14);
+    inset -5px 0 0 rgba(255, 255, 255, 0.86),
+    0 0 0 4px rgba(46, 107, 203, 0.2),
+    0 12px 20px rgba(17, 36, 63, 0.16);
 }
 
 .board-bar.resizing.resize-start::after,
@@ -3021,18 +3028,22 @@ button.weekly-day {
 }
 
 .board-bar.resizing.resize-start::after {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.08) 14%, transparent 34%);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.14) 18%, transparent 40%);
 }
 
 .board-bar.resizing.resize-end::after {
-  background: linear-gradient(270deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.08) 14%, transparent 34%);
+  background: linear-gradient(270deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.14) 18%, transparent 40%);
 }
 
 .board-bar.resizing.resize-snap {
   border-color: rgba(255, 255, 255, 0.96);
   box-shadow:
-    0 0 0 3px rgba(46, 107, 203, 0.2),
-    0 10px 18px rgba(17, 36, 63, 0.16);
+    0 0 0 4px rgba(46, 107, 203, 0.24),
+    0 12px 20px rgba(17, 36, 63, 0.18);
+}
+
+.board-bar.resizing .board-bar-inline {
+  text-shadow: 0 1px 0 rgba(17, 36, 63, 0.08);
 }
 
 .board-bar.selected {
