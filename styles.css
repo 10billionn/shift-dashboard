@@ -2713,6 +2713,11 @@ button.weekly-day {
   border-radius: 18px;
 }
 
+.board-lane.resizing-room .board-track-wrap {
+  background: rgba(46, 107, 203, 0.04);
+  border-radius: 18px;
+}
+
 .board-track.board-track-overlap {
   background:
       repeating-linear-gradient(
@@ -2866,6 +2871,16 @@ button.weekly-day {
   opacity: 0;
 }
 
+.board-bar::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
 .board-resize-handle {
   position: absolute;
   top: 0;
@@ -2903,12 +2918,14 @@ button.weekly-day {
 
 .board-bar.resizing.resize-start .board-resize-handle.left {
   opacity: 1;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.18), transparent);
+  width: 22px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.24), transparent);
 }
 
 .board-bar.resizing.resize-end .board-resize-handle.right {
   opacity: 1;
-  background: linear-gradient(270deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.18), transparent);
+  width: 22px;
+  background: linear-gradient(270deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.24), transparent);
 }
 
 #dashboardBoardView .board-bar {
@@ -3002,24 +3019,43 @@ button.weekly-day {
 
 .board-bar.resizing {
   border-color: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 0 0 4px rgba(46, 107, 203, 0.22), 0 14px 24px rgba(17, 36, 63, 0.2);
+  box-shadow: 0 0 0 5px rgba(46, 107, 203, 0.24), 0 16px 26px rgba(17, 36, 63, 0.22);
   z-index: 9;
   outline: 1px solid rgba(255, 255, 255, 0.18);
   transition: none;
+  cursor: ew-resize;
 }
 
 .board-bar.resizing.resize-start {
   box-shadow:
-    inset 5px 0 0 rgba(255, 255, 255, 0.86),
-    0 0 0 4px rgba(46, 107, 203, 0.2),
-    0 12px 20px rgba(17, 36, 63, 0.16);
+    inset 6px 0 0 rgba(255, 255, 255, 0.9),
+    0 0 0 5px rgba(46, 107, 203, 0.22),
+    0 14px 22px rgba(17, 36, 63, 0.18);
 }
 
 .board-bar.resizing.resize-end {
   box-shadow:
-    inset -5px 0 0 rgba(255, 255, 255, 0.86),
-    0 0 0 4px rgba(46, 107, 203, 0.2),
-    0 12px 20px rgba(17, 36, 63, 0.16);
+    inset -6px 0 0 rgba(255, 255, 255, 0.9),
+    0 0 0 5px rgba(46, 107, 203, 0.22),
+    0 14px 22px rgba(17, 36, 63, 0.18);
+}
+
+.board-bar.resizing.resize-start::before,
+.board-bar.resizing.resize-end::before {
+  opacity: 1;
+  width: 18px;
+}
+
+.board-bar.resizing.resize-start::before {
+  left: -8px;
+  border-radius: 14px 0 0 14px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.44), rgba(255, 255, 255, 0.16) 40%, transparent 100%);
+}
+
+.board-bar.resizing.resize-end::before {
+  right: -8px;
+  border-radius: 0 14px 14px 0;
+  background: linear-gradient(270deg, rgba(255, 255, 255, 0.44), rgba(255, 255, 255, 0.16) 40%, transparent 100%);
 }
 
 .board-bar.resizing.resize-start::after,
@@ -3044,6 +3080,14 @@ button.weekly-day {
 
 .board-bar.resizing .board-bar-inline {
   text-shadow: 0 1px 0 rgba(17, 36, 63, 0.08);
+}
+
+.board-bar.resizing.resize-start .board-bar-inline {
+  padding-left: 6px;
+}
+
+.board-bar.resizing.resize-end .board-bar-inline {
+  padding-right: 6px;
 }
 
 .board-bar.selected {
